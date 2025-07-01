@@ -9,7 +9,7 @@ class Event {
   DateTime startDateTime; // Change to DateTime
   DateTime endDateTime; // Change to DateTime
   DateTime date;
-  String customCategory; // New field for custom category
+  String? customCategory; // Make customCategory nullable to match usage
   String color; // New field for event color
 
   Event({
@@ -20,7 +20,7 @@ class Event {
     required this.startDateTime, // Change to DateTime
     required this.endDateTime, // Change to DateTime
     required this.date,
-    required this.customCategory, // New required field for custom category
+    this.customCategory, // Remove required since it's nullable
     required this.color, // New required field for color
   });
 
@@ -34,7 +34,7 @@ class Event {
       startDateTime: eventData.startDateTime, // Use DateTime directly
       endDateTime: eventData.endDateTime, // Use DateTime directly
       date: eventData.startDateTime, // Use eventDateTime as the date
-      customCategory: eventData.customCategory ?? '', // Map category from EventData
+      customCategory: eventData.customCategory, // Keep nullable
       color: eventData.color ?? '#FFFFFF', // Map color from EventData (default to white)
     );
   }
@@ -64,7 +64,7 @@ class Event {
       startDateTime: DateTime.parse(map['startTime']), // Parse DateTime directly
       endDateTime: DateTime.parse(map['endTime']), // Parse DateTime directly
       date: DateTime.parse(map['date']),
-      customCategory: map['Custom category'] ?? '', // Parse category from map
+      customCategory: map['category'], // Parse category from map (nullable)
       color: map['color'] ?? '#FFFFFF', // Parse color from map (default to white)
     );
   }
