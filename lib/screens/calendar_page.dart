@@ -914,14 +914,99 @@ class _CalendarPageState extends State<CalendarPage> { // Define the state class
       },
     );
   }
+// ----------- NEW: Week View -----------
+  Widget _buildWeekView() {
+    // Find the first day of the current week (Monday)
+    DateTime weekStart = _focusedDay.subtract(Duration(days: _focusedDay.weekday - 1));
+    List<DateTime> weekDays = List.generate(7, (i) => weekStart.add(Duration(days: i)));
 
+    return Column(
+      children: [
+        // Weekday headers
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: weekDays.map((date) =>
+            Expanded(
+              child: Container(
+                padding: EdgeInsets.symmetric(vertical: 8),
+                color: isSameDay(date, _selectedDay) ? Colors.blue[700] : Colors.transparent,
+                child: Column(
+                  children: [
+                    Text(
+                      DateFormat.E().format(date), // Mon, Tue, etc.
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    Text(
+                      DateFormat.d().format(date), // Day number
+                      style: TextStyle(
+                        color: Colors.white70,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ).toList(),
+        ),
+        Expanded(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: weekDays.map((date) {
+              List<Event> dayEvents = _getEventsForDay(date);
+              return Expanded(
+                child: Container(
+                  margin: EdgeInsets.all(2),
+                  padding: EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[800],
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: ListView.builder(
+                    itemCount: dayEvents.length,
+                    itemBuilder: (context, idx) {
+                      final event = dayEvents[idx];
+                      return Card(
+                        color: Color(int.parse(event.color.replaceFirst('#', '0xff'))),
+                        margin: EdgeInsets.symmetric(vertical: 2, horizontal: 0),
+                        child: ListTile(
+                          title: Text(
+                            event.title,
+                            style: TextStyle(color: Colors.white, fontSize: 12),
+                          ),
+                          subtitle: Text(
+                            '${DateFormat.jm().format(event.startDateTime)} - ${DateFormat.jm().format(event.endDateTime)}',
+                            style: TextStyle(color: Colors.white70, fontSize: 10),
+                          ),
+                          dense: true,
+                          contentPadding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          onTap: () => _editEvent(event),
+                          trailing: IconButton(
+                            icon: Icon(Icons.delete, color: Colors.red[200], size: 16),
+                            onPressed: () => _showDeleteConfirmationDialog(event),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        ),
+      ],
+    );
+  }
+  // ----------- END Week View -----------
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.grey[850],
       appBar: AppBar(
         backgroundColor: Colors.grey[900],
-        title: Text('Calendar', style: TextStyle(color: Colors.white)), 
+        title: Text('Calendar', style: TextStyle(color: Colors.white)),
         actions: [
           IconButton(
             icon: Icon(Icons.list, color: Colors.white),
@@ -940,6 +1025,14 @@ class _CalendarPageState extends State<CalendarPage> { // Define the state class
             },
           ),
           IconButton(
+            icon: Icon(Icons.view_week, color: Colors.white),
+            onPressed: () {
+              setState(() {
+                _currentView = 'week';
+              });
+            },
+          ),
+          IconButton(
             icon: Icon(Icons.access_time, color: Colors.white),
             onPressed: () {
               setState(() {
@@ -949,57 +1042,57 @@ class _CalendarPageState extends State<CalendarPage> { // Define the state class
           ),
         ],
       ),
-      //MonthView Implemenation of Calendar
       body: _currentView == 'calendar'
-    ? Column(
-        children: [
-          TableCalendar<Event>(
-            firstDay: DateTime.utc(2020, 1, 1),
-            lastDay: DateTime.utc(2030, 12, 31),
-            focusedDay: _focusedDay,
-            selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
-            onDaySelected: (selectedDay, focusedDay) {
-              setState(() {
-                _selectedDay = selectedDay;
-                _focusedDay = focusedDay;
-              });
-            },
-            calendarFormat: _calendarFormat,
-            onFormatChanged: (format) {
-              setState(() {
-                _calendarFormat = format;
-              });
-            },
-            eventLoader: _getEventsForDay,
-            headerStyle: HeaderStyle(
-              formatButtonVisible: false,
-              titleCentered: true,
-              leftChevronIcon: Icon(Icons.chevron_left, color: Colors.white),
-              rightChevronIcon: Icon(Icons.chevron_right, color: Colors.white),
-            ),
-            calendarStyle: CalendarStyle(
-              selectedDecoration: BoxDecoration(
-                color: Colors.blue,
-                shape: BoxShape.circle,
-              ),
-              todayDecoration: BoxDecoration(
-                color: Colors.orange,
-                shape: BoxShape.circle,
-              ),
-              markerDecoration: BoxDecoration(
-                color: Colors.red,
-                shape: BoxShape.circle,
-              ),
-            ),
-          ),
-          // This expands to fill the remaining space with the event list
-          Expanded(child: _buildEventList()),
-        ],
-      )
-    : _currentView == 'day'
-        ? _buildDayView()
-        : _buildAllEventsList(),
-floatingActionButton: FloatingActionButton(
+          ? Column(
+              children: [
+                TableCalendar<Event>(
+                  firstDay: DateTime.utc(2020, 1, 1),
+                  lastDay: DateTime.utc(2030, 12, 31),
+                  focusedDay: _focusedDay,
+                  selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
+                  onDaySelected: (selectedDay, focusedDay) {
+                    setState(() {
+                      _selectedDay = selectedDay;
+                      _focusedDay = focusedDay;
+                    });
+                  },
+                  calendarFormat: _calendarFormat,
+                  onFormatChanged: (format) {
+                    setState(() {
+                      _calendarFormat = format;
+                    });
+                  },
+                  eventLoader: _getEventsForDay,
+                  headerStyle: HeaderStyle(
+                    formatButtonVisible: false,
+                    titleCentered: true,
+                    leftChevronIcon: Icon(Icons.chevron_left, color: Colors.white),
+                    rightChevronIcon: Icon(Icons.chevron_right, color: Colors.white),
+                  ),
+                  calendarStyle: CalendarStyle(
+                    selectedDecoration: BoxDecoration(
+                      color: Colors.blue,
+                      shape: BoxShape.circle,
+                    ),
+                    todayDecoration: BoxDecoration(
+                      color: Colors.orange,
+                      shape: BoxShape.circle,
+                    ),
+                    markerDecoration: BoxDecoration(
+                      color: Colors.red,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ),
+                Expanded(child: _buildEventList()),
+              ],
+            )
+          : _currentView == 'week'
+              ? _buildWeekView()
+              : _currentView == 'day'
+                  ? _buildDayView()
+                  : _buildAllEventsList(),
+      floatingActionButton: FloatingActionButton(
         onPressed: _showAddEventDialog,
         child: Icon(Icons.add),
         backgroundColor: Colors.blue,
