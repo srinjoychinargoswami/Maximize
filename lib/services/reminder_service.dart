@@ -80,18 +80,121 @@ class NotificationService {
         await initialize();
       }
 
-      if (Platform.isWindows) {
-        // Use WinToast for Windows
-        await _scheduleWindowsNotification(reminder);
+      if (reminder.isRecurring && reminder.recurrenceRule != null) {
+        // Schedule all upcoming instances (e.g., next 10 occurrences)
+        final now = DateTime.now();
+        final futureLimit = now.add(Duration(days: 90)); // Next 3 months
+
+        final occurrences = _generateRecurrenceOccurrences(
+          reminder.scheduledTime,
+          reminder.recurrenceRule!,
+          now,
+          futureLimit,
+          reminder.recurrenceExceptionDates,
+        );
+
+        // Limit to 10 occurrences to avoid overwhelming the notification system
+        final limitedOccurrences = occurrences.take(10).toList();
+
+        for (int i = 0; i < limitedOccurrences.length; i++) {
+          final occurrence = limitedOccurrences[i];
+          final instanceReminder = reminder.copyWith(
+            id: '${reminder.id}_$i',
+            scheduledTime: occurrence,
+            notificationId: '${reminder.notificationId}_$i',
+          );
+
+          if (Platform.isWindows) {
+            await _scheduleWindowsNotification(instanceReminder);
+          } else {
+            await _scheduleFlutterNotification(instanceReminder);
+          }
+        }
       } else {
-        // Use flutter_local_notifications for other platforms
-        await _scheduleFlutterNotification(reminder);
+        if (Platform.isWindows) {
+          await _scheduleWindowsNotification(reminder);
+        } else {
+          await _scheduleFlutterNotification(reminder);
+        }
       }
 
       print('[NotificationService] Scheduled: ${reminder.title} @ ${reminder.scheduledTime}');
     } catch (e) {
       print('[NotificationService] Error scheduling: $e');
     }
+  }
+
+  // Generate recurrence occurrences based on RRULE
+  List<DateTime> _generateRecurrenceOccurrences(
+    DateTime startDate,
+    String rrule,
+    DateTime rangeStart,
+    DateTime rangeEnd,
+    List<DateTime>? exceptions,
+  ) {
+    List<DateTime> occurrences = [];
+    Map<String, String> rules = _parseRRule(rrule);
+    
+    String? frequency = rules['FREQ'];
+    int interval = int.parse(rules['INTERVAL'] ?? '1');
+    int? count = rules['COUNT'] != null ? int.parse(rules['COUNT']!) : null;
+    
+    DateTime current = startDate;
+    int occurrenceCount = 0;
+    
+    while (current.isBefore(rangeEnd) && (count == null || occurrenceCount < count)) {
+      if (current.isAfter(rangeStart) || current.isAtSameMomentAs(rangeStart)) {
+        bool isException = exceptions?.any((ex) => _isSameDay(ex, current)) ?? false;
+        if (!isException) {
+          occurrences.add(current);
+          occurrenceCount++;
+        }
+      }
+      
+      current = _getNextOccurrence(current, frequency!, interval);
+      
+      // Safety check to prevent infinite loops
+      if (occurrenceCount > 50) break;
+    }
+    
+    return occurrences;
+  }
+
+  Map<String, String> _parseRRule(String rrule) {
+    Map<String, String> rules = {};
+    List<String> parts = rrule.split(';');
+    
+    for (String part in parts) {
+      List<String> keyValue = part.split('=');
+      if (keyValue.length == 2) {
+        rules[keyValue[0]] = keyValue[1];
+      }
+    }
+    
+    return rules;
+  }
+
+  DateTime _getNextOccurrence(DateTime current, String frequency, int interval) {
+    switch (frequency.toUpperCase()) {
+      case 'HOURLY':
+        return current.add(Duration(hours: interval));
+      case 'DAILY':
+        return current.add(Duration(days: interval));
+      case 'WEEKLY':
+        return current.add(Duration(days: 7 * interval));
+      case 'MONTHLY':
+        return DateTime(current.year, current.month + interval, current.day, 
+                       current.hour, current.minute);
+      case 'YEARLY':
+        return DateTime(current.year + interval, current.month, current.day, 
+                       current.hour, current.minute);
+      default:
+        return current.add(Duration(days: interval));
+    }
+  }
+
+  bool _isSameDay(DateTime a, DateTime b) {
+    return a.year == b.year && a.month == b.month && a.day == b.day;
   }
 
   Future<void> _scheduleWindowsNotification(ReminderModel reminder) async {
@@ -120,7 +223,18 @@ class NotificationService {
 
   Future<void> _showWindowsToast(String title, String body) async {
     try {
-      // Use the correct win_toast API based on search results
+      // Validate inputs before sending to win_toast
+      final String safeTitle = (title.trim().isNotEmpty) ? title.trim() : "Reminder";
+      final String safeBody = (body.trim().isNotEmpty) ? body.trim() : "Notification";
+      
+      // Limit string length to prevent issues
+      final String limitedTitle = safeTitle.length > 100 ? safeTitle.substring(0, 100) : safeTitle;
+      final String limitedBody = safeBody.length > 200 ? safeBody.substring(0, 200) : safeBody;
+      
+      print('[DEBUG] Toast title: "$limitedTitle" (length: ${limitedTitle.length})');
+      print('[DEBUG] Toast body: "$limitedBody" (length: ${limitedBody.length})');
+      
+      // Use the correct win_toast API from search results
       await WinToast.instance().showToast(
         toast: Toast(
           duration: ToastDuration.short,
@@ -129,11 +243,11 @@ class NotificationService {
               binding: ToastVisualBinding(
                 children: [
                   ToastVisualBindingChildText(
-                    text: title,
+                    text: limitedTitle,
                     id: 1,
                   ),
                   ToastVisualBindingChildText(
-                    text: body,
+                    text: limitedBody,
                     id: 2,
                   ),
                 ],
@@ -144,6 +258,33 @@ class NotificationService {
       );
     } catch (e) {
       print('[NotificationService] Error showing Windows toast: $e');
+      
+      // Fallback: try with minimal safe content
+      try {
+        await WinToast.instance().showToast(
+          toast: Toast(
+            duration: ToastDuration.short,
+            children: [
+              ToastChildVisual(
+                binding: ToastVisualBinding(
+                  children: [
+                    ToastVisualBindingChildText(
+                      text: "Reminder",
+                      id: 1,
+                    ),
+                    ToastVisualBindingChildText(
+                      text: "Notification",
+                      id: 2,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      } catch (fallbackError) {
+        print('[NotificationService] Fallback toast also failed: $fallbackError');
+      }
     }
   }
 
@@ -191,7 +332,7 @@ class NotificationService {
     }
   }
 
-  Future<void> cancelNotification(String notificationId) async {
+  Future<void> cancelNotification(String notificationId, {bool isSeries = false}) async {
     try {
       // Ensure initialization before use
       if (!_isInitialized) {
@@ -199,15 +340,26 @@ class NotificationService {
       }
 
       if (Platform.isWindows) {
-        // WinToast doesn't have a direct cancel method for scheduled notifications
+        // WinToast doesn't support cancellation of scheduled notifications
         print('[NotificationService] Windows notification cancellation not fully supported');
       } else {
         if (_flutterLocalNotificationsPlugin == null) {
           throw Exception('Failed to initialize notification plugin');
         }
 
-        final int notificationIdInt = int.parse(notificationId);
-        await _flutterLocalNotificationsPlugin!.cancel(notificationIdInt);
+        if (isSeries) {
+          // Cancel all notifications for the series
+          // Assuming notificationId is base id, cancel all with suffixes
+          for (int i = 0; i < 10; i++) {
+            final id = int.tryParse('${notificationId}_$i');
+            if (id != null) {
+              await _flutterLocalNotificationsPlugin!.cancel(id);
+            }
+          }
+        } else {
+          final int notificationIdInt = int.parse(notificationId);
+          await _flutterLocalNotificationsPlugin!.cancel(notificationIdInt);
+        }
       }
       
       print('[NotificationService] Cancelled notification with id: $notificationId');
@@ -216,9 +368,9 @@ class NotificationService {
     }
   }
 
-  Future<void> modifyNotification(ReminderModel reminder) async {
+  Future<void> modifyNotification(ReminderModel reminder, {bool isSeries = false}) async {
     try {
-      await cancelNotification(reminder.notificationId);
+      await cancelNotification(reminder.notificationId, isSeries: isSeries);
       await scheduleNotification(reminder);
       print('[NotificationService] Modified: ${reminder.title}');
     } catch (e) {
@@ -247,6 +399,26 @@ class NotificationService {
       print('[NotificationService] All notifications cancelled');
     } catch (e) {
       print('[NotificationService] Error cancelling all: $e');
+    }
+  }
+
+  // Cancel all notifications for a specific recurring series
+  Future<void> cancelRecurringSeries(String baseNotificationId) async {
+    await cancelNotification(baseNotificationId, isSeries: true);
+  }
+
+  // Reschedule recurring reminders (useful when updating recurrence rules)
+  Future<void> rescheduleRecurringReminder(ReminderModel reminder) async {
+    try {
+      // Cancel existing series
+      await cancelNotification(reminder.notificationId, isSeries: true);
+      
+      // Reschedule with new rules
+      await scheduleNotification(reminder);
+      
+      print('[NotificationService] Rescheduled recurring reminder: ${reminder.title}');
+    } catch (e) {
+      print('[NotificationService] Error rescheduling recurring reminder: $e');
     }
   }
 
