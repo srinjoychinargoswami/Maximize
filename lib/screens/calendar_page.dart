@@ -52,142 +52,30 @@ class _CalendarPageState extends State<CalendarPage> {
   }
 
   Future<void> _loadEvents() async {
-    List<Event> events = await widget.calendarService.getEvents();
-    setState(() {
-      _events = events;
-      _expandedEvents = _expandRecurringEvents(events);
-      _eventCheckedStates = {};
-      for (var event in _expandedEvents) {
-        _eventCheckedStates[event.id] = _prefs?.getBool(event.id) ?? false;
-      }
-    });
-  }
-
-  // Expand recurring events to show individual occurrences
-  List<Event> _expandRecurringEvents(List<Event> events) {
-    List<Event> expandedEvents = [];
-    final now = DateTime.now();
-    final futureLimit = now.add(Duration(days: 365)); // Show next year's events
-
-    for (Event event in events) {
-      if (event.isRecurring && event.recurrenceRule != null) {
-        // Generate recurring instances
-        List<DateTime> occurrences = _generateRecurrenceOccurrences(
-          event.startDateTime,
-          event.recurrenceRule!,
-          now.subtract(Duration(days: 30)), // Show past month
-          futureLimit,
-          event.recurrenceExceptionDates,
-        );
-
-        for (DateTime occurrence in occurrences) {
-          if (event.recurrenceCount != null && 
-              occurrences.indexOf(occurrence) >= event.recurrenceCount!) {
-            break;
-          }
-          
-          if (event.recurrenceEndDate != null && 
-              occurrence.isAfter(event.recurrenceEndDate!)) {
-            break;
-          }
-
-          // Calculate duration
-          Duration eventDuration = event.endDateTime.difference(event.startDateTime);
-          
-          // Create instance for this occurrence
-          Event instance = event.copyWith(
-            id: '${event.id}_${occurrence.millisecondsSinceEpoch}',
-            startDateTime: occurrence,
-            endDateTime: occurrence.add(eventDuration),
-            date: occurrence,
-            parentEventId: event.id,
-          );
-          expandedEvents.add(instance);
-        }
-      } else {
-        // Non-recurring event
-        expandedEvents.add(event);
-      }
-    }
-
-    return expandedEvents;
-  }
-
-  // Generate recurrence occurrences based on RRULE
-  List<DateTime> _generateRecurrenceOccurrences(
-    DateTime startDate,
-    String rrule,
-    DateTime rangeStart,
-    DateTime rangeEnd,
-    List<DateTime>? exceptions,
-  ) {
-    List<DateTime> occurrences = [];
-    Map<String, String> rules = _parseRRule(rrule);
-    
-    String? frequency = rules['FREQ'];
-    int interval = int.parse(rules['INTERVAL'] ?? '1');
-    int? count = rules['COUNT'] != null ? int.parse(rules['COUNT']!) : null;
-    
-    DateTime current = startDate;
-    int occurrenceCount = 0;
-    
-    while (current.isBefore(rangeEnd) && (count == null || occurrenceCount < count)) {
-      if (current.isAfter(rangeStart) || current.isAtSameMomentAs(rangeStart)) {
-        bool isException = exceptions?.any((ex) => _isSameDay(ex, current)) ?? false;
-        if (!isException) {
-          occurrences.add(current);
-          occurrenceCount++;
-        }
-      }
+    try {
+      List<Event> events = await widget.calendarService.getEvents();
+      print('Loaded ${events.length} events from calendar service');
       
-      current = _getNextOccurrence(current, frequency!, interval);
-      
-      // Safety check to prevent infinite loops
-      if (occurrenceCount > 1000) break;
+      setState(() {
+        _expandedEvents = events; // Use events directly from service (already expanded)
+        _eventCheckedStates = {};
+        for (var event in _expandedEvents) {
+          _eventCheckedStates[event.id] = _prefs?.getBool(event.id) ?? false;
+        }
+      });
+    } catch (e) {
+      print('Error loading events: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error loading events: $e')),
+      );
     }
-    
-    return occurrences;
-  }
-
-  Map<String, String> _parseRRule(String rrule) {
-    Map<String, String> rules = {};
-    List<String> parts = rrule.split(';');
-    
-    for (String part in parts) {
-      List<String> keyValue = part.split('=');
-      if (keyValue.length == 2) {
-        rules[keyValue[0]] = keyValue[1];
-      }
-    }
-    
-    return rules;
-  }
-
-  DateTime _getNextOccurrence(DateTime current, String frequency, int interval) {
-    switch (frequency.toUpperCase()) {
-      case 'DAILY':
-        return current.add(Duration(days: interval));
-      case 'WEEKLY':
-        return current.add(Duration(days: 7 * interval));
-      case 'MONTHLY':
-        return DateTime(current.year, current.month + interval, current.day, 
-                       current.hour, current.minute);
-      case 'YEARLY':
-        return DateTime(current.year + interval, current.month, current.day, 
-                       current.hour, current.minute);
-      default:
-        return current.add(Duration(days: interval));
-    }
-  }
-
-  bool _isSameDay(DateTime a, DateTime b) {
-    return a.year == b.year && a.month == b.month && a.day == b.day;
   }
 
   // Get events for a specific day (using expanded events)
   List<Event> _getEventsForDay(DateTime day) {
     return _expandedEvents.where((event) {
-      return isSameDay(event.date, day);
+      return isSameDay(event.date, day) && 
+             (event.parentEventId != null || !event.isRecurring); // Only show instances or non-recurring
     }).toList();
   }
 
@@ -235,19 +123,22 @@ class _CalendarPageState extends State<CalendarPage> {
   }
 
   void _editSingleOccurrence(Event event) {
-    // Create an exception for this occurrence
-    // Implementation would involve creating a new single event
-    // and adding the date to the parent's exception list
     _showEditEventDialog(event, isSingleOccurrence: true);
   }
 
-  void _editEntireSeries(Event event) {
-    // Find the parent event and edit it
-    Event? parentEvent = _events.firstWhere(
-      (e) => e.id == event.parentEventId,
-      orElse: () => event,
-    );
-    _showEditEventDialog(parentEvent);
+  void _editEntireSeries(Event event) async {
+    try {
+      // Get base events to find the parent
+      final baseEvents = await widget.calendarService.getBaseEvents();
+      Event? parentEvent = baseEvents.firstWhere(
+        (e) => e.id == event.parentEventId,
+        orElse: () => event,
+      );
+      _showEditEventDialog(parentEvent);
+    } catch (e) {
+      print('Error finding parent event: $e');
+      _showEditEventDialog(event);
+    }
   }
 
   void _showEditEventDialog(Event event, {bool isSingleOccurrence = false}) {
@@ -295,7 +186,7 @@ class _CalendarPageState extends State<CalendarPage> {
                     ),
                     SizedBox(height: 8),
                     
-                    // Date and time selection (existing code)
+                    // Date and time selection
                     _buildDateTimeSelectors(
                       startDate, endDate, startTime, endTime, setDialogState,
                       (newStartDate) => startDate = newStartDate,
@@ -770,36 +661,47 @@ class _CalendarPageState extends State<CalendarPage> {
     bool isRecurring, RecurrenceFrequency frequency, int interval,
     int? recurrenceCount, DateTime? recurrenceEndDate,
   ) async {
-    final newEvent = Event(
-      id: Uuid().v4(),
-      title: titleController.text,
-      description: descriptionController.text,
-      startDateTime: DateTime(
-        startDate.year, startDate.month, startDate.day,
-        startTime.hour, startTime.minute,
-      ),
-      endDateTime: DateTime(
-        endDate.year, endDate.month, endDate.day,
-        endTime.hour, endTime.minute,
-      ),
-      date: startDate,
-      customCategory: categoryController.text,
-      color: '#${_selectedColor.value.toRadixString(16).substring(2)}',
-      isRecurring: isRecurring,
-      recurrencePattern: isRecurring ? RecurrencePattern(
-        frequency: frequency,
-        interval: interval,
-      ) : null,
-      recurrenceCount: recurrenceCount,
-      recurrenceEndDate: recurrenceEndDate,
-    );
+    try {
+      final newEvent = Event(
+        id: Uuid().v4(),
+        title: titleController.text,
+        description: descriptionController.text,
+        startDateTime: DateTime(
+          startDate.year, startDate.month, startDate.day,
+          startTime.hour, startTime.minute,
+        ),
+        endDateTime: DateTime(
+          endDate.year, endDate.month, endDate.day,
+          endTime.hour, endTime.minute,
+        ),
+        date: startDate,
+        customCategory: categoryController.text,
+        color: '#${_selectedColor.value.toRadixString(16).substring(2)}',
+        isRecurring: isRecurring,
+        recurrencePattern: isRecurring ? RecurrencePattern(
+          frequency: frequency,
+          interval: interval,
+        ) : null,
+        recurrenceCount: recurrenceCount,
+        recurrenceEndDate: recurrenceEndDate,
+      );
 
-    if (isRecurring) {
-      newEvent.recurrenceRule = newEvent.generateRRule();
+      if (isRecurring) {
+        newEvent.recurrenceRule = newEvent.generateRRule();
+      }
+
+      await widget.calendarService.addEvent(newEvent);
+      await _loadEvents();
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Event added successfully!')),
+      );
+    } catch (e) {
+      print('Error adding event: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error adding event: $e')),
+      );
     }
-
-    await widget.calendarService.addEvent(newEvent);
-    await _loadEvents();
   }
 
   Future<void> _saveEditedEvent(
@@ -814,73 +716,69 @@ class _CalendarPageState extends State<CalendarPage> {
     int? recurrenceCount, DateTime? recurrenceEndDate,
     bool isSingleOccurrence,
   ) async {
-    if (isSingleOccurrence) {
-      // Create a new single event and add exception to parent
-      final newSingleEvent = Event(
-        title: titleController.text,
-        description: descriptionController.text,
-        startDateTime: DateTime(
-          startDate.year, startDate.month, startDate.day,
-          startTime.hour, startTime.minute,
-        ),
-        endDateTime: DateTime(
-          endDate.year, endDate.month, endDate.day,
-          endTime.hour, endTime.minute,
-        ),
-        date: startDate,
-        customCategory: categoryController.text,
-        color: '#${selectedColor.value.toRadixString(16).substring(2)}',
-        isRecurring: false,
-      );
+    try {
+      if (isSingleOccurrence) {
+        // Create a new single event and add exception to parent
+        final newSingleEvent = Event(
+          title: titleController.text,
+          description: descriptionController.text,
+          startDateTime: DateTime(
+            startDate.year, startDate.month, startDate.day,
+            startTime.hour, startTime.minute,
+          ),
+          endDateTime: DateTime(
+            endDate.year, endDate.month, endDate.day,
+            endTime.hour, endTime.minute,
+          ),
+          date: startDate,
+          customCategory: categoryController.text,
+          color: '#${selectedColor.value.toRadixString(16).substring(2)}',
+          isRecurring: false,
+        );
 
-      await widget.calendarService.addEvent(newSingleEvent);
+        await widget.calendarService.createModifiedOccurrence(originalEvent, newSingleEvent);
+      } else {
+        final updatedEvent = originalEvent.copyWith(
+          title: titleController.text,
+          description: descriptionController.text,
+          startDateTime: DateTime(
+            startDate.year, startDate.month, startDate.day,
+            startTime.hour, startTime.minute,
+          ),
+          endDateTime: DateTime(
+            endDate.year, endDate.month, endDate.day,
+            endTime.hour, endTime.minute,
+          ),
+          date: startDate,
+          customCategory: categoryController.text,
+          color: '#${selectedColor.value.toRadixString(16).substring(2)}',
+          isRecurring: isRecurring,
+          recurrencePattern: isRecurring ? RecurrencePattern(
+            frequency: frequency,
+            interval: interval,
+          ) : null,
+          recurrenceCount: recurrenceCount,
+          recurrenceEndDate: recurrenceEndDate,
+        );
 
-      // Add exception to parent event
-      Event? parentEvent = _events.firstWhere(
-        (e) => e.id == originalEvent.parentEventId,
-        orElse: () => originalEvent,
-      );
-      
-      List<DateTime> exceptions = List.from(parentEvent.recurrenceExceptionDates ?? []);
-      exceptions.add(originalEvent.startDateTime);
-      
-      Event updatedParent = parentEvent.copyWith(
-        recurrenceExceptionDates: exceptions,
-      );
-      
-      await widget.calendarService.updateEvent(updatedParent);
-    } else {
-      final updatedEvent = originalEvent.copyWith(
-        title: titleController.text,
-        description: descriptionController.text,
-        startDateTime: DateTime(
-          startDate.year, startDate.month, startDate.day,
-          startTime.hour, startTime.minute,
-        ),
-        endDateTime: DateTime(
-          endDate.year, endDate.month, endDate.day,
-          endTime.hour, endTime.minute,
-        ),
-        date: startDate,
-        customCategory: categoryController.text,
-        color: '#${selectedColor.value.toRadixString(16).substring(2)}',
-        isRecurring: isRecurring,
-        recurrencePattern: isRecurring ? RecurrencePattern(
-          frequency: frequency,
-          interval: interval,
-        ) : null,
-        recurrenceCount: recurrenceCount,
-        recurrenceEndDate: recurrenceEndDate,
-      );
+        if (isRecurring) {
+          updatedEvent.recurrenceRule = updatedEvent.generateRRule();
+        }
 
-      if (isRecurring) {
-        updatedEvent.recurrenceRule = updatedEvent.generateRRule();
+        await widget.calendarService.updateEvent(updatedEvent);
       }
-
-      await widget.calendarService.updateEvent(updatedEvent);
+      
+      await _loadEvents();
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Event updated successfully!')),
+      );
+    } catch (e) {
+      print('Error updating event: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error updating event: $e')),
+      );
     }
-    
-    await _loadEvents();
   }
 
   void _showDeleteConfirmationDialog(Event event) {
@@ -918,8 +816,7 @@ class _CalendarPageState extends State<CalendarPage> {
               TextButton(
                 onPressed: () async {
                   Navigator.of(context).pop();
-                  await widget.calendarService.deleteEvent(event.id);
-                  await _loadEvents();
+                  await _deleteSingleEvent(event);
                 },
                 child: Text('Delete'),
               ),
@@ -931,31 +828,61 @@ class _CalendarPageState extends State<CalendarPage> {
   }
 
   Future<void> _deleteSingleOccurrence(Event event) async {
-    // Add this occurrence to the parent's exception list
-    Event? parentEvent = _events.firstWhere(
-      (e) => e.id == event.parentEventId,
-      orElse: () => event,
-    );
-    
-    List<DateTime> exceptions = List.from(parentEvent.recurrenceExceptionDates ?? []);
-    exceptions.add(event.startDateTime);
-    
-    Event updatedParent = parentEvent.copyWith(
-      recurrenceExceptionDates: exceptions,
-    );
-    
-    await widget.calendarService.updateEvent(updatedParent);
-    await _loadEvents();
+    try {
+      if (event.parentEventId != null) {
+        await widget.calendarService.addRecurrenceException(
+          event.parentEventId!, 
+          event.startDateTime
+        );
+      } else {
+        await widget.calendarService.deleteEvent(event.id);
+      }
+      
+      await _loadEvents();
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Event occurrence deleted successfully!')),
+      );
+    } catch (e) {
+      print('Error deleting single occurrence: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error deleting event: $e')),
+      );
+    }
   }
 
   Future<void> _deleteEntireSeries(Event event) async {
-    String parentId = event.parentEventId ?? event.id;
-    await widget.calendarService.deleteEvent(parentId);
-    await _loadEvents();
+    try {
+      String parentId = event.parentEventId ?? event.id;
+      await widget.calendarService.deleteEvent(parentId, deleteSeries: true);
+      await _loadEvents();
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Event series deleted successfully!')),
+      );
+    } catch (e) {
+      print('Error deleting entire series: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error deleting event series: $e')),
+      );
+    }
   }
 
-  // Rest of your existing methods (_buildDayView, _buildEventList, etc.) remain the same
-  // but use _expandedEvents instead of _events for display
+  Future<void> _deleteSingleEvent(Event event) async {
+    try {
+      await widget.calendarService.deleteEvent(event.id);
+      await _loadEvents();
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Event deleted successfully!')),
+      );
+    } catch (e) {
+      print('Error deleting event: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error deleting event: $e')),
+      );
+    }
+  }
 
   Widget _buildEventList() {
     List<Event> selectedDayEvents = _getEventsForDay(_selectedDay);
@@ -1144,9 +1071,6 @@ class _CalendarPageState extends State<CalendarPage> {
       },
     );
   }
-
-  // Keep your existing _buildDayView and _buildWeekView methods
-  // but update them to use _expandedEvents instead of _events
 
   Widget _buildDayView() {
     List<Event> dayEvents = _getEventsForDay(_selectedDay);

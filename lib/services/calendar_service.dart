@@ -17,8 +17,8 @@ class CalendarService {
       final futureLimit = now.add(Duration(days: 365)); // Expand for next year
 
       for (Event event in events) {
-        if (event.isRecurring && event.recurrenceRule != null) {
-          // Generate recurring instances
+        if (event.isRecurring && event.recurrenceRule != null && event.parentEventId == null) {
+          // This is a parent recurring event - generate instances
           List<DateTime> occurrences = _generateRecurrenceOccurrences(
             event.startDateTime,
             event.recurrenceRule!,
@@ -51,11 +51,21 @@ class CalendarService {
             );
             expandedEvents.add(instance);
           }
-        } else {
-          // Non-recurring event
+          
+          // DON'T add the parent event to expandedEvents - only add instances
+        } else if (!event.isRecurring || event.parentEventId != null) {
+          // Non-recurring event OR it's already an instance - add it
           expandedEvents.add(event);
         }
+        // Skip parent recurring events (don't add them to the display list)
       }
+
+      print('Total events loaded: ${expandedEvents.length}');
+      
+      // Count recurring vs non-recurring for debugging
+      int instanceCount = expandedEvents.where((e) => e.parentEventId != null).length;
+      int singleCount = expandedEvents.where((e) => !e.isRecurring && e.parentEventId == null).length;
+      print('Instances: $instanceCount, Single: $singleCount');
 
       return expandedEvents;
     } catch (e) {
@@ -143,32 +153,51 @@ class CalendarService {
   // Delete an event with series/single occurrence handling
   Future<void> deleteEvent(String id, {bool deleteSeries = false}) async {
     try {
+      print('Deleting event - ID: $id, deleteSeries: $deleteSeries');
+      
       if (deleteSeries) {
-        // Delete entire series
+        // Delete entire series - find all related events
         final eventsData = await _database.getAllEvents();
         final events = eventsData.map((e) => Event.fromEventData(e)).toList();
         
         // Find the parent event
-        Event? eventToDelete = events.firstWhere(
-          (e) => e.id == id,
+        Event? parentEvent = events.firstWhere(
+          (e) => e.id == id || e.parentEventId == id,
           orElse: () => throw Exception('Event not found'),
         );
         
-        String parentId = eventToDelete.parentEventId ?? eventToDelete.id;
+        String parentId = parentEvent.parentEventId ?? parentEvent.id;
+        print('Deleting parent event with ID: $parentId');
+        
+        // Delete parent event
         await _database.deleteEvent(parentId);
+        
+        // Also delete any instances that might exist as separate records
+        for (Event event in events) {
+          if (event.parentEventId == parentId && event.id != parentId) {
+            print('Deleting instance: ${event.id}');
+            await _database.deleteEvent(event.id);
+          }
+        }
+        
+        print('Successfully deleted entire series');
       } else {
         // Delete single event
+        print('Deleting single event with ID: $id');
         await _database.deleteEvent(id);
+        print('Successfully deleted single event');
       }
     } catch (e) {
       print('Error deleting event: $e');
-      throw Exception('Error deleting event');
+      throw Exception('Error deleting event: $e');
     }
   }
 
   // Add exception to recurring event (for single occurrence deletion)
   Future<void> addRecurrenceException(String parentEventId, DateTime exceptionDate) async {
     try {
+      print('Adding exception for parent: $parentEventId, date: $exceptionDate');
+      
       final eventsData = await _database.getAllEvents();
       final events = eventsData.map((e) => Event.fromEventData(e)).toList();
       
@@ -186,10 +215,13 @@ class CalendarService {
         );
         
         await _database.updateEvent(updatedEvent);
+        print('Successfully added exception date');
+      } else {
+        print('Exception date already exists');
       }
     } catch (e) {
       print('Error adding recurrence exception: $e');
-      throw Exception('Error adding recurrence exception');
+      throw Exception('Error adding recurrence exception: $e');
     }
   }
 
@@ -343,6 +375,25 @@ class CalendarService {
     } catch (e) {
       print('Error fetching upcoming events: $e');
       throw Exception('Error fetching upcoming events');
+    }
+  }
+
+  // Debug method to check database state
+  Future<void> debugDatabaseState() async {
+    try {
+      final allEvents = await _database.getAllEvents();
+      print('=== Database Events Debug ===');
+      for (var event in allEvents) {
+        print('ID: ${event.id}');
+        print('  Title: ${event.title}');
+        print('  Parent: ${event.parentEventId}');
+        print('  Recurring: ${event.isRecurring}');
+        print('  Start: ${event.startDateTime}');
+        print('---');
+      }
+      print('Total database events: ${allEvents.length}');
+    } catch (e) {
+      print('Error debugging database state: $e');
     }
   }
 }
