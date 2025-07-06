@@ -7,9 +7,7 @@ import 'package:maximize/screens/task_list_screen.dart';
 import 'package:maximize/models/event_model.dart'; // Adjust the path as necessary
 import 'package:shared_preferences/shared_preferences.dart'; // Import shared_preferences
 import 'package:maximize/models/task_model.dart';
-import 'package:maximize/models/reminder_model.dart'; // Import reminder model
 import 'package:maximize/screens/reminder_page.dart'; // Import reminder page
-import 'package:maximize/services/reminder_service.dart'; // Import reminder service
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
