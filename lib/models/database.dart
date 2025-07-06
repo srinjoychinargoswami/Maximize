@@ -53,7 +53,7 @@ class Subtasks extends Table {
   Set<Column> get primaryKey => {id};
 }
 
-// Event Table
+// Event Table - Updated with recurring fields
 @DataClassName('EventData')
 class Events extends Table {
   TextColumn get id => text().clientDefault(() => const Uuid().v1())();
@@ -64,6 +64,14 @@ class Events extends Table {
   DateTimeColumn get endDateTime => dateTime()(); // Store as DateTime
   TextColumn get customCategory => text().nullable()(); // New column for custom category
   TextColumn get color => text().nullable()(); // New column for event color
+  
+  // Recurring event fields
+  BoolColumn get isRecurring => boolean().withDefault(Constant(false))();
+  TextColumn get recurrenceRule => text().nullable()(); // RRULE format
+  TextColumn get parentEventId => text().nullable()(); // For linking recurring instances
+  TextColumn get recurrenceExceptionDates => text().nullable()(); // Comma-separated exception dates
+  DateTimeColumn get recurrenceEndDate => dateTime().nullable()(); // When recurrence stops
+  IntColumn get recurrenceCount => integer().nullable()(); // Number of occurrences
   
   @override
   Set<Column> get primaryKey => {id};
@@ -82,7 +90,7 @@ class Classes extends Table {
   Set<Column> get primaryKey => {id};
 }
 
-// Reminder Table - Updated to match ReminderModel
+// Reminder Table - Updated with recurring fields
 @DataClassName('ReminderData')
 class Reminders extends Table { 
   TextColumn get id => text().clientDefault(() => const Uuid().v4())(); // Use v4 for consistency
@@ -90,6 +98,14 @@ class Reminders extends Table {
   TextColumn get body => text().withLength(min: 1, max: 500)(); // Add length constraints
   DateTimeColumn get scheduledTime => dateTime()(); 
   TextColumn get notificationId => text()(); // Changed to TextColumn to match ReminderModel
+  
+  // Recurring reminder fields
+  BoolColumn get isRecurring => boolean().withDefault(Constant(false))();
+  TextColumn get recurrenceRule => text().nullable()(); // RRULE format
+  TextColumn get parentReminderId => text().nullable()(); // For linking recurring instances
+  TextColumn get recurrenceExceptionDates => text().nullable()(); // Comma-separated exception dates
+  DateTimeColumn get recurrenceEndDate => dateTime().nullable()(); // When recurrence stops
+  IntColumn get recurrenceCount => integer().nullable()(); // Number of occurrences
 
   @override
   Set<Column> get primaryKey => {id};
@@ -102,24 +118,99 @@ class AppDatabase extends _$AppDatabase {
   static final AppDatabase instance = AppDatabase._();
 
   @override
-  int get schemaVersion => 4; // Increment this version for reminder table changes
+  int get schemaVersion => 5; // Increment version for recurring fields
 
   // Define migrations
-  @override
-  MigrationStrategy get migration => MigrationStrategy(
-    onUpgrade: (Migrator m, int from, int to) async {
-      if (from < 3 && to >= 3) {
-        // Add new columns 'customCategory' and 'color' to 'events' table when upgrading to version 3 or above
-        await m.addColumn(events, events.customCategory);
-        await m.addColumn(events, events.color);
+ @override
+MigrationStrategy get migration => MigrationStrategy(
+  onUpgrade: (Migrator m, int from, int to) async {
+    if (from < 3 && to >= 3) {
+      // Add new columns 'customCategory' and 'color' to 'events' table when upgrading to version 3 or above
+      await m.addColumn(events, events.customCategory);
+      await m.addColumn(events, events.color);
+    }
+    if (from < 4 && to >= 4) {
+      // Create the reminders table when upgrading to version 4
+      await m.createTable(reminders);
+    }
+    if (from < 5 && to >= 5) {
+      // Add recurring fields to events table - with error handling
+      try {
+        await m.addColumn(events, events.isRecurring);
+      } catch (e) {
+        if (!e.toString().contains('duplicate column')) rethrow;
       }
-      if (from < 4 && to >= 4) {
-        // Create the reminders table when upgrading to version 4
-        await m.createTable(reminders);
+      
+      try {
+        await m.addColumn(events, events.recurrenceRule);
+      } catch (e) {
+        if (!e.toString().contains('duplicate column')) rethrow;
       }
-      // You can add more migration steps here for future versions
-    },
-  );
+      
+      try {
+        await m.addColumn(events, events.parentEventId);
+      } catch (e) {
+        if (!e.toString().contains('duplicate column')) rethrow;
+      }
+      
+      try {
+        await m.addColumn(events, events.recurrenceExceptionDates);
+      } catch (e) {
+        if (!e.toString().contains('duplicate column')) rethrow;
+      }
+      
+      try {
+        await m.addColumn(events, events.recurrenceEndDate);
+      } catch (e) {
+        if (!e.toString().contains('duplicate column')) rethrow;
+      }
+      
+      try {
+        await m.addColumn(events, events.recurrenceCount);
+      } catch (e) {
+        if (!e.toString().contains('duplicate column')) rethrow;
+      }
+      
+      // Add recurring fields to reminders table - with error handling
+      try {
+        await m.addColumn(reminders, reminders.isRecurring);
+      } catch (e) {
+        if (!e.toString().contains('duplicate column')) rethrow;
+      }
+      
+      try {
+        await m.addColumn(reminders, reminders.recurrenceRule);
+      } catch (e) {
+        if (!e.toString().contains('duplicate column')) rethrow;
+      }
+      
+      try {
+        await m.addColumn(reminders, reminders.parentReminderId);
+      } catch (e) {
+        if (!e.toString().contains('duplicate column')) rethrow;
+      }
+      
+      try {
+        await m.addColumn(reminders, reminders.recurrenceExceptionDates);
+      } catch (e) {
+        if (!e.toString().contains('duplicate column')) rethrow;
+      }
+      
+      try {
+        await m.addColumn(reminders, reminders.recurrenceEndDate);
+      } catch (e) {
+        if (!e.toString().contains('duplicate column')) rethrow;
+      }
+      
+      try {
+        await m.addColumn(reminders, reminders.recurrenceCount);
+      } catch (e) {
+        if (!e.toString().contains('duplicate column')) rethrow;
+      }
+    }
+  },
+);
+
 
   // Open the database connection
   static LazyDatabase _openConnection() {
@@ -250,7 +341,7 @@ class AppDatabase extends _$AppDatabase {
     }
   }
 
-  // Event Methods
+  // Event Methods - Updated with recurring support
   Future<int> insertEvent(Event event) async {
     try {
       final eventCompanion = EventsCompanion(
@@ -262,6 +353,14 @@ class AppDatabase extends _$AppDatabase {
         endDateTime: Value(event.endDateTime), // Store as DateTime
         customCategory: Value(event.customCategory), // Store custom category
         color: Value(event.color), // Store event color
+        isRecurring: Value(event.isRecurring),
+        recurrenceRule: event.recurrenceRule != null ? Value(event.recurrenceRule) : const Value.absent(),
+        parentEventId: event.parentEventId != null ? Value(event.parentEventId) : const Value.absent(),
+        recurrenceExceptionDates: event.recurrenceExceptionDates != null 
+            ? Value(event.recurrenceExceptionDates!.map((d) => d.toIso8601String()).join(','))
+            : const Value.absent(),
+        recurrenceEndDate: event.recurrenceEndDate != null ? Value(event.recurrenceEndDate) : const Value.absent(),
+        recurrenceCount: event.recurrenceCount != null ? Value(event.recurrenceCount) : const Value.absent(),
       );
       return await into(events).insert(eventCompanion); // Return the inserted event ID
     } catch (e) {
@@ -273,21 +372,32 @@ class AppDatabase extends _$AppDatabase {
   Future<List<EventData>> getAllEvents() async {
     try {
       final eventsData = await (select(events)).get();
-      return eventsData.map((event) {
-        return EventData(
-          id: event.id,
-          title: event.title,
-          description: event.description,
-          comments: event.comments,
-          startDateTime: event.startDateTime, // Directly use DateTime
-          endDateTime: event.endDateTime, // Directly use DateTime
-          customCategory: event.customCategory, // Include custom category
-          color: event.color, // Include event color
-        );
-      }).toList();
+      return eventsData;
     } catch (e) {
       print('Error fetching events: $e');
       throw DatabaseException('Error fetching events: $e');
+    }
+  }
+
+  // Get only base events (non-recurring instances)
+  Future<List<EventData>> getBaseEvents() async {
+    try {
+      final eventsData = await (select(events)..where((tbl) => tbl.parentEventId.isNull())).get();
+      return eventsData;
+    } catch (e) {
+      print('Error fetching base events: $e');
+      throw DatabaseException('Error fetching base events: $e');
+    }
+  }
+
+  // Get recurring events only
+  Future<List<EventData>> getRecurringEvents() async {
+    try {
+      final eventsData = await (select(events)..where((tbl) => tbl.isRecurring.equals(true))).get();
+      return eventsData;
+    } catch (e) {
+      print('Error fetching recurring events: $e');
+      throw DatabaseException('Error fetching recurring events: $e');
     }
   }
 
@@ -315,6 +425,14 @@ class AppDatabase extends _$AppDatabase {
         endDateTime: Value(event.endDateTime), // Store as DateTime
         customCategory: Value(event.customCategory), // Update custom category
         color: Value(event.color), // Update event color
+        isRecurring: Value(event.isRecurring),
+        recurrenceRule: event.recurrenceRule != null ? Value(event.recurrenceRule) : const Value.absent(),
+        parentEventId: event.parentEventId != null ? Value(event.parentEventId) : const Value.absent(),
+        recurrenceExceptionDates: event.recurrenceExceptionDates != null 
+            ? Value(event.recurrenceExceptionDates!.map((d) => d.toIso8601String()).join(','))
+            : const Value.absent(),
+        recurrenceEndDate: event.recurrenceEndDate != null ? Value(event.recurrenceEndDate) : const Value.absent(),
+        recurrenceCount: event.recurrenceCount != null ? Value(event.recurrenceCount) : const Value.absent(),
       );
 
       await (update(events)..where((tbl) => tbl.id.equals(event.id))).write(eventCompanion);
@@ -324,13 +442,35 @@ class AppDatabase extends _$AppDatabase {
     }
   }
 
-  // Reminder Methods - Updated to work with ReminderModel
+  // Reminder Methods - Updated with recurring support
   Future<List<ReminderData>> getAllReminders() async {
     try {
       return await select(reminders).get();
     } catch (e) {
       print('Error fetching reminders: $e');
       throw DatabaseException('Error fetching reminders: $e');
+    }
+  }
+
+  // Get only base reminders (non-recurring instances)
+  Future<List<ReminderData>> getBaseReminders() async {
+    try {
+      final reminderData = await (select(reminders)..where((tbl) => tbl.parentReminderId.isNull())).get();
+      return reminderData;
+    } catch (e) {
+      print('Error fetching base reminders: $e');
+      throw DatabaseException('Error fetching base reminders: $e');
+    }
+  }
+
+  // Get recurring reminders only
+  Future<List<ReminderData>> getRecurringReminders() async {
+    try {
+      final reminderData = await (select(reminders)..where((tbl) => tbl.isRecurring.equals(true))).get();
+      return reminderData;
+    } catch (e) {
+      print('Error fetching recurring reminders: $e');
+      throw DatabaseException('Error fetching recurring reminders: $e');
     }
   }
 
@@ -342,6 +482,14 @@ class AppDatabase extends _$AppDatabase {
         body: Value(reminder.body),
         scheduledTime: Value(reminder.scheduledTime),
         notificationId: Value(reminder.notificationId), // Now String type
+        isRecurring: Value(reminder.isRecurring),
+        recurrenceRule: reminder.recurrenceRule != null ? Value(reminder.recurrenceRule) : const Value.absent(),
+        parentReminderId: reminder.parentReminderId != null ? Value(reminder.parentReminderId) : const Value.absent(),
+        recurrenceExceptionDates: reminder.recurrenceExceptionDates != null 
+            ? Value(reminder.recurrenceExceptionDates!.map((d) => d.toIso8601String()).join(','))
+            : const Value.absent(),
+        recurrenceEndDate: reminder.recurrenceEndDate != null ? Value(reminder.recurrenceEndDate) : const Value.absent(),
+        recurrenceCount: reminder.recurrenceCount != null ? Value(reminder.recurrenceCount) : const Value.absent(),
       );
       await into(reminders).insert(reminderCompanion);
     } catch (e) {
@@ -367,11 +515,67 @@ class AppDatabase extends _$AppDatabase {
         body: Value(reminder.body),
         scheduledTime: Value(reminder.scheduledTime),
         notificationId: Value(reminder.notificationId), // Now String type
+        isRecurring: Value(reminder.isRecurring),
+        recurrenceRule: reminder.recurrenceRule != null ? Value(reminder.recurrenceRule) : const Value.absent(),
+        parentReminderId: reminder.parentReminderId != null ? Value(reminder.parentReminderId) : const Value.absent(),
+        recurrenceExceptionDates: reminder.recurrenceExceptionDates != null 
+            ? Value(reminder.recurrenceExceptionDates!.map((d) => d.toIso8601String()).join(','))
+            : const Value.absent(),
+        recurrenceEndDate: reminder.recurrenceEndDate != null ? Value(reminder.recurrenceEndDate) : const Value.absent(),
+        recurrenceCount: reminder.recurrenceCount != null ? Value(reminder.recurrenceCount) : const Value.absent(),
       );
       await (update(reminders)..where((tbl) => tbl.id.equals(reminder.id))).write(reminderCompanion);
     } catch (e) {
       print('Error updating reminder: $e');
       throw DatabaseException('Error updating reminder: $e');
+    }
+  }
+
+  // Utility methods for recurring items
+  
+  // Delete all instances of a recurring event series
+  Future<void> deleteEventSeries(String parentEventId) async {
+    try {
+      await (delete(events)..where((tbl) => 
+        tbl.id.equals(parentEventId) | tbl.parentEventId.equals(parentEventId))).go();
+    } catch (e) {
+      print('Error deleting event series: $e');
+      throw DatabaseException('Error deleting event series: $e');
+    }
+  }
+
+  // Delete all instances of a recurring reminder series
+  Future<void> deleteReminderSeries(String parentReminderId) async {
+    try {
+      await (delete(reminders)..where((tbl) => 
+        tbl.id.equals(parentReminderId) | tbl.parentReminderId.equals(parentReminderId))).go();
+    } catch (e) {
+      print('Error deleting reminder series: $e');
+      throw DatabaseException('Error deleting reminder series: $e');
+    }
+  }
+
+  // Get events in a date range (useful for calendar views)
+  Future<List<EventData>> getEventsInRange(DateTime start, DateTime end) async {
+    try {
+      final eventsData = await (select(events)..where((tbl) => 
+        tbl.startDateTime.isBetweenValues(start, end))).get();
+      return eventsData;
+    } catch (e) {
+      print('Error fetching events in range: $e');
+      throw DatabaseException('Error fetching events in range: $e');
+    }
+  }
+
+  // Get reminders in a date range
+  Future<List<ReminderData>> getRemindersInRange(DateTime start, DateTime end) async {
+    try {
+      final reminderData = await (select(reminders)..where((tbl) => 
+        tbl.scheduledTime.isBetweenValues(start, end))).get();
+      return reminderData;
+    } catch (e) {
+      print('Error fetching reminders in range: $e');
+      throw DatabaseException('Error fetching reminders in range: $e');
     }
   }
 }

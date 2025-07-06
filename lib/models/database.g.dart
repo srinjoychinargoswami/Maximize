@@ -886,6 +886,46 @@ class $EventsTable extends Events with TableInfo<$EventsTable, EventData> {
   late final GeneratedColumn<String> color = GeneratedColumn<String>(
       'color', aliasedName, true,
       type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _isRecurringMeta =
+      const VerificationMeta('isRecurring');
+  @override
+  late final GeneratedColumn<bool> isRecurring = GeneratedColumn<bool>(
+      'is_recurring', aliasedName, false,
+      type: DriftSqlType.bool,
+      requiredDuringInsert: false,
+      defaultConstraints: GeneratedColumn.constraintIsAlways(
+          'CHECK ("is_recurring" IN (0, 1))'),
+      defaultValue: Constant(false));
+  static const VerificationMeta _recurrenceRuleMeta =
+      const VerificationMeta('recurrenceRule');
+  @override
+  late final GeneratedColumn<String> recurrenceRule = GeneratedColumn<String>(
+      'recurrence_rule', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _parentEventIdMeta =
+      const VerificationMeta('parentEventId');
+  @override
+  late final GeneratedColumn<String> parentEventId = GeneratedColumn<String>(
+      'parent_event_id', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _recurrenceExceptionDatesMeta =
+      const VerificationMeta('recurrenceExceptionDates');
+  @override
+  late final GeneratedColumn<String> recurrenceExceptionDates =
+      GeneratedColumn<String>('recurrence_exception_dates', aliasedName, true,
+          type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _recurrenceEndDateMeta =
+      const VerificationMeta('recurrenceEndDate');
+  @override
+  late final GeneratedColumn<DateTime> recurrenceEndDate =
+      GeneratedColumn<DateTime>('recurrence_end_date', aliasedName, true,
+          type: DriftSqlType.dateTime, requiredDuringInsert: false);
+  static const VerificationMeta _recurrenceCountMeta =
+      const VerificationMeta('recurrenceCount');
+  @override
+  late final GeneratedColumn<int> recurrenceCount = GeneratedColumn<int>(
+      'recurrence_count', aliasedName, true,
+      type: DriftSqlType.int, requiredDuringInsert: false);
   @override
   List<GeneratedColumn> get $columns => [
         id,
@@ -895,7 +935,13 @@ class $EventsTable extends Events with TableInfo<$EventsTable, EventData> {
         startDateTime,
         endDateTime,
         customCategory,
-        color
+        color,
+        isRecurring,
+        recurrenceRule,
+        parentEventId,
+        recurrenceExceptionDates,
+        recurrenceEndDate,
+        recurrenceCount
       ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -952,6 +998,43 @@ class $EventsTable extends Events with TableInfo<$EventsTable, EventData> {
       context.handle(
           _colorMeta, color.isAcceptableOrUnknown(data['color']!, _colorMeta));
     }
+    if (data.containsKey('is_recurring')) {
+      context.handle(
+          _isRecurringMeta,
+          isRecurring.isAcceptableOrUnknown(
+              data['is_recurring']!, _isRecurringMeta));
+    }
+    if (data.containsKey('recurrence_rule')) {
+      context.handle(
+          _recurrenceRuleMeta,
+          recurrenceRule.isAcceptableOrUnknown(
+              data['recurrence_rule']!, _recurrenceRuleMeta));
+    }
+    if (data.containsKey('parent_event_id')) {
+      context.handle(
+          _parentEventIdMeta,
+          parentEventId.isAcceptableOrUnknown(
+              data['parent_event_id']!, _parentEventIdMeta));
+    }
+    if (data.containsKey('recurrence_exception_dates')) {
+      context.handle(
+          _recurrenceExceptionDatesMeta,
+          recurrenceExceptionDates.isAcceptableOrUnknown(
+              data['recurrence_exception_dates']!,
+              _recurrenceExceptionDatesMeta));
+    }
+    if (data.containsKey('recurrence_end_date')) {
+      context.handle(
+          _recurrenceEndDateMeta,
+          recurrenceEndDate.isAcceptableOrUnknown(
+              data['recurrence_end_date']!, _recurrenceEndDateMeta));
+    }
+    if (data.containsKey('recurrence_count')) {
+      context.handle(
+          _recurrenceCountMeta,
+          recurrenceCount.isAcceptableOrUnknown(
+              data['recurrence_count']!, _recurrenceCountMeta));
+    }
     return context;
   }
 
@@ -977,6 +1060,19 @@ class $EventsTable extends Events with TableInfo<$EventsTable, EventData> {
           .read(DriftSqlType.string, data['${effectivePrefix}custom_category']),
       color: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}color']),
+      isRecurring: attachedDatabase.typeMapping
+          .read(DriftSqlType.bool, data['${effectivePrefix}is_recurring'])!,
+      recurrenceRule: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}recurrence_rule']),
+      parentEventId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}parent_event_id']),
+      recurrenceExceptionDates: attachedDatabase.typeMapping.read(
+          DriftSqlType.string,
+          data['${effectivePrefix}recurrence_exception_dates']),
+      recurrenceEndDate: attachedDatabase.typeMapping.read(
+          DriftSqlType.dateTime, data['${effectivePrefix}recurrence_end_date']),
+      recurrenceCount: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}recurrence_count']),
     );
   }
 
@@ -995,6 +1091,12 @@ class EventData extends DataClass implements Insertable<EventData> {
   final DateTime endDateTime;
   final String? customCategory;
   final String? color;
+  final bool isRecurring;
+  final String? recurrenceRule;
+  final String? parentEventId;
+  final String? recurrenceExceptionDates;
+  final DateTime? recurrenceEndDate;
+  final int? recurrenceCount;
   const EventData(
       {required this.id,
       required this.title,
@@ -1003,7 +1105,13 @@ class EventData extends DataClass implements Insertable<EventData> {
       required this.startDateTime,
       required this.endDateTime,
       this.customCategory,
-      this.color});
+      this.color,
+      required this.isRecurring,
+      this.recurrenceRule,
+      this.parentEventId,
+      this.recurrenceExceptionDates,
+      this.recurrenceEndDate,
+      this.recurrenceCount});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -1022,6 +1130,23 @@ class EventData extends DataClass implements Insertable<EventData> {
     }
     if (!nullToAbsent || color != null) {
       map['color'] = Variable<String>(color);
+    }
+    map['is_recurring'] = Variable<bool>(isRecurring);
+    if (!nullToAbsent || recurrenceRule != null) {
+      map['recurrence_rule'] = Variable<String>(recurrenceRule);
+    }
+    if (!nullToAbsent || parentEventId != null) {
+      map['parent_event_id'] = Variable<String>(parentEventId);
+    }
+    if (!nullToAbsent || recurrenceExceptionDates != null) {
+      map['recurrence_exception_dates'] =
+          Variable<String>(recurrenceExceptionDates);
+    }
+    if (!nullToAbsent || recurrenceEndDate != null) {
+      map['recurrence_end_date'] = Variable<DateTime>(recurrenceEndDate);
+    }
+    if (!nullToAbsent || recurrenceCount != null) {
+      map['recurrence_count'] = Variable<int>(recurrenceCount);
     }
     return map;
   }
@@ -1043,6 +1168,22 @@ class EventData extends DataClass implements Insertable<EventData> {
           : Value(customCategory),
       color:
           color == null && nullToAbsent ? const Value.absent() : Value(color),
+      isRecurring: Value(isRecurring),
+      recurrenceRule: recurrenceRule == null && nullToAbsent
+          ? const Value.absent()
+          : Value(recurrenceRule),
+      parentEventId: parentEventId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(parentEventId),
+      recurrenceExceptionDates: recurrenceExceptionDates == null && nullToAbsent
+          ? const Value.absent()
+          : Value(recurrenceExceptionDates),
+      recurrenceEndDate: recurrenceEndDate == null && nullToAbsent
+          ? const Value.absent()
+          : Value(recurrenceEndDate),
+      recurrenceCount: recurrenceCount == null && nullToAbsent
+          ? const Value.absent()
+          : Value(recurrenceCount),
     );
   }
 
@@ -1058,6 +1199,14 @@ class EventData extends DataClass implements Insertable<EventData> {
       endDateTime: serializer.fromJson<DateTime>(json['endDateTime']),
       customCategory: serializer.fromJson<String?>(json['customCategory']),
       color: serializer.fromJson<String?>(json['color']),
+      isRecurring: serializer.fromJson<bool>(json['isRecurring']),
+      recurrenceRule: serializer.fromJson<String?>(json['recurrenceRule']),
+      parentEventId: serializer.fromJson<String?>(json['parentEventId']),
+      recurrenceExceptionDates:
+          serializer.fromJson<String?>(json['recurrenceExceptionDates']),
+      recurrenceEndDate:
+          serializer.fromJson<DateTime?>(json['recurrenceEndDate']),
+      recurrenceCount: serializer.fromJson<int?>(json['recurrenceCount']),
     );
   }
   @override
@@ -1072,6 +1221,13 @@ class EventData extends DataClass implements Insertable<EventData> {
       'endDateTime': serializer.toJson<DateTime>(endDateTime),
       'customCategory': serializer.toJson<String?>(customCategory),
       'color': serializer.toJson<String?>(color),
+      'isRecurring': serializer.toJson<bool>(isRecurring),
+      'recurrenceRule': serializer.toJson<String?>(recurrenceRule),
+      'parentEventId': serializer.toJson<String?>(parentEventId),
+      'recurrenceExceptionDates':
+          serializer.toJson<String?>(recurrenceExceptionDates),
+      'recurrenceEndDate': serializer.toJson<DateTime?>(recurrenceEndDate),
+      'recurrenceCount': serializer.toJson<int?>(recurrenceCount),
     };
   }
 
@@ -1083,7 +1239,13 @@ class EventData extends DataClass implements Insertable<EventData> {
           DateTime? startDateTime,
           DateTime? endDateTime,
           Value<String?> customCategory = const Value.absent(),
-          Value<String?> color = const Value.absent()}) =>
+          Value<String?> color = const Value.absent(),
+          bool? isRecurring,
+          Value<String?> recurrenceRule = const Value.absent(),
+          Value<String?> parentEventId = const Value.absent(),
+          Value<String?> recurrenceExceptionDates = const Value.absent(),
+          Value<DateTime?> recurrenceEndDate = const Value.absent(),
+          Value<int?> recurrenceCount = const Value.absent()}) =>
       EventData(
         id: id ?? this.id,
         title: title ?? this.title,
@@ -1094,6 +1256,20 @@ class EventData extends DataClass implements Insertable<EventData> {
         customCategory:
             customCategory.present ? customCategory.value : this.customCategory,
         color: color.present ? color.value : this.color,
+        isRecurring: isRecurring ?? this.isRecurring,
+        recurrenceRule:
+            recurrenceRule.present ? recurrenceRule.value : this.recurrenceRule,
+        parentEventId:
+            parentEventId.present ? parentEventId.value : this.parentEventId,
+        recurrenceExceptionDates: recurrenceExceptionDates.present
+            ? recurrenceExceptionDates.value
+            : this.recurrenceExceptionDates,
+        recurrenceEndDate: recurrenceEndDate.present
+            ? recurrenceEndDate.value
+            : this.recurrenceEndDate,
+        recurrenceCount: recurrenceCount.present
+            ? recurrenceCount.value
+            : this.recurrenceCount,
       );
   EventData copyWithCompanion(EventsCompanion data) {
     return EventData(
@@ -1111,6 +1287,23 @@ class EventData extends DataClass implements Insertable<EventData> {
           ? data.customCategory.value
           : this.customCategory,
       color: data.color.present ? data.color.value : this.color,
+      isRecurring:
+          data.isRecurring.present ? data.isRecurring.value : this.isRecurring,
+      recurrenceRule: data.recurrenceRule.present
+          ? data.recurrenceRule.value
+          : this.recurrenceRule,
+      parentEventId: data.parentEventId.present
+          ? data.parentEventId.value
+          : this.parentEventId,
+      recurrenceExceptionDates: data.recurrenceExceptionDates.present
+          ? data.recurrenceExceptionDates.value
+          : this.recurrenceExceptionDates,
+      recurrenceEndDate: data.recurrenceEndDate.present
+          ? data.recurrenceEndDate.value
+          : this.recurrenceEndDate,
+      recurrenceCount: data.recurrenceCount.present
+          ? data.recurrenceCount.value
+          : this.recurrenceCount,
     );
   }
 
@@ -1124,14 +1317,33 @@ class EventData extends DataClass implements Insertable<EventData> {
           ..write('startDateTime: $startDateTime, ')
           ..write('endDateTime: $endDateTime, ')
           ..write('customCategory: $customCategory, ')
-          ..write('color: $color')
+          ..write('color: $color, ')
+          ..write('isRecurring: $isRecurring, ')
+          ..write('recurrenceRule: $recurrenceRule, ')
+          ..write('parentEventId: $parentEventId, ')
+          ..write('recurrenceExceptionDates: $recurrenceExceptionDates, ')
+          ..write('recurrenceEndDate: $recurrenceEndDate, ')
+          ..write('recurrenceCount: $recurrenceCount')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(id, title, description, comments,
-      startDateTime, endDateTime, customCategory, color);
+  int get hashCode => Object.hash(
+      id,
+      title,
+      description,
+      comments,
+      startDateTime,
+      endDateTime,
+      customCategory,
+      color,
+      isRecurring,
+      recurrenceRule,
+      parentEventId,
+      recurrenceExceptionDates,
+      recurrenceEndDate,
+      recurrenceCount);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -1143,7 +1355,13 @@ class EventData extends DataClass implements Insertable<EventData> {
           other.startDateTime == this.startDateTime &&
           other.endDateTime == this.endDateTime &&
           other.customCategory == this.customCategory &&
-          other.color == this.color);
+          other.color == this.color &&
+          other.isRecurring == this.isRecurring &&
+          other.recurrenceRule == this.recurrenceRule &&
+          other.parentEventId == this.parentEventId &&
+          other.recurrenceExceptionDates == this.recurrenceExceptionDates &&
+          other.recurrenceEndDate == this.recurrenceEndDate &&
+          other.recurrenceCount == this.recurrenceCount);
 }
 
 class EventsCompanion extends UpdateCompanion<EventData> {
@@ -1155,6 +1373,12 @@ class EventsCompanion extends UpdateCompanion<EventData> {
   final Value<DateTime> endDateTime;
   final Value<String?> customCategory;
   final Value<String?> color;
+  final Value<bool> isRecurring;
+  final Value<String?> recurrenceRule;
+  final Value<String?> parentEventId;
+  final Value<String?> recurrenceExceptionDates;
+  final Value<DateTime?> recurrenceEndDate;
+  final Value<int?> recurrenceCount;
   final Value<int> rowid;
   const EventsCompanion({
     this.id = const Value.absent(),
@@ -1165,6 +1389,12 @@ class EventsCompanion extends UpdateCompanion<EventData> {
     this.endDateTime = const Value.absent(),
     this.customCategory = const Value.absent(),
     this.color = const Value.absent(),
+    this.isRecurring = const Value.absent(),
+    this.recurrenceRule = const Value.absent(),
+    this.parentEventId = const Value.absent(),
+    this.recurrenceExceptionDates = const Value.absent(),
+    this.recurrenceEndDate = const Value.absent(),
+    this.recurrenceCount = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   EventsCompanion.insert({
@@ -1176,6 +1406,12 @@ class EventsCompanion extends UpdateCompanion<EventData> {
     required DateTime endDateTime,
     this.customCategory = const Value.absent(),
     this.color = const Value.absent(),
+    this.isRecurring = const Value.absent(),
+    this.recurrenceRule = const Value.absent(),
+    this.parentEventId = const Value.absent(),
+    this.recurrenceExceptionDates = const Value.absent(),
+    this.recurrenceEndDate = const Value.absent(),
+    this.recurrenceCount = const Value.absent(),
     this.rowid = const Value.absent(),
   })  : title = Value(title),
         startDateTime = Value(startDateTime),
@@ -1189,6 +1425,12 @@ class EventsCompanion extends UpdateCompanion<EventData> {
     Expression<DateTime>? endDateTime,
     Expression<String>? customCategory,
     Expression<String>? color,
+    Expression<bool>? isRecurring,
+    Expression<String>? recurrenceRule,
+    Expression<String>? parentEventId,
+    Expression<String>? recurrenceExceptionDates,
+    Expression<DateTime>? recurrenceEndDate,
+    Expression<int>? recurrenceCount,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -1200,6 +1442,13 @@ class EventsCompanion extends UpdateCompanion<EventData> {
       if (endDateTime != null) 'end_date_time': endDateTime,
       if (customCategory != null) 'custom_category': customCategory,
       if (color != null) 'color': color,
+      if (isRecurring != null) 'is_recurring': isRecurring,
+      if (recurrenceRule != null) 'recurrence_rule': recurrenceRule,
+      if (parentEventId != null) 'parent_event_id': parentEventId,
+      if (recurrenceExceptionDates != null)
+        'recurrence_exception_dates': recurrenceExceptionDates,
+      if (recurrenceEndDate != null) 'recurrence_end_date': recurrenceEndDate,
+      if (recurrenceCount != null) 'recurrence_count': recurrenceCount,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -1213,6 +1462,12 @@ class EventsCompanion extends UpdateCompanion<EventData> {
       Value<DateTime>? endDateTime,
       Value<String?>? customCategory,
       Value<String?>? color,
+      Value<bool>? isRecurring,
+      Value<String?>? recurrenceRule,
+      Value<String?>? parentEventId,
+      Value<String?>? recurrenceExceptionDates,
+      Value<DateTime?>? recurrenceEndDate,
+      Value<int?>? recurrenceCount,
       Value<int>? rowid}) {
     return EventsCompanion(
       id: id ?? this.id,
@@ -1223,6 +1478,13 @@ class EventsCompanion extends UpdateCompanion<EventData> {
       endDateTime: endDateTime ?? this.endDateTime,
       customCategory: customCategory ?? this.customCategory,
       color: color ?? this.color,
+      isRecurring: isRecurring ?? this.isRecurring,
+      recurrenceRule: recurrenceRule ?? this.recurrenceRule,
+      parentEventId: parentEventId ?? this.parentEventId,
+      recurrenceExceptionDates:
+          recurrenceExceptionDates ?? this.recurrenceExceptionDates,
+      recurrenceEndDate: recurrenceEndDate ?? this.recurrenceEndDate,
+      recurrenceCount: recurrenceCount ?? this.recurrenceCount,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -1254,6 +1516,25 @@ class EventsCompanion extends UpdateCompanion<EventData> {
     if (color.present) {
       map['color'] = Variable<String>(color.value);
     }
+    if (isRecurring.present) {
+      map['is_recurring'] = Variable<bool>(isRecurring.value);
+    }
+    if (recurrenceRule.present) {
+      map['recurrence_rule'] = Variable<String>(recurrenceRule.value);
+    }
+    if (parentEventId.present) {
+      map['parent_event_id'] = Variable<String>(parentEventId.value);
+    }
+    if (recurrenceExceptionDates.present) {
+      map['recurrence_exception_dates'] =
+          Variable<String>(recurrenceExceptionDates.value);
+    }
+    if (recurrenceEndDate.present) {
+      map['recurrence_end_date'] = Variable<DateTime>(recurrenceEndDate.value);
+    }
+    if (recurrenceCount.present) {
+      map['recurrence_count'] = Variable<int>(recurrenceCount.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -1271,6 +1552,12 @@ class EventsCompanion extends UpdateCompanion<EventData> {
           ..write('endDateTime: $endDateTime, ')
           ..write('customCategory: $customCategory, ')
           ..write('color: $color, ')
+          ..write('isRecurring: $isRecurring, ')
+          ..write('recurrenceRule: $recurrenceRule, ')
+          ..write('parentEventId: $parentEventId, ')
+          ..write('recurrenceExceptionDates: $recurrenceExceptionDates, ')
+          ..write('recurrenceEndDate: $recurrenceEndDate, ')
+          ..write('recurrenceCount: $recurrenceCount, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -1628,9 +1915,60 @@ class $RemindersTable extends Reminders
   late final GeneratedColumn<String> notificationId = GeneratedColumn<String>(
       'notification_id', aliasedName, false,
       type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _isRecurringMeta =
+      const VerificationMeta('isRecurring');
   @override
-  List<GeneratedColumn> get $columns =>
-      [id, title, body, scheduledTime, notificationId];
+  late final GeneratedColumn<bool> isRecurring = GeneratedColumn<bool>(
+      'is_recurring', aliasedName, false,
+      type: DriftSqlType.bool,
+      requiredDuringInsert: false,
+      defaultConstraints: GeneratedColumn.constraintIsAlways(
+          'CHECK ("is_recurring" IN (0, 1))'),
+      defaultValue: Constant(false));
+  static const VerificationMeta _recurrenceRuleMeta =
+      const VerificationMeta('recurrenceRule');
+  @override
+  late final GeneratedColumn<String> recurrenceRule = GeneratedColumn<String>(
+      'recurrence_rule', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _parentReminderIdMeta =
+      const VerificationMeta('parentReminderId');
+  @override
+  late final GeneratedColumn<String> parentReminderId = GeneratedColumn<String>(
+      'parent_reminder_id', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _recurrenceExceptionDatesMeta =
+      const VerificationMeta('recurrenceExceptionDates');
+  @override
+  late final GeneratedColumn<String> recurrenceExceptionDates =
+      GeneratedColumn<String>('recurrence_exception_dates', aliasedName, true,
+          type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _recurrenceEndDateMeta =
+      const VerificationMeta('recurrenceEndDate');
+  @override
+  late final GeneratedColumn<DateTime> recurrenceEndDate =
+      GeneratedColumn<DateTime>('recurrence_end_date', aliasedName, true,
+          type: DriftSqlType.dateTime, requiredDuringInsert: false);
+  static const VerificationMeta _recurrenceCountMeta =
+      const VerificationMeta('recurrenceCount');
+  @override
+  late final GeneratedColumn<int> recurrenceCount = GeneratedColumn<int>(
+      'recurrence_count', aliasedName, true,
+      type: DriftSqlType.int, requiredDuringInsert: false);
+  @override
+  List<GeneratedColumn> get $columns => [
+        id,
+        title,
+        body,
+        scheduledTime,
+        notificationId,
+        isRecurring,
+        recurrenceRule,
+        parentReminderId,
+        recurrenceExceptionDates,
+        recurrenceEndDate,
+        recurrenceCount
+      ];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -1672,6 +2010,43 @@ class $RemindersTable extends Reminders
     } else if (isInserting) {
       context.missing(_notificationIdMeta);
     }
+    if (data.containsKey('is_recurring')) {
+      context.handle(
+          _isRecurringMeta,
+          isRecurring.isAcceptableOrUnknown(
+              data['is_recurring']!, _isRecurringMeta));
+    }
+    if (data.containsKey('recurrence_rule')) {
+      context.handle(
+          _recurrenceRuleMeta,
+          recurrenceRule.isAcceptableOrUnknown(
+              data['recurrence_rule']!, _recurrenceRuleMeta));
+    }
+    if (data.containsKey('parent_reminder_id')) {
+      context.handle(
+          _parentReminderIdMeta,
+          parentReminderId.isAcceptableOrUnknown(
+              data['parent_reminder_id']!, _parentReminderIdMeta));
+    }
+    if (data.containsKey('recurrence_exception_dates')) {
+      context.handle(
+          _recurrenceExceptionDatesMeta,
+          recurrenceExceptionDates.isAcceptableOrUnknown(
+              data['recurrence_exception_dates']!,
+              _recurrenceExceptionDatesMeta));
+    }
+    if (data.containsKey('recurrence_end_date')) {
+      context.handle(
+          _recurrenceEndDateMeta,
+          recurrenceEndDate.isAcceptableOrUnknown(
+              data['recurrence_end_date']!, _recurrenceEndDateMeta));
+    }
+    if (data.containsKey('recurrence_count')) {
+      context.handle(
+          _recurrenceCountMeta,
+          recurrenceCount.isAcceptableOrUnknown(
+              data['recurrence_count']!, _recurrenceCountMeta));
+    }
     return context;
   }
 
@@ -1691,6 +2066,19 @@ class $RemindersTable extends Reminders
           DriftSqlType.dateTime, data['${effectivePrefix}scheduled_time'])!,
       notificationId: attachedDatabase.typeMapping.read(
           DriftSqlType.string, data['${effectivePrefix}notification_id'])!,
+      isRecurring: attachedDatabase.typeMapping
+          .read(DriftSqlType.bool, data['${effectivePrefix}is_recurring'])!,
+      recurrenceRule: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}recurrence_rule']),
+      parentReminderId: attachedDatabase.typeMapping.read(
+          DriftSqlType.string, data['${effectivePrefix}parent_reminder_id']),
+      recurrenceExceptionDates: attachedDatabase.typeMapping.read(
+          DriftSqlType.string,
+          data['${effectivePrefix}recurrence_exception_dates']),
+      recurrenceEndDate: attachedDatabase.typeMapping.read(
+          DriftSqlType.dateTime, data['${effectivePrefix}recurrence_end_date']),
+      recurrenceCount: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}recurrence_count']),
     );
   }
 
@@ -1706,12 +2094,24 @@ class ReminderData extends DataClass implements Insertable<ReminderData> {
   final String body;
   final DateTime scheduledTime;
   final String notificationId;
+  final bool isRecurring;
+  final String? recurrenceRule;
+  final String? parentReminderId;
+  final String? recurrenceExceptionDates;
+  final DateTime? recurrenceEndDate;
+  final int? recurrenceCount;
   const ReminderData(
       {required this.id,
       required this.title,
       required this.body,
       required this.scheduledTime,
-      required this.notificationId});
+      required this.notificationId,
+      required this.isRecurring,
+      this.recurrenceRule,
+      this.parentReminderId,
+      this.recurrenceExceptionDates,
+      this.recurrenceEndDate,
+      this.recurrenceCount});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -1720,6 +2120,23 @@ class ReminderData extends DataClass implements Insertable<ReminderData> {
     map['body'] = Variable<String>(body);
     map['scheduled_time'] = Variable<DateTime>(scheduledTime);
     map['notification_id'] = Variable<String>(notificationId);
+    map['is_recurring'] = Variable<bool>(isRecurring);
+    if (!nullToAbsent || recurrenceRule != null) {
+      map['recurrence_rule'] = Variable<String>(recurrenceRule);
+    }
+    if (!nullToAbsent || parentReminderId != null) {
+      map['parent_reminder_id'] = Variable<String>(parentReminderId);
+    }
+    if (!nullToAbsent || recurrenceExceptionDates != null) {
+      map['recurrence_exception_dates'] =
+          Variable<String>(recurrenceExceptionDates);
+    }
+    if (!nullToAbsent || recurrenceEndDate != null) {
+      map['recurrence_end_date'] = Variable<DateTime>(recurrenceEndDate);
+    }
+    if (!nullToAbsent || recurrenceCount != null) {
+      map['recurrence_count'] = Variable<int>(recurrenceCount);
+    }
     return map;
   }
 
@@ -1730,6 +2147,22 @@ class ReminderData extends DataClass implements Insertable<ReminderData> {
       body: Value(body),
       scheduledTime: Value(scheduledTime),
       notificationId: Value(notificationId),
+      isRecurring: Value(isRecurring),
+      recurrenceRule: recurrenceRule == null && nullToAbsent
+          ? const Value.absent()
+          : Value(recurrenceRule),
+      parentReminderId: parentReminderId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(parentReminderId),
+      recurrenceExceptionDates: recurrenceExceptionDates == null && nullToAbsent
+          ? const Value.absent()
+          : Value(recurrenceExceptionDates),
+      recurrenceEndDate: recurrenceEndDate == null && nullToAbsent
+          ? const Value.absent()
+          : Value(recurrenceEndDate),
+      recurrenceCount: recurrenceCount == null && nullToAbsent
+          ? const Value.absent()
+          : Value(recurrenceCount),
     );
   }
 
@@ -1742,6 +2175,14 @@ class ReminderData extends DataClass implements Insertable<ReminderData> {
       body: serializer.fromJson<String>(json['body']),
       scheduledTime: serializer.fromJson<DateTime>(json['scheduledTime']),
       notificationId: serializer.fromJson<String>(json['notificationId']),
+      isRecurring: serializer.fromJson<bool>(json['isRecurring']),
+      recurrenceRule: serializer.fromJson<String?>(json['recurrenceRule']),
+      parentReminderId: serializer.fromJson<String?>(json['parentReminderId']),
+      recurrenceExceptionDates:
+          serializer.fromJson<String?>(json['recurrenceExceptionDates']),
+      recurrenceEndDate:
+          serializer.fromJson<DateTime?>(json['recurrenceEndDate']),
+      recurrenceCount: serializer.fromJson<int?>(json['recurrenceCount']),
     );
   }
   @override
@@ -1753,6 +2194,13 @@ class ReminderData extends DataClass implements Insertable<ReminderData> {
       'body': serializer.toJson<String>(body),
       'scheduledTime': serializer.toJson<DateTime>(scheduledTime),
       'notificationId': serializer.toJson<String>(notificationId),
+      'isRecurring': serializer.toJson<bool>(isRecurring),
+      'recurrenceRule': serializer.toJson<String?>(recurrenceRule),
+      'parentReminderId': serializer.toJson<String?>(parentReminderId),
+      'recurrenceExceptionDates':
+          serializer.toJson<String?>(recurrenceExceptionDates),
+      'recurrenceEndDate': serializer.toJson<DateTime?>(recurrenceEndDate),
+      'recurrenceCount': serializer.toJson<int?>(recurrenceCount),
     };
   }
 
@@ -1761,13 +2209,34 @@ class ReminderData extends DataClass implements Insertable<ReminderData> {
           String? title,
           String? body,
           DateTime? scheduledTime,
-          String? notificationId}) =>
+          String? notificationId,
+          bool? isRecurring,
+          Value<String?> recurrenceRule = const Value.absent(),
+          Value<String?> parentReminderId = const Value.absent(),
+          Value<String?> recurrenceExceptionDates = const Value.absent(),
+          Value<DateTime?> recurrenceEndDate = const Value.absent(),
+          Value<int?> recurrenceCount = const Value.absent()}) =>
       ReminderData(
         id: id ?? this.id,
         title: title ?? this.title,
         body: body ?? this.body,
         scheduledTime: scheduledTime ?? this.scheduledTime,
         notificationId: notificationId ?? this.notificationId,
+        isRecurring: isRecurring ?? this.isRecurring,
+        recurrenceRule:
+            recurrenceRule.present ? recurrenceRule.value : this.recurrenceRule,
+        parentReminderId: parentReminderId.present
+            ? parentReminderId.value
+            : this.parentReminderId,
+        recurrenceExceptionDates: recurrenceExceptionDates.present
+            ? recurrenceExceptionDates.value
+            : this.recurrenceExceptionDates,
+        recurrenceEndDate: recurrenceEndDate.present
+            ? recurrenceEndDate.value
+            : this.recurrenceEndDate,
+        recurrenceCount: recurrenceCount.present
+            ? recurrenceCount.value
+            : this.recurrenceCount,
       );
   ReminderData copyWithCompanion(RemindersCompanion data) {
     return ReminderData(
@@ -1780,6 +2249,23 @@ class ReminderData extends DataClass implements Insertable<ReminderData> {
       notificationId: data.notificationId.present
           ? data.notificationId.value
           : this.notificationId,
+      isRecurring:
+          data.isRecurring.present ? data.isRecurring.value : this.isRecurring,
+      recurrenceRule: data.recurrenceRule.present
+          ? data.recurrenceRule.value
+          : this.recurrenceRule,
+      parentReminderId: data.parentReminderId.present
+          ? data.parentReminderId.value
+          : this.parentReminderId,
+      recurrenceExceptionDates: data.recurrenceExceptionDates.present
+          ? data.recurrenceExceptionDates.value
+          : this.recurrenceExceptionDates,
+      recurrenceEndDate: data.recurrenceEndDate.present
+          ? data.recurrenceEndDate.value
+          : this.recurrenceEndDate,
+      recurrenceCount: data.recurrenceCount.present
+          ? data.recurrenceCount.value
+          : this.recurrenceCount,
     );
   }
 
@@ -1790,14 +2276,30 @@ class ReminderData extends DataClass implements Insertable<ReminderData> {
           ..write('title: $title, ')
           ..write('body: $body, ')
           ..write('scheduledTime: $scheduledTime, ')
-          ..write('notificationId: $notificationId')
+          ..write('notificationId: $notificationId, ')
+          ..write('isRecurring: $isRecurring, ')
+          ..write('recurrenceRule: $recurrenceRule, ')
+          ..write('parentReminderId: $parentReminderId, ')
+          ..write('recurrenceExceptionDates: $recurrenceExceptionDates, ')
+          ..write('recurrenceEndDate: $recurrenceEndDate, ')
+          ..write('recurrenceCount: $recurrenceCount')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode =>
-      Object.hash(id, title, body, scheduledTime, notificationId);
+  int get hashCode => Object.hash(
+      id,
+      title,
+      body,
+      scheduledTime,
+      notificationId,
+      isRecurring,
+      recurrenceRule,
+      parentReminderId,
+      recurrenceExceptionDates,
+      recurrenceEndDate,
+      recurrenceCount);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -1806,7 +2308,13 @@ class ReminderData extends DataClass implements Insertable<ReminderData> {
           other.title == this.title &&
           other.body == this.body &&
           other.scheduledTime == this.scheduledTime &&
-          other.notificationId == this.notificationId);
+          other.notificationId == this.notificationId &&
+          other.isRecurring == this.isRecurring &&
+          other.recurrenceRule == this.recurrenceRule &&
+          other.parentReminderId == this.parentReminderId &&
+          other.recurrenceExceptionDates == this.recurrenceExceptionDates &&
+          other.recurrenceEndDate == this.recurrenceEndDate &&
+          other.recurrenceCount == this.recurrenceCount);
 }
 
 class RemindersCompanion extends UpdateCompanion<ReminderData> {
@@ -1815,6 +2323,12 @@ class RemindersCompanion extends UpdateCompanion<ReminderData> {
   final Value<String> body;
   final Value<DateTime> scheduledTime;
   final Value<String> notificationId;
+  final Value<bool> isRecurring;
+  final Value<String?> recurrenceRule;
+  final Value<String?> parentReminderId;
+  final Value<String?> recurrenceExceptionDates;
+  final Value<DateTime?> recurrenceEndDate;
+  final Value<int?> recurrenceCount;
   final Value<int> rowid;
   const RemindersCompanion({
     this.id = const Value.absent(),
@@ -1822,6 +2336,12 @@ class RemindersCompanion extends UpdateCompanion<ReminderData> {
     this.body = const Value.absent(),
     this.scheduledTime = const Value.absent(),
     this.notificationId = const Value.absent(),
+    this.isRecurring = const Value.absent(),
+    this.recurrenceRule = const Value.absent(),
+    this.parentReminderId = const Value.absent(),
+    this.recurrenceExceptionDates = const Value.absent(),
+    this.recurrenceEndDate = const Value.absent(),
+    this.recurrenceCount = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   RemindersCompanion.insert({
@@ -1830,6 +2350,12 @@ class RemindersCompanion extends UpdateCompanion<ReminderData> {
     required String body,
     required DateTime scheduledTime,
     required String notificationId,
+    this.isRecurring = const Value.absent(),
+    this.recurrenceRule = const Value.absent(),
+    this.parentReminderId = const Value.absent(),
+    this.recurrenceExceptionDates = const Value.absent(),
+    this.recurrenceEndDate = const Value.absent(),
+    this.recurrenceCount = const Value.absent(),
     this.rowid = const Value.absent(),
   })  : title = Value(title),
         body = Value(body),
@@ -1841,6 +2367,12 @@ class RemindersCompanion extends UpdateCompanion<ReminderData> {
     Expression<String>? body,
     Expression<DateTime>? scheduledTime,
     Expression<String>? notificationId,
+    Expression<bool>? isRecurring,
+    Expression<String>? recurrenceRule,
+    Expression<String>? parentReminderId,
+    Expression<String>? recurrenceExceptionDates,
+    Expression<DateTime>? recurrenceEndDate,
+    Expression<int>? recurrenceCount,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -1849,6 +2381,13 @@ class RemindersCompanion extends UpdateCompanion<ReminderData> {
       if (body != null) 'body': body,
       if (scheduledTime != null) 'scheduled_time': scheduledTime,
       if (notificationId != null) 'notification_id': notificationId,
+      if (isRecurring != null) 'is_recurring': isRecurring,
+      if (recurrenceRule != null) 'recurrence_rule': recurrenceRule,
+      if (parentReminderId != null) 'parent_reminder_id': parentReminderId,
+      if (recurrenceExceptionDates != null)
+        'recurrence_exception_dates': recurrenceExceptionDates,
+      if (recurrenceEndDate != null) 'recurrence_end_date': recurrenceEndDate,
+      if (recurrenceCount != null) 'recurrence_count': recurrenceCount,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -1859,6 +2398,12 @@ class RemindersCompanion extends UpdateCompanion<ReminderData> {
       Value<String>? body,
       Value<DateTime>? scheduledTime,
       Value<String>? notificationId,
+      Value<bool>? isRecurring,
+      Value<String?>? recurrenceRule,
+      Value<String?>? parentReminderId,
+      Value<String?>? recurrenceExceptionDates,
+      Value<DateTime?>? recurrenceEndDate,
+      Value<int?>? recurrenceCount,
       Value<int>? rowid}) {
     return RemindersCompanion(
       id: id ?? this.id,
@@ -1866,6 +2411,13 @@ class RemindersCompanion extends UpdateCompanion<ReminderData> {
       body: body ?? this.body,
       scheduledTime: scheduledTime ?? this.scheduledTime,
       notificationId: notificationId ?? this.notificationId,
+      isRecurring: isRecurring ?? this.isRecurring,
+      recurrenceRule: recurrenceRule ?? this.recurrenceRule,
+      parentReminderId: parentReminderId ?? this.parentReminderId,
+      recurrenceExceptionDates:
+          recurrenceExceptionDates ?? this.recurrenceExceptionDates,
+      recurrenceEndDate: recurrenceEndDate ?? this.recurrenceEndDate,
+      recurrenceCount: recurrenceCount ?? this.recurrenceCount,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -1888,6 +2440,25 @@ class RemindersCompanion extends UpdateCompanion<ReminderData> {
     if (notificationId.present) {
       map['notification_id'] = Variable<String>(notificationId.value);
     }
+    if (isRecurring.present) {
+      map['is_recurring'] = Variable<bool>(isRecurring.value);
+    }
+    if (recurrenceRule.present) {
+      map['recurrence_rule'] = Variable<String>(recurrenceRule.value);
+    }
+    if (parentReminderId.present) {
+      map['parent_reminder_id'] = Variable<String>(parentReminderId.value);
+    }
+    if (recurrenceExceptionDates.present) {
+      map['recurrence_exception_dates'] =
+          Variable<String>(recurrenceExceptionDates.value);
+    }
+    if (recurrenceEndDate.present) {
+      map['recurrence_end_date'] = Variable<DateTime>(recurrenceEndDate.value);
+    }
+    if (recurrenceCount.present) {
+      map['recurrence_count'] = Variable<int>(recurrenceCount.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -1902,6 +2473,12 @@ class RemindersCompanion extends UpdateCompanion<ReminderData> {
           ..write('body: $body, ')
           ..write('scheduledTime: $scheduledTime, ')
           ..write('notificationId: $notificationId, ')
+          ..write('isRecurring: $isRecurring, ')
+          ..write('recurrenceRule: $recurrenceRule, ')
+          ..write('parentReminderId: $parentReminderId, ')
+          ..write('recurrenceExceptionDates: $recurrenceExceptionDates, ')
+          ..write('recurrenceEndDate: $recurrenceEndDate, ')
+          ..write('recurrenceCount: $recurrenceCount, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -2524,6 +3101,12 @@ typedef $$EventsTableCreateCompanionBuilder = EventsCompanion Function({
   required DateTime endDateTime,
   Value<String?> customCategory,
   Value<String?> color,
+  Value<bool> isRecurring,
+  Value<String?> recurrenceRule,
+  Value<String?> parentEventId,
+  Value<String?> recurrenceExceptionDates,
+  Value<DateTime?> recurrenceEndDate,
+  Value<int?> recurrenceCount,
   Value<int> rowid,
 });
 typedef $$EventsTableUpdateCompanionBuilder = EventsCompanion Function({
@@ -2535,6 +3118,12 @@ typedef $$EventsTableUpdateCompanionBuilder = EventsCompanion Function({
   Value<DateTime> endDateTime,
   Value<String?> customCategory,
   Value<String?> color,
+  Value<bool> isRecurring,
+  Value<String?> recurrenceRule,
+  Value<String?> parentEventId,
+  Value<String?> recurrenceExceptionDates,
+  Value<DateTime?> recurrenceEndDate,
+  Value<int?> recurrenceCount,
   Value<int> rowid,
 });
 
@@ -2571,6 +3160,28 @@ class $$EventsTableFilterComposer
 
   ColumnFilters<String> get color => $composableBuilder(
       column: $table.color, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<bool> get isRecurring => $composableBuilder(
+      column: $table.isRecurring, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get recurrenceRule => $composableBuilder(
+      column: $table.recurrenceRule,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get parentEventId => $composableBuilder(
+      column: $table.parentEventId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get recurrenceExceptionDates => $composableBuilder(
+      column: $table.recurrenceExceptionDates,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get recurrenceEndDate => $composableBuilder(
+      column: $table.recurrenceEndDate,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get recurrenceCount => $composableBuilder(
+      column: $table.recurrenceCount,
+      builder: (column) => ColumnFilters(column));
 }
 
 class $$EventsTableOrderingComposer
@@ -2607,6 +3218,29 @@ class $$EventsTableOrderingComposer
 
   ColumnOrderings<String> get color => $composableBuilder(
       column: $table.color, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<bool> get isRecurring => $composableBuilder(
+      column: $table.isRecurring, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get recurrenceRule => $composableBuilder(
+      column: $table.recurrenceRule,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get parentEventId => $composableBuilder(
+      column: $table.parentEventId,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get recurrenceExceptionDates => $composableBuilder(
+      column: $table.recurrenceExceptionDates,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get recurrenceEndDate => $composableBuilder(
+      column: $table.recurrenceEndDate,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get recurrenceCount => $composableBuilder(
+      column: $table.recurrenceCount,
+      builder: (column) => ColumnOrderings(column));
 }
 
 class $$EventsTableAnnotationComposer
@@ -2641,6 +3275,24 @@ class $$EventsTableAnnotationComposer
 
   GeneratedColumn<String> get color =>
       $composableBuilder(column: $table.color, builder: (column) => column);
+
+  GeneratedColumn<bool> get isRecurring => $composableBuilder(
+      column: $table.isRecurring, builder: (column) => column);
+
+  GeneratedColumn<String> get recurrenceRule => $composableBuilder(
+      column: $table.recurrenceRule, builder: (column) => column);
+
+  GeneratedColumn<String> get parentEventId => $composableBuilder(
+      column: $table.parentEventId, builder: (column) => column);
+
+  GeneratedColumn<String> get recurrenceExceptionDates => $composableBuilder(
+      column: $table.recurrenceExceptionDates, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get recurrenceEndDate => $composableBuilder(
+      column: $table.recurrenceEndDate, builder: (column) => column);
+
+  GeneratedColumn<int> get recurrenceCount => $composableBuilder(
+      column: $table.recurrenceCount, builder: (column) => column);
 }
 
 class $$EventsTableTableManager extends RootTableManager<
@@ -2674,6 +3326,12 @@ class $$EventsTableTableManager extends RootTableManager<
             Value<DateTime> endDateTime = const Value.absent(),
             Value<String?> customCategory = const Value.absent(),
             Value<String?> color = const Value.absent(),
+            Value<bool> isRecurring = const Value.absent(),
+            Value<String?> recurrenceRule = const Value.absent(),
+            Value<String?> parentEventId = const Value.absent(),
+            Value<String?> recurrenceExceptionDates = const Value.absent(),
+            Value<DateTime?> recurrenceEndDate = const Value.absent(),
+            Value<int?> recurrenceCount = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
               EventsCompanion(
@@ -2685,6 +3343,12 @@ class $$EventsTableTableManager extends RootTableManager<
             endDateTime: endDateTime,
             customCategory: customCategory,
             color: color,
+            isRecurring: isRecurring,
+            recurrenceRule: recurrenceRule,
+            parentEventId: parentEventId,
+            recurrenceExceptionDates: recurrenceExceptionDates,
+            recurrenceEndDate: recurrenceEndDate,
+            recurrenceCount: recurrenceCount,
             rowid: rowid,
           ),
           createCompanionCallback: ({
@@ -2696,6 +3360,12 @@ class $$EventsTableTableManager extends RootTableManager<
             required DateTime endDateTime,
             Value<String?> customCategory = const Value.absent(),
             Value<String?> color = const Value.absent(),
+            Value<bool> isRecurring = const Value.absent(),
+            Value<String?> recurrenceRule = const Value.absent(),
+            Value<String?> parentEventId = const Value.absent(),
+            Value<String?> recurrenceExceptionDates = const Value.absent(),
+            Value<DateTime?> recurrenceEndDate = const Value.absent(),
+            Value<int?> recurrenceCount = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
               EventsCompanion.insert(
@@ -2707,6 +3377,12 @@ class $$EventsTableTableManager extends RootTableManager<
             endDateTime: endDateTime,
             customCategory: customCategory,
             color: color,
+            isRecurring: isRecurring,
+            recurrenceRule: recurrenceRule,
+            parentEventId: parentEventId,
+            recurrenceExceptionDates: recurrenceExceptionDates,
+            recurrenceEndDate: recurrenceEndDate,
+            recurrenceCount: recurrenceCount,
             rowid: rowid,
           ),
           withReferenceMapper: (p0) => p0
@@ -2899,6 +3575,12 @@ typedef $$RemindersTableCreateCompanionBuilder = RemindersCompanion Function({
   required String body,
   required DateTime scheduledTime,
   required String notificationId,
+  Value<bool> isRecurring,
+  Value<String?> recurrenceRule,
+  Value<String?> parentReminderId,
+  Value<String?> recurrenceExceptionDates,
+  Value<DateTime?> recurrenceEndDate,
+  Value<int?> recurrenceCount,
   Value<int> rowid,
 });
 typedef $$RemindersTableUpdateCompanionBuilder = RemindersCompanion Function({
@@ -2907,6 +3589,12 @@ typedef $$RemindersTableUpdateCompanionBuilder = RemindersCompanion Function({
   Value<String> body,
   Value<DateTime> scheduledTime,
   Value<String> notificationId,
+  Value<bool> isRecurring,
+  Value<String?> recurrenceRule,
+  Value<String?> parentReminderId,
+  Value<String?> recurrenceExceptionDates,
+  Value<DateTime?> recurrenceEndDate,
+  Value<int?> recurrenceCount,
   Value<int> rowid,
 });
 
@@ -2933,6 +3621,29 @@ class $$RemindersTableFilterComposer
 
   ColumnFilters<String> get notificationId => $composableBuilder(
       column: $table.notificationId,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<bool> get isRecurring => $composableBuilder(
+      column: $table.isRecurring, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get recurrenceRule => $composableBuilder(
+      column: $table.recurrenceRule,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get parentReminderId => $composableBuilder(
+      column: $table.parentReminderId,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get recurrenceExceptionDates => $composableBuilder(
+      column: $table.recurrenceExceptionDates,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get recurrenceEndDate => $composableBuilder(
+      column: $table.recurrenceEndDate,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get recurrenceCount => $composableBuilder(
+      column: $table.recurrenceCount,
       builder: (column) => ColumnFilters(column));
 }
 
@@ -2961,6 +3672,29 @@ class $$RemindersTableOrderingComposer
   ColumnOrderings<String> get notificationId => $composableBuilder(
       column: $table.notificationId,
       builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<bool> get isRecurring => $composableBuilder(
+      column: $table.isRecurring, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get recurrenceRule => $composableBuilder(
+      column: $table.recurrenceRule,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get parentReminderId => $composableBuilder(
+      column: $table.parentReminderId,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get recurrenceExceptionDates => $composableBuilder(
+      column: $table.recurrenceExceptionDates,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get recurrenceEndDate => $composableBuilder(
+      column: $table.recurrenceEndDate,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get recurrenceCount => $composableBuilder(
+      column: $table.recurrenceCount,
+      builder: (column) => ColumnOrderings(column));
 }
 
 class $$RemindersTableAnnotationComposer
@@ -2986,6 +3720,24 @@ class $$RemindersTableAnnotationComposer
 
   GeneratedColumn<String> get notificationId => $composableBuilder(
       column: $table.notificationId, builder: (column) => column);
+
+  GeneratedColumn<bool> get isRecurring => $composableBuilder(
+      column: $table.isRecurring, builder: (column) => column);
+
+  GeneratedColumn<String> get recurrenceRule => $composableBuilder(
+      column: $table.recurrenceRule, builder: (column) => column);
+
+  GeneratedColumn<String> get parentReminderId => $composableBuilder(
+      column: $table.parentReminderId, builder: (column) => column);
+
+  GeneratedColumn<String> get recurrenceExceptionDates => $composableBuilder(
+      column: $table.recurrenceExceptionDates, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get recurrenceEndDate => $composableBuilder(
+      column: $table.recurrenceEndDate, builder: (column) => column);
+
+  GeneratedColumn<int> get recurrenceCount => $composableBuilder(
+      column: $table.recurrenceCount, builder: (column) => column);
 }
 
 class $$RemindersTableTableManager extends RootTableManager<
@@ -3019,6 +3771,12 @@ class $$RemindersTableTableManager extends RootTableManager<
             Value<String> body = const Value.absent(),
             Value<DateTime> scheduledTime = const Value.absent(),
             Value<String> notificationId = const Value.absent(),
+            Value<bool> isRecurring = const Value.absent(),
+            Value<String?> recurrenceRule = const Value.absent(),
+            Value<String?> parentReminderId = const Value.absent(),
+            Value<String?> recurrenceExceptionDates = const Value.absent(),
+            Value<DateTime?> recurrenceEndDate = const Value.absent(),
+            Value<int?> recurrenceCount = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
               RemindersCompanion(
@@ -3027,6 +3785,12 @@ class $$RemindersTableTableManager extends RootTableManager<
             body: body,
             scheduledTime: scheduledTime,
             notificationId: notificationId,
+            isRecurring: isRecurring,
+            recurrenceRule: recurrenceRule,
+            parentReminderId: parentReminderId,
+            recurrenceExceptionDates: recurrenceExceptionDates,
+            recurrenceEndDate: recurrenceEndDate,
+            recurrenceCount: recurrenceCount,
             rowid: rowid,
           ),
           createCompanionCallback: ({
@@ -3035,6 +3799,12 @@ class $$RemindersTableTableManager extends RootTableManager<
             required String body,
             required DateTime scheduledTime,
             required String notificationId,
+            Value<bool> isRecurring = const Value.absent(),
+            Value<String?> recurrenceRule = const Value.absent(),
+            Value<String?> parentReminderId = const Value.absent(),
+            Value<String?> recurrenceExceptionDates = const Value.absent(),
+            Value<DateTime?> recurrenceEndDate = const Value.absent(),
+            Value<int?> recurrenceCount = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
               RemindersCompanion.insert(
@@ -3043,6 +3813,12 @@ class $$RemindersTableTableManager extends RootTableManager<
             body: body,
             scheduledTime: scheduledTime,
             notificationId: notificationId,
+            isRecurring: isRecurring,
+            recurrenceRule: recurrenceRule,
+            parentReminderId: parentReminderId,
+            recurrenceExceptionDates: recurrenceExceptionDates,
+            recurrenceEndDate: recurrenceEndDate,
+            recurrenceCount: recurrenceCount,
             rowid: rowid,
           ),
           withReferenceMapper: (p0) => p0
