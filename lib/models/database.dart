@@ -10,6 +10,7 @@ import 'package:uuid/uuid.dart';
 // Import your models
 import 'package:maximize/models/task_model.dart';
 import 'package:maximize/models/event_model.dart';
+import 'package:maximize/models/reminder_model.dart';
 
 part 'database.g.dart'; // This is where the generated code will be placed
 
@@ -81,8 +82,22 @@ class Classes extends Table {
   Set<Column> get primaryKey => {id};
 }
 
+//Reminder Table 
+@DataClassName('ReminderData')
+class Reminders extends Table { 
+  TextColumn get id => text()(); 
+  TextColumn get title => text()(); 
+  TextColumn get body => text()(); 
+  DateTimeColumn get scehduledTime => dateTime()(); 
+  IntColumn get notificationId => integer()();
+
+@override
+Set<Column> get primaryKey => {id};
+
+}
+
 // Drift Database Class
-@DriftDatabase(tables: [Tasks, Subtasks, Events, Classes])
+@DriftDatabase(tables: [Tasks, Subtasks, Events, Classes, Reminders])
 class AppDatabase extends _$AppDatabase {
   AppDatabase._() : super(_openConnection());
   static final AppDatabase instance = AppDatabase._();
@@ -91,16 +106,17 @@ class AppDatabase extends _$AppDatabase {
   int get schemaVersion => 3; // Increment this version
 
   // Define migrations
-  @override
-  MigrationStrategy get migration => MigrationStrategy(
-    onUpgrade: (Migrator m, int from, int to) async {
-      if (from == 2 && to == 3) {
-        // Add new columns for custom category and color to the Events table
-        await m.addColumn(events, events.customCategory);
-        await m.addColumn(events, events.color);
-      }
-    },
-  );
+ @override
+MigrationStrategy get migration => MigrationStrategy(
+  onUpgrade: (Migrator m, int from, int to) async {
+    if (from < 3 && to >= 3) {
+      // Add new columns 'customCategory' and 'color' to 'events' table when upgrading to version 3 or above
+      await m.addColumn(events, events.customCategory);
+      await m.addColumn(events, events.color);
+    }
+    // You can add more migration steps here for future versions
+  },
+);
 
   // Open the database connection
   static LazyDatabase _openConnection() {
@@ -304,4 +320,56 @@ class AppDatabase extends _$AppDatabase {
       throw DatabaseException('Error updating event: $e');
     }
   }
+  // Get All reminders
+  // Reminder Methods
+Future<List<ReminderData>> getAllReminders() async {
+  try {
+    return await select(reminders).get();
+  } catch (e) {
+    print('Error fetching reminders: $e');
+    throw DatabaseException('Error fetching reminders: $e');
+  }
+}
+
+Future<int> insertReminder(ReminderModel reminder) async {
+  try {
+    final reminderCompanion = RemindersCompanion(
+      id: Value(reminder.id),
+      title: Value(reminder.title),
+      body: Value(reminder.body),
+      scehduledTime: Value(reminder.scheduledTime),
+      notificationId: Value(reminder.notificationId),
+    );
+    return await into(reminders).insert(reminderCompanion);
+  } catch (e) {
+    print('Error inserting reminder: $e');
+    throw DatabaseException('Error inserting reminder: $e');
+  }
+}
+
+Future<void> deleteReminder(String id) async {
+  try {
+    await (delete(reminders)..where((tbl) => tbl.id.equals(id))).go();
+  } catch (e) {
+    print('Error deleting reminder: $e');
+    throw DatabaseException('Error deleting reminder: $e');
+  }
+}
+
+Future<void> updateReminder(ReminderModel reminder) async {
+  try {
+    final reminderCompanion = RemindersCompanion(
+      id: Value(reminder.id),
+      title: Value(reminder.title),
+      body: Value(reminder.body),
+      scehduledTime: Value(reminder.scheduledTime),
+      notificationId: Value(reminder.notificationId),
+    );
+    await (update(reminders)..where((tbl) => tbl.id.equals(reminder.id))).write(reminderCompanion);
+  } catch (e) {
+    print('Error updating reminder: $e');
+    throw DatabaseException('Error updating reminder: $e');
+  }
+}
+
 }
