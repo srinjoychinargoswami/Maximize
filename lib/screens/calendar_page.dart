@@ -7,25 +7,24 @@ import 'package:uuid/uuid.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 
-// Define the state class that manages the mutable state for CalendarPage
 class CalendarPage extends StatefulWidget {
-    // Declare a final field to hold the calendar service dependency
   final CalendarService calendarService;
-  // Constructor that requires a CalendarService and accepts an optional key
   const CalendarPage({super.key, required this.calendarService});
-// Override the createState method to return the state object for this widget
+
   @override
   _CalendarPageState createState() => _CalendarPageState();
 }
-class _CalendarPageState extends State<CalendarPage> { // Define the state class that manages the mutable state for CalendarPage
-  DateTime _selectedDay = DateTime.now(); // Store the currently selected day, initialized to today's date
-  DateTime _focusedDay = DateTime.now();   // Store the day that the calendar is currently focused on, initialized to today
-  List<Event> _events = []; // List to hold all events loaded from the calendar service
-  CalendarFormat _calendarFormat = CalendarFormat.month;   // Current format of the calendar display (month, week, etc.)
-  String _currentView = 'calendar'; // Track the current view (calendar, list, or day)
-  Map<String, bool> _eventCheckedStates = {};   // Map to store the checked/unchecked state of each event by event ID
-  SharedPreferences? _prefs;   // SharedPreferences instance for persisting data locally (nullable)
-  Color _selectedColor = Colors.blue;   // Currently selected color for new events, defaulted to blue
+
+class _CalendarPageState extends State<CalendarPage> {
+  DateTime _selectedDay = DateTime.now();
+  DateTime _focusedDay = DateTime.now();
+  List<Event> _events = [];
+  List<Event> _expandedEvents = []; // For displaying recurring instances
+  CalendarFormat _calendarFormat = CalendarFormat.month;
+  String _currentView = 'calendar';
+  Map<String, bool> _eventCheckedStates = {};
+  SharedPreferences? _prefs;
+  Color _selectedColor = Colors.blue;
 
   @override
   void initState() {
@@ -40,7 +39,7 @@ class _CalendarPageState extends State<CalendarPage> { // Define the state class
   }
 
   void _loadCheckedStates() {
-    for (var event in _events) {
+    for (var event in _expandedEvents) {
       bool isChecked = _prefs?.getBool(event.id) ?? false;
       _eventCheckedStates[event.id] = isChecked;
     }
@@ -56,21 +55,202 @@ class _CalendarPageState extends State<CalendarPage> { // Define the state class
     List<Event> events = await widget.calendarService.getEvents();
     setState(() {
       _events = events;
+      _expandedEvents = _expandRecurringEvents(events);
       _eventCheckedStates = {};
-      for (var event in events) {
+      for (var event in _expandedEvents) {
         _eventCheckedStates[event.id] = _prefs?.getBool(event.id) ?? false;
       }
     });
   }
 
-  // Get events for a specific day
+  // Expand recurring events to show individual occurrences
+  List<Event> _expandRecurringEvents(List<Event> events) {
+    List<Event> expandedEvents = [];
+    final now = DateTime.now();
+    final futureLimit = now.add(Duration(days: 365)); // Show next year's events
+
+    for (Event event in events) {
+      if (event.isRecurring && event.recurrenceRule != null) {
+        // Generate recurring instances
+        List<DateTime> occurrences = _generateRecurrenceOccurrences(
+          event.startDateTime,
+          event.recurrenceRule!,
+          now.subtract(Duration(days: 30)), // Show past month
+          futureLimit,
+          event.recurrenceExceptionDates,
+        );
+
+        for (DateTime occurrence in occurrences) {
+          if (event.recurrenceCount != null && 
+              occurrences.indexOf(occurrence) >= event.recurrenceCount!) {
+            break;
+          }
+          
+          if (event.recurrenceEndDate != null && 
+              occurrence.isAfter(event.recurrenceEndDate!)) {
+            break;
+          }
+
+          // Calculate duration
+          Duration eventDuration = event.endDateTime.difference(event.startDateTime);
+          
+          // Create instance for this occurrence
+          Event instance = event.copyWith(
+            id: '${event.id}_${occurrence.millisecondsSinceEpoch}',
+            startDateTime: occurrence,
+            endDateTime: occurrence.add(eventDuration),
+            date: occurrence,
+            parentEventId: event.id,
+          );
+          expandedEvents.add(instance);
+        }
+      } else {
+        // Non-recurring event
+        expandedEvents.add(event);
+      }
+    }
+
+    return expandedEvents;
+  }
+
+  // Generate recurrence occurrences based on RRULE
+  List<DateTime> _generateRecurrenceOccurrences(
+    DateTime startDate,
+    String rrule,
+    DateTime rangeStart,
+    DateTime rangeEnd,
+    List<DateTime>? exceptions,
+  ) {
+    List<DateTime> occurrences = [];
+    Map<String, String> rules = _parseRRule(rrule);
+    
+    String? frequency = rules['FREQ'];
+    int interval = int.parse(rules['INTERVAL'] ?? '1');
+    int? count = rules['COUNT'] != null ? int.parse(rules['COUNT']!) : null;
+    
+    DateTime current = startDate;
+    int occurrenceCount = 0;
+    
+    while (current.isBefore(rangeEnd) && (count == null || occurrenceCount < count)) {
+      if (current.isAfter(rangeStart) || current.isAtSameMomentAs(rangeStart)) {
+        bool isException = exceptions?.any((ex) => _isSameDay(ex, current)) ?? false;
+        if (!isException) {
+          occurrences.add(current);
+          occurrenceCount++;
+        }
+      }
+      
+      current = _getNextOccurrence(current, frequency!, interval);
+      
+      // Safety check to prevent infinite loops
+      if (occurrenceCount > 1000) break;
+    }
+    
+    return occurrences;
+  }
+
+  Map<String, String> _parseRRule(String rrule) {
+    Map<String, String> rules = {};
+    List<String> parts = rrule.split(';');
+    
+    for (String part in parts) {
+      List<String> keyValue = part.split('=');
+      if (keyValue.length == 2) {
+        rules[keyValue[0]] = keyValue[1];
+      }
+    }
+    
+    return rules;
+  }
+
+  DateTime _getNextOccurrence(DateTime current, String frequency, int interval) {
+    switch (frequency.toUpperCase()) {
+      case 'DAILY':
+        return current.add(Duration(days: interval));
+      case 'WEEKLY':
+        return current.add(Duration(days: 7 * interval));
+      case 'MONTHLY':
+        return DateTime(current.year, current.month + interval, current.day, 
+                       current.hour, current.minute);
+      case 'YEARLY':
+        return DateTime(current.year + interval, current.month, current.day, 
+                       current.hour, current.minute);
+      default:
+        return current.add(Duration(days: interval));
+    }
+  }
+
+  bool _isSameDay(DateTime a, DateTime b) {
+    return a.year == b.year && a.month == b.month && a.day == b.day;
+  }
+
+  // Get events for a specific day (using expanded events)
   List<Event> _getEventsForDay(DateTime day) {
-    return _events.where((event) {
+    return _expandedEvents.where((event) {
       return isSameDay(event.date, day);
     }).toList();
   }
 
   void _editEvent(Event event) {
+    // Check if this is a recurring event instance
+    bool isRecurringInstance = event.parentEventId != null;
+    
+    if (isRecurringInstance) {
+      _showRecurrenceEditDialog(event);
+    } else {
+      _showEditEventDialog(event);
+    }
+  }
+
+  void _showRecurrenceEditDialog(Event event) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text('Edit Recurring Event'),
+          content: Text('This is part of a recurring series. What would you like to edit?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _editSingleOccurrence(event);
+              },
+              child: Text('This Event Only'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _editEntireSeries(event);
+              },
+              child: Text('Entire Series'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _editSingleOccurrence(Event event) {
+    // Create an exception for this occurrence
+    // Implementation would involve creating a new single event
+    // and adding the date to the parent's exception list
+    _showEditEventDialog(event, isSingleOccurrence: true);
+  }
+
+  void _editEntireSeries(Event event) {
+    // Find the parent event and edit it
+    Event? parentEvent = _events.firstWhere(
+      (e) => e.id == event.parentEventId,
+      orElse: () => event,
+    );
+    _showEditEventDialog(parentEvent);
+  }
+
+  void _showEditEventDialog(Event event, {bool isSingleOccurrence = false}) {
     final TextEditingController titleController = TextEditingController(text: event.title);
     final TextEditingController descriptionController = TextEditingController(text: event.description);
     final TextEditingController categoryController = TextEditingController(text: event.customCategory ?? '');
@@ -79,6 +259,20 @@ class _CalendarPageState extends State<CalendarPage> { // Define the state class
     TimeOfDay? startTime = TimeOfDay.fromDateTime(event.startDateTime);
     TimeOfDay? endTime = TimeOfDay.fromDateTime(event.endDateTime);
     Color selectedColor = Color(int.parse(event.color.replaceFirst('#', '0xff')));
+    
+    // Recurrence settings
+    bool isRecurring = event.isRecurring && !isSingleOccurrence;
+    RecurrenceFrequency selectedFrequency = RecurrenceFrequency.daily;
+    int interval = 1;
+    int? recurrenceCount;
+    DateTime? recurrenceEndDate;
+
+    if (event.recurrencePattern != null) {
+      selectedFrequency = event.recurrencePattern!.frequency;
+      interval = event.recurrencePattern!.interval;
+    }
+    if (event.recurrenceCount != null) recurrenceCount = event.recurrenceCount;
+    if (event.recurrenceEndDate != null) recurrenceEndDate = event.recurrenceEndDate;
 
     showDialog(
       context: context,
@@ -86,7 +280,7 @@ class _CalendarPageState extends State<CalendarPage> { // Define the state class
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return AlertDialog(
-              title: Text('Edit Event'),
+              title: Text(isSingleOccurrence ? 'Edit Single Occurrence' : 'Edit Event'),
               content: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -100,165 +294,55 @@ class _CalendarPageState extends State<CalendarPage> { // Define the state class
                       decoration: InputDecoration(hintText: 'Enter event description'),
                     ),
                     SizedBox(height: 8),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text('Start Date: ${DateFormat.yMMMd().format(startDate)}'),
-                        TextButton(
-                          onPressed: () async {
-                            DateTime? date = await showDatePicker(
-                              context: context,
-                              initialDate: startDate,
-                              firstDate: DateTime(2000),
-                              lastDate: DateTime(2100),
-                            );
-                            if (date != null) {
-                              setDialogState(() {
-                                startDate = date;
-                              });
-                            }
-                          },
-                          child: Text('Select'),
-                        ),
-                      ],
+                    
+                    // Date and time selection (existing code)
+                    _buildDateTimeSelectors(
+                      startDate, endDate, startTime, endTime, setDialogState,
+                      (newStartDate) => startDate = newStartDate,
+                      (newEndDate) => endDate = newEndDate,
+                      (newStartTime) => startTime = newStartTime,
+                      (newEndTime) => endTime = newEndTime,
                     ),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text('Start Time: ${startTime?.format(context) ?? 'Select'}'),
-                        TextButton(
-                          onPressed: () async {
-                            TimeOfDay? time = await showTimePicker(
-                              context: context,
-                              initialTime: startTime ?? TimeOfDay.now(),
-                            );
-                            if (time != null) {
-                              setDialogState(() {
-                                startTime = time;
-                              });
-                            }
-                          },
-                          child: Text('Select'),
-                        ),
-                      ],
-                    ),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text('End Date: ${DateFormat.yMMMd().format(endDate)}'),
-                        TextButton(
-                          onPressed: () async {
-                            DateTime? date = await showDatePicker(
-                              context: context,
-                              initialDate: endDate,
-                              firstDate: startDate,
-                              lastDate: DateTime(2100),
-                            );
-                            if (date != null) {
-                              setDialogState(() {
-                                endDate = date;
-                              });
-                            }
-                          },
-                          child: Text('Select'),
-                        ),
-                      ],
-                    ),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text('End Time: ${endTime?.format(context) ?? 'Select'}'),
-                        TextButton(
-                          onPressed: () async {
-                            TimeOfDay? time = await showTimePicker(
-                              context: context,
-                              initialTime: endTime ?? TimeOfDay.now(),
-                            );
-                            if (time != null) {
-                              setDialogState(() {
-                                endTime = time;
-                              });
-                            }
-                          },
-                          child: Text('Select'),
-                        ),
-                      ],
-                    ),
+                    
                     SizedBox(height: 8),
-                    Text('Select Color:'),
-                    GestureDetector(
-                      onTap: () {
-                        showDialog(
-                          context: context,
-                          builder: (context) {
-                            return AlertDialog(
-                              title: Text('Pick a Color'),
-                              content: SingleChildScrollView(
-                                child: BlockPicker(
-                                  pickerColor: selectedColor,
-                                  onColorChanged: (color) {
-                                    setDialogState(() {
-                                      selectedColor = color;
-                                    });
-                                    Navigator.of(context).pop();
-                                  },
-                                ),
-                              ),
-                            );
-                          },
-                        );
-                      },
-                      child: Container(
-                        width: 100,
-                        height: 50,
-                        color: selectedColor,
-                        child: Center(child: Text('Color')),
-                      ),
-                    ),
+                    _buildColorSelector(selectedColor, setDialogState, 
+                      (newColor) => selectedColor = newColor),
+                    
                     SizedBox(height: 8),
-                    Text('Custom Category:'),
                     TextField(
                       controller: categoryController,
                       decoration: InputDecoration(hintText: 'Enter custom category'),
                     ),
+                    
+                    if (!isSingleOccurrence) ...[
+                      SizedBox(height: 16),
+                      _buildRecurrenceSelector(
+                        isRecurring, selectedFrequency, interval, 
+                        recurrenceCount, recurrenceEndDate, setDialogState,
+                        (recurring) => isRecurring = recurring,
+                        (freq) => selectedFrequency = freq,
+                        (intv) => interval = intv,
+                        (count) => recurrenceCount = count,
+                        (endDate) => recurrenceEndDate = endDate,
+                      ),
+                    ],
                   ],
                 ),
               ),
               actions: [
                 TextButton(
-                  onPressed: () {
-                    Navigator.of(context).pop();
-                  },
+                  onPressed: () => Navigator.of(context).pop(),
                   child: Text('Cancel'),
                 ),
                 TextButton(
                   onPressed: () async {
                     if (titleController.text.isNotEmpty && startTime != null && endTime != null) {
-                      final updatedEvent = Event(
-                        id: event.id,
-                        title: titleController.text,
-                        description: descriptionController.text,
-                        startDateTime: DateTime(
-                          startDate.year,
-                          startDate.month,
-                          startDate.day,
-                          startTime!.hour,
-                          startTime!.minute,
-                        ),
-                        endDateTime: DateTime(
-                          endDate.year,
-                          endDate.month,
-                          endDate.day,
-                          endTime!.hour,
-                          endTime!.minute,
-                        ),
-                        date: startDate,
-                        customCategory: categoryController.text,
-                        color: '#${selectedColor.value.toRadixString(16).substring(2)}',
+                      await _saveEditedEvent(
+                        event, titleController, descriptionController, categoryController,
+                        startDate, endDate, startTime!, endTime!, selectedColor,
+                        isRecurring, selectedFrequency, interval, 
+                        recurrenceCount, recurrenceEndDate, isSingleOccurrence,
                       );
-
-                      await widget.calendarService.updateEvent(updatedEvent);
-                      await _loadEvents();
                       Navigator.of(context).pop();
                     }
                   },
@@ -280,6 +364,13 @@ class _CalendarPageState extends State<CalendarPage> { // Define the state class
     DateTime endDate = _selectedDay;
     TimeOfDay? startTime;
     TimeOfDay? endTime;
+    
+    // Recurrence settings
+    bool isRecurring = false;
+    RecurrenceFrequency selectedFrequency = RecurrenceFrequency.daily;
+    int interval = 1;
+    int? recurrenceCount;
+    DateTime? recurrenceEndDate;
 
     showDialog(
       context: context,
@@ -301,165 +392,53 @@ class _CalendarPageState extends State<CalendarPage> { // Define the state class
                       decoration: InputDecoration(hintText: 'Enter event description'),
                     ),
                     SizedBox(height: 8),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text('Start Date: ${DateFormat.yMMMd().format(startDate)}'),
-                        TextButton(
-                          onPressed: () async {
-                            DateTime? date = await showDatePicker(
-                              context: context,
-                              initialDate: startDate,
-                              firstDate: DateTime(2000),
-                              lastDate: DateTime(2100),
-                            );
-                            if (date != null) {
-                              setDialogState(() {
-                                startDate = date;
-                              });
-                            }
-                          },
-                          child: Text('Select'),
-                        ),
-                      ],
+                    
+                    // Date and time selection
+                    _buildDateTimeSelectors(
+                      startDate, endDate, startTime, endTime, setDialogState,
+                      (newStartDate) => startDate = newStartDate,
+                      (newEndDate) => endDate = newEndDate,
+                      (newStartTime) => startTime = newStartTime,
+                      (newEndTime) => endTime = newEndTime,
                     ),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text('Start Time: ${startTime?.format(context) ?? 'Select'}'),
-                        TextButton(
-                          onPressed: () async {
-                            TimeOfDay? time = await showTimePicker(
-                              context: context,
-                              initialTime: TimeOfDay.now(),
-                            );
-                            if (time != null) {
-                              setDialogState(() {
-                                startTime = time;
-                              });
-                            }
-                          },
-                          child: Text('Select'),
-                        ),
-                      ],
-                    ),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text('End Date: ${DateFormat.yMMMd().format(endDate)}'),
-                        TextButton(
-                          onPressed: () async {
-                            DateTime? date = await showDatePicker(
-                              context: context,
-                              initialDate: endDate,
-                              firstDate: startDate,
-                              lastDate: DateTime(2100),
-                            );
-                            if (date != null) {
-                              setDialogState(() {
-                                endDate = date;
-                              });
-                            }
-                          },
-                          child: Text('Select'),
-                        ),
-                      ],
-                    ),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text('End Time: ${endTime?.format(context) ?? 'Select'}'),
-                        TextButton(
-                          onPressed: () async {
-                            TimeOfDay? time = await showTimePicker(
-                              context: context,
-                              initialTime: TimeOfDay.now(),
-                            );
-                            if (time != null) {
-                              setDialogState(() {
-                                endTime = time;
-                              });
-                            }
-                          },
-                          child: Text('Select'),
-                        ),
-                      ],
-                    ),
+                    
                     SizedBox(height: 8),
-                    Text('Select Color:'),
-                    GestureDetector(
-                      onTap: () {
-                        showDialog(
-                          context: context,
-                          builder: (context) {
-                            return AlertDialog(
-                              title: Text('Pick a Color'),
-                              content: SingleChildScrollView(
-                                child: BlockPicker(
-                                  pickerColor: _selectedColor,
-                                  onColorChanged: (color) {
-                                    setDialogState(() {
-                                      _selectedColor = color;
-                                    });
-                                    Navigator.of(context).pop();
-                                  },
-                                ),
-                              ),
-                            );
-                          },
-                        );
-                      },
-                      child: Container(
-                        width: 100,
-                        height: 50,
-                        color: _selectedColor,
-                        child: Center(child: Text('Color')),
-                      ),
-                    ),
+                    _buildColorSelector(_selectedColor, setDialogState, 
+                      (newColor) => _selectedColor = newColor),
+                    
                     SizedBox(height: 8),
-                    Text('Custom Category:'),
                     TextField(
                       controller: categoryController,
                       decoration: InputDecoration(hintText: 'Enter custom category'),
+                    ),
+                    
+                    SizedBox(height: 16),
+                    _buildRecurrenceSelector(
+                      isRecurring, selectedFrequency, interval, 
+                      recurrenceCount, recurrenceEndDate, setDialogState,
+                      (recurring) => isRecurring = recurring,
+                      (freq) => selectedFrequency = freq,
+                      (intv) => interval = intv,
+                      (count) => recurrenceCount = count,
+                      (endDate) => recurrenceEndDate = endDate,
                     ),
                   ],
                 ),
               ),
               actions: [
                 TextButton(
-                  onPressed: () {
-                    Navigator.of(context).pop();
-                  },
+                  onPressed: () => Navigator.of(context).pop(),
                   child: Text('Cancel'),
                 ),
                 TextButton(
                   onPressed: () async {
                     if (titleController.text.isNotEmpty && startTime != null && endTime != null) {
-                      final newEvent = Event(
-                        id: Uuid().v4(),
-                        title: titleController.text,
-                        description: descriptionController.text,
-                        startDateTime: DateTime(
-                          startDate.year,
-                          startDate.month,
-                          startDate.day,
-                          startTime!.hour,
-                          startTime!.minute,
-                        ),
-                        endDateTime: DateTime(
-                          endDate.year,
-                          endDate.month,
-                          endDate.day,
-                          endTime!.hour,
-                          endTime!.minute,
-                        ),
-                        date: startDate,
-                        customCategory: categoryController.text,
-                        color: '#${_selectedColor.value.toRadixString(16).substring(2)}',
+                      await _saveNewEvent(
+                        titleController, descriptionController, categoryController,
+                        startDate, endDate, startTime!, endTime!,
+                        isRecurring, selectedFrequency, interval, 
+                        recurrenceCount, recurrenceEndDate,
                       );
-
-                      await widget.calendarService.addEvent(newEvent);
-                      await _loadEvents();
                       Navigator.of(context).pop();
                     }
                   },
@@ -473,40 +452,701 @@ class _CalendarPageState extends State<CalendarPage> { // Define the state class
     );
   }
 
+  Widget _buildRecurrenceSelector(
+    bool isRecurring, RecurrenceFrequency frequency, int interval,
+    int? count, DateTime? endDate, StateSetter setDialogState,
+    Function(bool) onRecurringChanged,
+    Function(RecurrenceFrequency) onFrequencyChanged,
+    Function(int) onIntervalChanged,
+    Function(int?) onCountChanged,
+    Function(DateTime?) onEndDateChanged,
+  ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Checkbox(
+              value: isRecurring,
+              onChanged: (value) {
+                setDialogState(() {
+                  onRecurringChanged(value ?? false);
+                });
+              },
+            ),
+            Text('Recurring Event'),
+          ],
+        ),
+        if (isRecurring) ...[
+          SizedBox(height: 8),
+          Row(
+            children: [
+              Text('Repeat every '),
+              SizedBox(
+                width: 60,
+                child: TextField(
+                  keyboardType: TextInputType.number,
+                  decoration: InputDecoration(
+                    hintText: interval.toString(),
+                    border: OutlineInputBorder(),
+                    contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  ),
+                  onChanged: (value) {
+                    int? newInterval = int.tryParse(value);
+                    if (newInterval != null && newInterval > 0) {
+                      onIntervalChanged(newInterval);
+                    }
+                  },
+                ),
+              ),
+              SizedBox(width: 8),
+              DropdownButton<RecurrenceFrequency>(
+                value: frequency,
+                items: RecurrenceFrequency.values.map((freq) {
+                  String label = freq.name;
+                  if (interval > 1) {
+                    switch (freq) {
+                      case RecurrenceFrequency.daily:
+                        label = 'days';
+                        break;
+                      case RecurrenceFrequency.weekly:
+                        label = 'weeks';
+                        break;
+                      case RecurrenceFrequency.monthly:
+                        label = 'months';
+                        break;
+                      case RecurrenceFrequency.yearly:
+                        label = 'years';
+                        break;
+                      default:
+                        break;
+                    }
+                  }
+                  return DropdownMenuItem(
+                    value: freq,
+                    child: Text(label),
+                  );
+                }).toList(),
+                onChanged: (value) {
+                  if (value != null) {
+                    setDialogState(() {
+                      onFrequencyChanged(value);
+                    });
+                  }
+                },
+              ),
+            ],
+          ),
+          SizedBox(height: 8),
+          Text('End recurrence:'),
+          Row(
+            children: [
+              Radio<String>(
+                value: 'never',
+                groupValue: count != null ? 'count' : (endDate != null ? 'date' : 'never'),
+                onChanged: (value) {
+                  setDialogState(() {
+                    onCountChanged(null);
+                    onEndDateChanged(null);
+                  });
+                },
+              ),
+              Text('Never'),
+            ],
+          ),
+          Row(
+            children: [
+              Radio<String>(
+                value: 'count',
+                groupValue: count != null ? 'count' : (endDate != null ? 'date' : 'never'),
+                onChanged: (value) {
+                  setDialogState(() {
+                    onCountChanged(10);
+                    onEndDateChanged(null);
+                  });
+                },
+              ),
+              Text('After '),
+              SizedBox(
+                width: 60,
+                child: TextField(
+                  keyboardType: TextInputType.number,
+                  decoration: InputDecoration(
+                    hintText: count?.toString() ?? '10',
+                    border: OutlineInputBorder(),
+                    contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  ),
+                  onChanged: (value) {
+                    int? newCount = int.tryParse(value);
+                    if (newCount != null && newCount > 0) {
+                      onCountChanged(newCount);
+                    }
+                  },
+                ),
+              ),
+              Text(' occurrences'),
+            ],
+          ),
+          Row(
+            children: [
+              Radio<String>(
+                value: 'date',
+                groupValue: count != null ? 'count' : (endDate != null ? 'date' : 'never'),
+                onChanged: (value) {
+                  setDialogState(() {
+                    onCountChanged(null);
+                    onEndDateChanged(DateTime.now().add(Duration(days: 30)));
+                  });
+                },
+              ),
+              Text('On '),
+              TextButton(
+                onPressed: () async {
+                  DateTime? selectedDate = await showDatePicker(
+                    context: context,
+                    initialDate: endDate ?? DateTime.now().add(Duration(days: 30)),
+                    firstDate: DateTime.now(),
+                    lastDate: DateTime(2100),
+                  );
+                  if (selectedDate != null) {
+                    setDialogState(() {
+                      onEndDateChanged(selectedDate);
+                      onCountChanged(null);
+                    });
+                  }
+                },
+                child: Text(endDate != null 
+                  ? DateFormat.yMMMd().format(endDate) 
+                  : 'Select Date'),
+              ),
+            ],
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildDateTimeSelectors(
+    DateTime startDate, DateTime endDate, TimeOfDay? startTime, TimeOfDay? endTime,
+    StateSetter setDialogState,
+    Function(DateTime) onStartDateChanged,
+    Function(DateTime) onEndDateChanged,
+    Function(TimeOfDay) onStartTimeChanged,
+    Function(TimeOfDay) onEndTimeChanged,
+  ) {
+    return Column(
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text('Start Date: ${DateFormat.yMMMd().format(startDate)}'),
+            TextButton(
+              onPressed: () async {
+                DateTime? date = await showDatePicker(
+                  context: context,
+                  initialDate: startDate,
+                  firstDate: DateTime(2000),
+                  lastDate: DateTime(2100),
+                );
+                if (date != null) {
+                  setDialogState(() {
+                    onStartDateChanged(date);
+                  });
+                }
+              },
+              child: Text('Select'),
+            ),
+          ],
+        ),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text('Start Time: ${startTime?.format(context) ?? 'Select'}'),
+            TextButton(
+              onPressed: () async {
+                TimeOfDay? time = await showTimePicker(
+                  context: context,
+                  initialTime: startTime ?? TimeOfDay.now(),
+                );
+                if (time != null) {
+                  setDialogState(() {
+                    onStartTimeChanged(time);
+                  });
+                }
+              },
+              child: Text('Select'),
+            ),
+          ],
+        ),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text('End Date: ${DateFormat.yMMMd().format(endDate)}'),
+            TextButton(
+              onPressed: () async {
+                DateTime? date = await showDatePicker(
+                  context: context,
+                  initialDate: endDate,
+                  firstDate: startDate,
+                  lastDate: DateTime(2100),
+                );
+                if (date != null) {
+                  setDialogState(() {
+                    onEndDateChanged(date);
+                  });
+                }
+              },
+              child: Text('Select'),
+            ),
+          ],
+        ),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text('End Time: ${endTime?.format(context) ?? 'Select'}'),
+            TextButton(
+              onPressed: () async {
+                TimeOfDay? time = await showTimePicker(
+                  context: context,
+                  initialTime: endTime ?? TimeOfDay.now(),
+                );
+                if (time != null) {
+                  setDialogState(() {
+                    onEndTimeChanged(time);
+                  });
+                }
+              },
+              child: Text('Select'),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildColorSelector(Color selectedColor, StateSetter setDialogState, Function(Color) onColorChanged) {
+    return Column(
+      children: [
+        Text('Select Color:'),
+        GestureDetector(
+          onTap: () {
+            showDialog(
+              context: context,
+              builder: (context) {
+                return AlertDialog(
+                  title: Text('Pick a Color'),
+                  content: SingleChildScrollView(
+                    child: BlockPicker(
+                      pickerColor: selectedColor,
+                      onColorChanged: (color) {
+                        setDialogState(() {
+                          onColorChanged(color);
+                        });
+                        Navigator.of(context).pop();
+                      },
+                    ),
+                  ),
+                );
+              },
+            );
+          },
+          child: Container(
+            width: 100,
+            height: 50,
+            color: selectedColor,
+            child: Center(child: Text('Color')),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _saveNewEvent(
+    TextEditingController titleController,
+    TextEditingController descriptionController,
+    TextEditingController categoryController,
+    DateTime startDate, DateTime endDate,
+    TimeOfDay startTime, TimeOfDay endTime,
+    bool isRecurring, RecurrenceFrequency frequency, int interval,
+    int? recurrenceCount, DateTime? recurrenceEndDate,
+  ) async {
+    final newEvent = Event(
+      id: Uuid().v4(),
+      title: titleController.text,
+      description: descriptionController.text,
+      startDateTime: DateTime(
+        startDate.year, startDate.month, startDate.day,
+        startTime.hour, startTime.minute,
+      ),
+      endDateTime: DateTime(
+        endDate.year, endDate.month, endDate.day,
+        endTime.hour, endTime.minute,
+      ),
+      date: startDate,
+      customCategory: categoryController.text,
+      color: '#${_selectedColor.value.toRadixString(16).substring(2)}',
+      isRecurring: isRecurring,
+      recurrencePattern: isRecurring ? RecurrencePattern(
+        frequency: frequency,
+        interval: interval,
+      ) : null,
+      recurrenceCount: recurrenceCount,
+      recurrenceEndDate: recurrenceEndDate,
+    );
+
+    if (isRecurring) {
+      newEvent.recurrenceRule = newEvent.generateRRule();
+    }
+
+    await widget.calendarService.addEvent(newEvent);
+    await _loadEvents();
+  }
+
+  Future<void> _saveEditedEvent(
+    Event originalEvent,
+    TextEditingController titleController,
+    TextEditingController descriptionController,
+    TextEditingController categoryController,
+    DateTime startDate, DateTime endDate,
+    TimeOfDay startTime, TimeOfDay endTime,
+    Color selectedColor,
+    bool isRecurring, RecurrenceFrequency frequency, int interval,
+    int? recurrenceCount, DateTime? recurrenceEndDate,
+    bool isSingleOccurrence,
+  ) async {
+    if (isSingleOccurrence) {
+      // Create a new single event and add exception to parent
+      final newSingleEvent = Event(
+        title: titleController.text,
+        description: descriptionController.text,
+        startDateTime: DateTime(
+          startDate.year, startDate.month, startDate.day,
+          startTime.hour, startTime.minute,
+        ),
+        endDateTime: DateTime(
+          endDate.year, endDate.month, endDate.day,
+          endTime.hour, endTime.minute,
+        ),
+        date: startDate,
+        customCategory: categoryController.text,
+        color: '#${selectedColor.value.toRadixString(16).substring(2)}',
+        isRecurring: false,
+      );
+
+      await widget.calendarService.addEvent(newSingleEvent);
+
+      // Add exception to parent event
+      Event? parentEvent = _events.firstWhere(
+        (e) => e.id == originalEvent.parentEventId,
+        orElse: () => originalEvent,
+      );
+      
+      List<DateTime> exceptions = List.from(parentEvent.recurrenceExceptionDates ?? []);
+      exceptions.add(originalEvent.startDateTime);
+      
+      Event updatedParent = parentEvent.copyWith(
+        recurrenceExceptionDates: exceptions,
+      );
+      
+      await widget.calendarService.updateEvent(updatedParent);
+    } else {
+      final updatedEvent = originalEvent.copyWith(
+        title: titleController.text,
+        description: descriptionController.text,
+        startDateTime: DateTime(
+          startDate.year, startDate.month, startDate.day,
+          startTime.hour, startTime.minute,
+        ),
+        endDateTime: DateTime(
+          endDate.year, endDate.month, endDate.day,
+          endTime.hour, endTime.minute,
+        ),
+        date: startDate,
+        customCategory: categoryController.text,
+        color: '#${selectedColor.value.toRadixString(16).substring(2)}',
+        isRecurring: isRecurring,
+        recurrencePattern: isRecurring ? RecurrencePattern(
+          frequency: frequency,
+          interval: interval,
+        ) : null,
+        recurrenceCount: recurrenceCount,
+        recurrenceEndDate: recurrenceEndDate,
+      );
+
+      if (isRecurring) {
+        updatedEvent.recurrenceRule = updatedEvent.generateRRule();
+      }
+
+      await widget.calendarService.updateEvent(updatedEvent);
+    }
+    
+    await _loadEvents();
+  }
+
   void _showDeleteConfirmationDialog(Event event) {
+    bool isRecurringInstance = event.parentEventId != null;
+    
     showDialog(
       context: context,
       builder: (context) {
         return AlertDialog(
           title: Text('Delete Event'),
-          content: Text('Are you sure you want to delete "${event.title}"?'),
+          content: Text(isRecurringInstance 
+            ? 'This is part of a recurring series. What would you like to delete?'
+            : 'Are you sure you want to delete "${event.title}"?'),
           actions: [
             TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
+              onPressed: () => Navigator.of(context).pop(),
               child: Text('Cancel'),
             ),
-            TextButton(
-              onPressed: () async {
-                try {
+            if (isRecurringInstance) ...[
+              TextButton(
+                onPressed: () async {
+                  Navigator.of(context).pop();
+                  await _deleteSingleOccurrence(event);
+                },
+                child: Text('This Event Only'),
+              ),
+              TextButton(
+                onPressed: () async {
+                  Navigator.of(context).pop();
+                  await _deleteEntireSeries(event);
+                },
+                child: Text('Entire Series'),
+              ),
+            ] else ...[
+              TextButton(
+                onPressed: () async {
+                  Navigator.of(context).pop();
                   await widget.calendarService.deleteEvent(event.id);
                   await _loadEvents();
-                  Navigator.of(context).pop();
-                } catch (e) {
-                  print('Error deleting event: $e');
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Failed to delete event.')),
-                  );
-                }
-              },
-              child: Text('Delete'),
-            ),
+                },
+                child: Text('Delete'),
+              ),
+            ],
           ],
         );
       },
     );
   }
+
+  Future<void> _deleteSingleOccurrence(Event event) async {
+    // Add this occurrence to the parent's exception list
+    Event? parentEvent = _events.firstWhere(
+      (e) => e.id == event.parentEventId,
+      orElse: () => event,
+    );
+    
+    List<DateTime> exceptions = List.from(parentEvent.recurrenceExceptionDates ?? []);
+    exceptions.add(event.startDateTime);
+    
+    Event updatedParent = parentEvent.copyWith(
+      recurrenceExceptionDates: exceptions,
+    );
+    
+    await widget.calendarService.updateEvent(updatedParent);
+    await _loadEvents();
+  }
+
+  Future<void> _deleteEntireSeries(Event event) async {
+    String parentId = event.parentEventId ?? event.id;
+    await widget.calendarService.deleteEvent(parentId);
+    await _loadEvents();
+  }
+
+  // Rest of your existing methods (_buildDayView, _buildEventList, etc.) remain the same
+  // but use _expandedEvents instead of _events for display
+
+  Widget _buildEventList() {
+    List<Event> selectedDayEvents = _getEventsForDay(_selectedDay);
+    
+    if (selectedDayEvents.isEmpty) {
+      return Container(
+        padding: EdgeInsets.all(20),
+        child: Text(
+          'No events for ${DateFormat.yMMMd().format(_selectedDay)}',
+          style: TextStyle(color: Colors.white70, fontSize: 16),
+          textAlign: TextAlign.center,
+        ),
+      );
+    }
+
+    return ListView.builder(
+      shrinkWrap: true,
+      physics: NeverScrollableScrollPhysics(),
+      itemCount: selectedDayEvents.length,
+      itemBuilder: (context, index) {
+        Event event = selectedDayEvents[index];
+        bool isRecurringInstance = event.parentEventId != null;
+        
+        return Card(
+          color: Colors.grey[800],
+          margin: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          child: ListTile(
+            leading: Container(
+              width: 4,
+              height: double.infinity,
+              color: Color(int.parse(event.color.replaceFirst('#', '0xff'))),
+            ),
+            title: Row(
+              children: [
+                if (isRecurringInstance) 
+                  Icon(Icons.repeat, size: 16, color: Colors.grey[400]),
+                if (isRecurringInstance) SizedBox(width: 4),
+                Expanded(
+                  child: Text(
+                    event.title,
+                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
+            ),
+            subtitle: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '${DateFormat.jm().format(event.startDateTime)} - ${DateFormat.jm().format(event.endDateTime)}',
+                  style: TextStyle(color: Colors.grey[300]),
+                ),
+                if (event.description != null && event.description!.isNotEmpty)
+                  Text(
+                    event.description!,
+                    style: TextStyle(color: Colors.grey[400]),
+                  ),
+                if (event.customCategory != null && event.customCategory!.isNotEmpty)
+                  Text(
+                    'Category: ${event.customCategory}',
+                    style: TextStyle(color: Colors.grey[400]),
+                  ),
+                if (isRecurringInstance)
+                  Text(
+                    'Recurring event',
+                    style: TextStyle(color: Colors.blue[300], fontSize: 12),
+                  ),
+              ],
+            ),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Checkbox(
+                  value: _eventCheckedStates[event.id] ?? false,
+                  onChanged: (value) {
+                    setState(() {
+                      _eventCheckedStates[event.id] = value!;
+                      _saveCheckedStates();
+                    });
+                  },
+                ),
+                IconButton(
+                  icon: Icon(Icons.edit, color: Colors.blue),
+                  onPressed: () => _editEvent(event),
+                ),
+                IconButton(
+                  icon: Icon(Icons.delete, color: Colors.red),
+                  onPressed: () => _showDeleteConfirmationDialog(event),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildAllEventsList() {
+    if (_expandedEvents.isEmpty) {
+      return Container(
+        padding: EdgeInsets.all(20),
+        child: Text(
+          'No events found',
+          style: TextStyle(color: Colors.white70, fontSize: 16),
+          textAlign: TextAlign.center,
+        ),
+      );
+    }
+
+    return ListView.builder(
+      itemCount: _expandedEvents.length,
+      itemBuilder: (context, index) {
+        Event event = _expandedEvents[index];
+        bool isRecurringInstance = event.parentEventId != null;
+        
+        return Card(
+          color: Colors.grey[800],
+          margin: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          child: ListTile(
+            leading: Container(
+              width: 4,
+              height: double.infinity,
+              color: Color(int.parse(event.color.replaceFirst('#', '0xff'))),
+            ),
+            title: Row(
+              children: [
+                if (isRecurringInstance) 
+                  Icon(Icons.repeat, size: 16, color: Colors.grey[400]),
+                if (isRecurringInstance) SizedBox(width: 4),
+                Expanded(
+                  child: Text(
+                    event.title,
+                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
+            ),
+            subtitle: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '${DateFormat.yMMMd().format(event.date)} - ${DateFormat.jm().format(event.startDateTime)} to ${DateFormat.jm().format(event.endDateTime)}',
+                  style: TextStyle(color: Colors.grey[300]),
+                ),
+                if (event.description != null && event.description!.isNotEmpty)
+                  Text(
+                    event.description!,
+                    style: TextStyle(color: Colors.grey[400]),
+                  ),
+                if (event.customCategory != null && event.customCategory!.isNotEmpty)
+                  Text(
+                    'Category: ${event.customCategory}',
+                    style: TextStyle(color: Colors.grey[400]),
+                  ),
+                if (isRecurringInstance)
+                  Text(
+                    'Recurring event',
+                    style: TextStyle(color: Colors.blue[300], fontSize: 12),
+                  ),
+              ],
+            ),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Checkbox(
+                  value: _eventCheckedStates[event.id] ?? false,
+                  onChanged: (value) {
+                    setState(() {
+                      _eventCheckedStates[event.id] = value!;
+                      _saveCheckedStates();
+                    });
+                  },
+                ),
+                IconButton(
+                  icon: Icon(Icons.edit, color: Colors.blue),
+                  onPressed: () => _editEvent(event),
+                ),
+                IconButton(
+                  icon: Icon(Icons.delete, color: Colors.red),
+                  onPressed: () => _showDeleteConfirmationDialog(event),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  // Keep your existing _buildDayView and _buildWeekView methods
+  // but update them to use _expandedEvents instead of _events
 
   Widget _buildDayView() {
     List<Event> dayEvents = _getEventsForDay(_selectedDay);
@@ -625,14 +1265,10 @@ class _CalendarPageState extends State<CalendarPage> { // Define the state class
                                 child: Column(
                                   children: hourEvents.map((event) {
                                     final eventStartHour = event.startDateTime.hour;
-                                    final eventStartMinute = event.startDateTime.minute;
-                                    final eventEndHour = event.endDateTime.hour;
-                                    final eventEndMinute = event.endDateTime.minute;
-                                    
-                                    // Calculate event duration and position
                                     bool isEventStart = eventStartHour == hour;
-                                    String timeDisplay = '';
+                                    bool isRecurringInstance = event.parentEventId != null;
                                     
+                                    String timeDisplay = '';
                                     if (isEventStart) {
                                       timeDisplay = '${DateFormat.jm().format(event.startDateTime)} - ${DateFormat.jm().format(event.endDateTime)}';
                                     }
@@ -651,6 +1287,10 @@ class _CalendarPageState extends State<CalendarPage> { // Define the state class
                                         ),
                                         child: Row(
                                           children: [
+                                            if (isRecurringInstance && isEventStart)
+                                              Icon(Icons.repeat, size: 12, color: Colors.white70),
+                                            if (isRecurringInstance && isEventStart)
+                                              SizedBox(width: 2),
                                             Expanded(
                                               child: Column(
                                                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -751,170 +1391,6 @@ class _CalendarPageState extends State<CalendarPage> { // Define the state class
     );
   }
 
-  Widget _buildEventList() {
-    List<Event> selectedDayEvents = _getEventsForDay(_selectedDay);
-    
-    if (selectedDayEvents.isEmpty) {
-      return Container(
-        padding: EdgeInsets.all(20),
-        child: Text(
-          'No events for ${DateFormat.yMMMd().format(_selectedDay)}',
-          style: TextStyle(color: Colors.white70, fontSize: 16),
-          textAlign: TextAlign.center,
-        ),
-      );
-    }
-
-    return ListView.builder(
-      shrinkWrap: true,
-      physics: NeverScrollableScrollPhysics(),
-      itemCount: selectedDayEvents.length,
-      itemBuilder: (context, index) {
-        Event event = selectedDayEvents[index];
-        return Card(
-          color: Colors.grey[800],
-          margin: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          child: ListTile(
-            leading: Container(
-              width: 4,
-              height: double.infinity,
-              color: Color(int.parse(event.color.replaceFirst('#', '0xff'))),
-            ),
-            title: Text(
-              event.title,
-              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-            ),
-            subtitle: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '${DateFormat.jm().format(event.startDateTime)} - ${DateFormat.jm().format(event.endDateTime)}',
-                  style: TextStyle(color: Colors.grey[300]),
-                ),
-                if (event.description!.isNotEmpty)
-                  Text(
-                    event.description ?? 'No description',
-                    style: TextStyle(color: Colors.grey[400]),
-                  ),
-                if (event.customCategory != null && event.customCategory!.isNotEmpty)
-                  Text(
-                    'Category: ${event.customCategory}',
-                    style: TextStyle(color: Colors.grey[400]),
-                  ),
-              ],
-            ),
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Checkbox(
-                  value: _eventCheckedStates[event.id] ?? false,
-                  onChanged: (value) {
-                    setState(() {
-                      _eventCheckedStates[event.id] = value!;
-                      _saveCheckedStates();
-                    });
-                  },
-                ),
-                IconButton(
-                  icon: Icon(Icons.edit, color: Colors.blue),
-                  onPressed: () {
-                    _editEvent(event);
-                  },
-                ),
-                IconButton(
-                  icon: Icon(Icons.delete, color: Colors.red),
-                  onPressed: () {
-                    _showDeleteConfirmationDialog(event);
-                  },
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildAllEventsList() {
-    if (_events.isEmpty) {
-      return Container(
-        padding: EdgeInsets.all(20),
-        child: Text(
-          'No events found',
-          style: TextStyle(color: Colors.white70, fontSize: 16),
-          textAlign: TextAlign.center,
-        ),
-      );
-    }
-
-    return ListView.builder(
-      itemCount: _events.length,
-      itemBuilder: (context, index) {
-        Event event = _events[index];
-        return Card(
-          color: Colors.grey[800],
-          margin: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          child: ListTile(
-            leading: Container(
-              width: 4,
-              height: double.infinity,
-              color: Color(int.parse(event.color.replaceFirst('#', '0xff'))),
-            ),
-            title: Text(
-              event.title,
-              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-            ),
-            subtitle: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '${DateFormat.yMMMd().format(event.date)} - ${DateFormat.jm().format(event.startDateTime)} to ${DateFormat.jm().format(event.endDateTime)}',
-                  style: TextStyle(color: Colors.grey[300]),
-                ),
-                if (event.description!.isNotEmpty)
-                  Text(
-                    event.description ?? 'No description',
-                    style: TextStyle(color: Colors.grey[400]),
-                  ),
-                if (event.customCategory != null && event.customCategory!.isNotEmpty)
-                  Text(
-                    'Category: ${event.customCategory}',
-                    style: TextStyle(color: Colors.grey[400]),
-                  ),
-              ],
-            ),
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Checkbox(
-                  value: _eventCheckedStates[event.id] ?? false,
-                  onChanged: (value) {
-                    setState(() {
-                      _eventCheckedStates[event.id] = value!;
-                      _saveCheckedStates();
-                    });
-                  },
-                ),
-                IconButton(
-                  icon: Icon(Icons.edit, color: Colors.blue),
-                  onPressed: () {
-                    _editEvent(event);
-                  },
-                ),
-                IconButton(
-                  icon: Icon(Icons.delete, color: Colors.red),
-                  onPressed: () {
-                    _showDeleteConfirmationDialog(event);
-                  },
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-// ----------- NEW: Week View -----------
   Widget _buildWeekView() {
     // Find the first day of the current week (Monday)
     DateTime weekStart = _focusedDay.subtract(Duration(days: _focusedDay.weekday - 1));
@@ -968,13 +1444,24 @@ class _CalendarPageState extends State<CalendarPage> { // Define the state class
                     itemCount: dayEvents.length,
                     itemBuilder: (context, idx) {
                       final event = dayEvents[idx];
+                      bool isRecurringInstance = event.parentEventId != null;
+                      
                       return Card(
                         color: Color(int.parse(event.color.replaceFirst('#', '0xff'))),
                         margin: EdgeInsets.symmetric(vertical: 2, horizontal: 0),
                         child: ListTile(
-                          title: Text(
-                            event.title,
-                            style: TextStyle(color: Colors.white, fontSize: 12),
+                          title: Row(
+                            children: [
+                              if (isRecurringInstance) 
+                                Icon(Icons.repeat, size: 10, color: Colors.white70),
+                              if (isRecurringInstance) SizedBox(width: 2),
+                              Expanded(
+                                child: Text(
+                                  event.title,
+                                  style: TextStyle(color: Colors.white, fontSize: 12),
+                                ),
+                              ),
+                            ],
                           ),
                           subtitle: Text(
                             '${DateFormat.jm().format(event.startDateTime)} - ${DateFormat.jm().format(event.endDateTime)}',
@@ -999,7 +1486,7 @@ class _CalendarPageState extends State<CalendarPage> { // Define the state class
       ],
     );
   }
-  // ----------- END Week View -----------
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -1100,5 +1587,3 @@ class _CalendarPageState extends State<CalendarPage> { // Define the state class
     );
   }
 }
-        
-       
