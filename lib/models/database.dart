@@ -82,18 +82,17 @@ class Classes extends Table {
   Set<Column> get primaryKey => {id};
 }
 
-//Reminder Table 
+// Reminder Table - Updated to match ReminderModel
 @DataClassName('ReminderData')
 class Reminders extends Table { 
-  TextColumn get id => text()(); 
-  TextColumn get title => text()(); 
-  TextColumn get body => text()(); 
-  DateTimeColumn get scehduledTime => dateTime()(); 
-  IntColumn get notificationId => integer()();
+  TextColumn get id => text().clientDefault(() => const Uuid().v4())(); // Use v4 for consistency
+  TextColumn get title => text().withLength(min: 1, max: 200)(); // Add length constraints
+  TextColumn get body => text().withLength(min: 1, max: 500)(); // Add length constraints
+  DateTimeColumn get scheduledTime => dateTime()(); 
+  TextColumn get notificationId => text()(); // Changed to TextColumn to match ReminderModel
 
-@override
-Set<Column> get primaryKey => {id};
-
+  @override
+  Set<Column> get primaryKey => {id};
 }
 
 // Drift Database Class
@@ -103,20 +102,24 @@ class AppDatabase extends _$AppDatabase {
   static final AppDatabase instance = AppDatabase._();
 
   @override
-  int get schemaVersion => 3; // Increment this version
+  int get schemaVersion => 4; // Increment this version for reminder table changes
 
   // Define migrations
- @override
-MigrationStrategy get migration => MigrationStrategy(
-  onUpgrade: (Migrator m, int from, int to) async {
-    if (from < 3 && to >= 3) {
-      // Add new columns 'customCategory' and 'color' to 'events' table when upgrading to version 3 or above
-      await m.addColumn(events, events.customCategory);
-      await m.addColumn(events, events.color);
-    }
-    // You can add more migration steps here for future versions
-  },
-);
+  @override
+  MigrationStrategy get migration => MigrationStrategy(
+    onUpgrade: (Migrator m, int from, int to) async {
+      if (from < 3 && to >= 3) {
+        // Add new columns 'customCategory' and 'color' to 'events' table when upgrading to version 3 or above
+        await m.addColumn(events, events.customCategory);
+        await m.addColumn(events, events.color);
+      }
+      if (from < 4 && to >= 4) {
+        // Create the reminders table when upgrading to version 4
+        await m.createTable(reminders);
+      }
+      // You can add more migration steps here for future versions
+    },
+  );
 
   // Open the database connection
   static LazyDatabase _openConnection() {
@@ -135,7 +138,7 @@ MigrationStrategy get migration => MigrationStrategy(
       print('Error fetching tasks: $e');
       throw DatabaseException('Error fetching tasks: $e');
     }
- }
+  }
 
   Future<int> insertTask(TaskModel task) async {
     try {
@@ -261,7 +264,7 @@ MigrationStrategy get migration => MigrationStrategy(
         color: Value(event.color), // Store event color
       );
       return await into(events).insert(eventCompanion); // Return the inserted event ID
-    } catch ( e) {
+    } catch (e) {
       print('Error inserting event: $e');
       throw DatabaseException('Error inserting event: $e');
     }
@@ -320,56 +323,55 @@ MigrationStrategy get migration => MigrationStrategy(
       throw DatabaseException('Error updating event: $e');
     }
   }
-  // Get All reminders
-  // Reminder Methods
-Future<List<ReminderData>> getAllReminders() async {
-  try {
-    return await select(reminders).get();
-  } catch (e) {
-    print('Error fetching reminders: $e');
-    throw DatabaseException('Error fetching reminders: $e');
-  }
-}
 
-Future<int> insertReminder(ReminderModel reminder) async {
-  try {
-    final reminderCompanion = RemindersCompanion(
-      id: Value(reminder.id),
-      title: Value(reminder.title),
-      body: Value(reminder.body),
-      scehduledTime: Value(reminder.scheduledTime),
-      notificationId: Value(reminder.notificationId),
-    );
-    return await into(reminders).insert(reminderCompanion);
-  } catch (e) {
-    print('Error inserting reminder: $e');
-    throw DatabaseException('Error inserting reminder: $e');
+  // Reminder Methods - Updated to work with ReminderModel
+  Future<List<ReminderData>> getAllReminders() async {
+    try {
+      return await select(reminders).get();
+    } catch (e) {
+      print('Error fetching reminders: $e');
+      throw DatabaseException('Error fetching reminders: $e');
+    }
   }
-}
 
-Future<void> deleteReminder(String id) async {
-  try {
-    await (delete(reminders)..where((tbl) => tbl.id.equals(id))).go();
-  } catch (e) {
-    print('Error deleting reminder: $e');
-    throw DatabaseException('Error deleting reminder: $e');
+  Future<void> insertReminder(ReminderModel reminder) async {
+    try {
+      final reminderCompanion = RemindersCompanion(
+        id: Value(reminder.id),
+        title: Value(reminder.title),
+        body: Value(reminder.body),
+        scheduledTime: Value(reminder.scheduledTime),
+        notificationId: Value(reminder.notificationId), // Now String type
+      );
+      await into(reminders).insert(reminderCompanion);
+    } catch (e) {
+      print('Error inserting reminder: $e');
+      throw DatabaseException('Error inserting reminder: $e');
+    }
   }
-}
 
-Future<void> updateReminder(ReminderModel reminder) async {
-  try {
-    final reminderCompanion = RemindersCompanion(
-      id: Value(reminder.id),
-      title: Value(reminder.title),
-      body: Value(reminder.body),
-      scehduledTime: Value(reminder.scheduledTime),
-      notificationId: Value(reminder.notificationId),
-    );
-    await (update(reminders)..where((tbl) => tbl.id.equals(reminder.id))).write(reminderCompanion);
-  } catch (e) {
-    print('Error updating reminder: $e');
-    throw DatabaseException('Error updating reminder: $e');
+  Future<void> deleteReminder(String id) async {
+    try {
+      await (delete(reminders)..where((tbl) => tbl.id.equals(id))).go();
+    } catch (e) {
+      print('Error deleting reminder: $e');
+      throw DatabaseException('Error deleting reminder: $e');
+    }
   }
-}
 
+  Future<void> updateReminder(ReminderModel reminder) async {
+    try {
+      final reminderCompanion = RemindersCompanion(
+        id: Value(reminder.id),
+        title: Value(reminder.title),
+        body: Value(reminder.body),
+        scheduledTime: Value(reminder.scheduledTime),
+        notificationId: Value(reminder.notificationId), // Now String type
+      );
+      await (update(reminders)..where((tbl) => tbl.id.equals(reminder.id))).write(reminderCompanion);
+    } catch (e) {
+      print('Error updating reminder: $e');
+      throw DatabaseException('Error updating reminder: $e');
+    }
+  }
 }
