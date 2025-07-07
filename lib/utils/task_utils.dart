@@ -31,5 +31,16 @@ TaskData convertTaskModelToData(TaskModel taskModel) {
     customCategory: taskModel.customCategory,
     pageId: taskModel.pageId,
     day: taskModel.day,
+    // Recurring task fields
+    isRecurring: taskModel.isRecurring,
+    recurrenceRule: taskModel.recurrenceRule,
+    recurrenceInterval: taskModel.recurrenceInterval,
+    daysOfWeek: taskModel.daysOfWeek?.join(','), // Convert List<int> to comma-separated string
+    recurrenceEndDate: taskModel.recurrenceEndDate,
+    parentTaskId: taskModel.parentTaskId,
+    maxOccurrences: taskModel.maxOccurrences,
+    skipWeekends: taskModel.skipWeekends,
+    dayOfMonth: taskModel.dayOfMonth,
+    weekOfMonth: taskModel.weekOfMonth,
   );
 }

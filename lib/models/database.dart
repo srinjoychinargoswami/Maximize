@@ -22,7 +22,7 @@ class DatabaseException implements Exception {
   String toString() => "DatabaseException: $message";
 }
 
-// Task Table
+// Task Table - Updated with recurring fields
 @DataClassName('TaskData')
 class Tasks extends Table {
   TextColumn get id => text().clientDefault(() => const Uuid().v1())();
@@ -36,6 +36,18 @@ class Tasks extends Table {
   TextColumn get customCategory => text().nullable()();
   TextColumn get pageId => text().nullable()();
   TextColumn get day => text().nullable()();
+  
+  // Recurring task fields
+  BoolColumn get isRecurring => boolean().withDefault(Constant(false))();
+  TextColumn get recurrenceRule => text().nullable()(); // daily, weekly, monthly, yearly
+  IntColumn get recurrenceInterval => integer().nullable()(); // every X days/weeks/months
+  TextColumn get daysOfWeek => text().nullable()(); // comma-separated list of weekdays (1-7)
+  DateTimeColumn get recurrenceEndDate => dateTime().nullable()(); // end date for recurrence
+  TextColumn get parentTaskId => text().nullable()(); // ID of parent recurring task
+  IntColumn get maxOccurrences => integer().nullable()(); // maximum number of occurrences
+  BoolColumn get skipWeekends => boolean().withDefault(Constant(false))(); // skip weekends for daily
+  IntColumn get dayOfMonth => integer().nullable()(); // specific day of month for monthly
+  IntColumn get weekOfMonth => integer().nullable()(); // week of month for monthly
   
   @override
   Set<Column> get primaryKey => {id};
@@ -118,7 +130,7 @@ class AppDatabase extends _$AppDatabase {
   static final AppDatabase instance = AppDatabase._();
 
   @override
-  int get schemaVersion => 5; // Increment version for recurring fields
+  int get schemaVersion => 6; // Increment version for recurring task fields
 
   // Define migrations
  @override
@@ -208,9 +220,70 @@ MigrationStrategy get migration => MigrationStrategy(
         if (!e.toString().contains('duplicate column')) rethrow;
       }
     }
+    if (from < 6 && to >= 6) {
+      // Add recurring fields to tasks table - with error handling
+      try {
+        await m.addColumn(tasks, tasks.isRecurring);
+      } catch (e) {
+        if (!e.toString().contains('duplicate column')) rethrow;
+      }
+      
+      try {
+        await m.addColumn(tasks, tasks.recurrenceRule);
+      } catch (e) {
+        if (!e.toString().contains('duplicate column')) rethrow;
+      }
+      
+      try {
+        await m.addColumn(tasks, tasks.recurrenceInterval);
+      } catch (e) {
+        if (!e.toString().contains('duplicate column')) rethrow;
+      }
+      
+      try {
+        await m.addColumn(tasks, tasks.daysOfWeek);
+      } catch (e) {
+        if (!e.toString().contains('duplicate column')) rethrow;
+      }
+      
+      try {
+        await m.addColumn(tasks, tasks.recurrenceEndDate);
+      } catch (e) {
+        if (!e.toString().contains('duplicate column')) rethrow;
+      }
+      
+      try {
+        await m.addColumn(tasks, tasks.parentTaskId);
+      } catch (e) {
+        if (!e.toString().contains('duplicate column')) rethrow;
+      }
+      
+      try {
+        await m.addColumn(tasks, tasks.maxOccurrences);
+      } catch (e) {
+        if (!e.toString().contains('duplicate column')) rethrow;
+      }
+      
+      try {
+        await m.addColumn(tasks, tasks.skipWeekends);
+      } catch (e) {
+        if (!e.toString().contains('duplicate column')) rethrow;
+      }
+      
+      try {
+        await m.addColumn(tasks, tasks.dayOfMonth);
+      } catch (e) {
+        if (!e.toString().contains('duplicate column')) rethrow;
+      }
+      
+      try {
+        await m.addColumn(tasks, tasks.weekOfMonth);
+      } catch (e) {
+        if (!e.toString().contains('duplicate column')) rethrow;
+      }
+    }
   },
 );
-
 
   // Open the database connection
   static LazyDatabase _openConnection() {
@@ -221,13 +294,47 @@ MigrationStrategy get migration => MigrationStrategy(
     });
   }
 
-  // Task Methods
+  // Task Methods - Updated with recurring support
   Future<List<TaskData>> getAllTasks() async {
     try {
       return await (select(tasks)).get();
     } catch (e) {
       print('Error fetching tasks: $e');
       throw DatabaseException('Error fetching tasks: $e');
+    }
+  }
+
+  // Get only base tasks (non-recurring instances)
+  Future<List<TaskData>> getBaseTasks() async {
+    try {
+      final tasksData = await (select(tasks)..where((tbl) => tbl.parentTaskId.isNull())).get();
+      return tasksData;
+    } catch (e) {
+      print('Error fetching base tasks: $e');
+      throw DatabaseException('Error fetching base tasks: $e');
+    }
+  }
+
+  // Get recurring tasks only
+  Future<List<TaskData>> getRecurringTasks() async {
+    try {
+      final tasksData = await (select(tasks)..where((tbl) => tbl.isRecurring.equals(true))).get();
+      return tasksData;
+    } catch (e) {
+      print('Error fetching recurring tasks: $e');
+      throw DatabaseException('Error fetching recurring tasks: $e');
+    }
+  }
+
+  // Get tasks in a date range (useful for dashboard views)
+  Future<List<TaskData>> getTasksInRange(DateTime start, DateTime end) async {
+    try {
+      final tasksData = await (select(tasks)..where((tbl) => 
+        tbl.dueDate.isBetweenValues(start, end))).get();
+      return tasksData;
+    } catch (e) {
+      print('Error fetching tasks in range: $e');
+      throw DatabaseException('Error fetching tasks in range: $e');
     }
   }
 
@@ -245,6 +352,17 @@ MigrationStrategy get migration => MigrationStrategy(
         customCategory: Value(task.customCategory),
         pageId: Value(task.pageId),
         day: Value(task.day),
+        // Recurring fields
+        isRecurring: Value(task.isRecurring),
+        recurrenceRule: task.recurrenceRule != null ? Value(task.recurrenceRule) : const Value.absent(),
+        recurrenceInterval: task.recurrenceInterval != null ? Value(task.recurrenceInterval) : const Value.absent(),
+        daysOfWeek: task.daysOfWeek != null ? Value(task.daysOfWeek!.join(',')) : const Value.absent(),
+        recurrenceEndDate: task.recurrenceEndDate != null ? Value(task.recurrenceEndDate) : const Value.absent(),
+        parentTaskId: task.parentTaskId != null ? Value(task.parentTaskId) : const Value.absent(),
+        maxOccurrences: task.maxOccurrences != null ? Value(task.maxOccurrences) : const Value.absent(),
+        skipWeekends: Value(task.skipWeekends),
+        dayOfMonth: task.dayOfMonth != null ? Value(task.dayOfMonth) : const Value.absent(),
+        weekOfMonth: task.weekOfMonth != null ? Value(task.weekOfMonth) : const Value.absent(),
       );
       return await into(tasks).insert(taskCompanion); // Return the inserted task ID
     } catch (e) {
@@ -262,6 +380,17 @@ MigrationStrategy get migration => MigrationStrategy(
     }
   }
 
+  // Delete all instances of a recurring task series
+  Future<void> deleteTaskSeries(String parentTaskId) async {
+    try {
+      await (delete(tasks)..where((tbl) => 
+        tbl.id.equals(parentTaskId) | tbl.parentTaskId.equals(parentTaskId))).go();
+    } catch (e) {
+      print('Error deleting task series: $e');
+      throw DatabaseException('Error deleting task series: $e');
+    }
+  }
+
   Future<void> updateTask(TaskModel task) async {
     try {
       final taskCompanion = TasksCompanion(
@@ -276,11 +405,56 @@ MigrationStrategy get migration => MigrationStrategy(
         customCategory: Value(task.customCategory),
         pageId: Value(task.pageId),
         day: Value(task.day),
+        // Recurring fields
+        isRecurring: Value(task.isRecurring),
+        recurrenceRule: task.recurrenceRule != null ? Value(task.recurrenceRule) : const Value.absent(),
+        recurrenceInterval: task.recurrenceInterval != null ? Value(task.recurrenceInterval) : const Value.absent(),
+        daysOfWeek: task.daysOfWeek != null ? Value(task.daysOfWeek!.join(',')) : const Value.absent(),
+        recurrenceEndDate: task.recurrenceEndDate != null ? Value(task.recurrenceEndDate) : const Value.absent(),
+        parentTaskId: task.parentTaskId != null ? Value(task.parentTaskId) : const Value.absent(),
+        maxOccurrences: task.maxOccurrences != null ? Value(task.maxOccurrences) : const Value.absent(),
+        skipWeekends: Value(task.skipWeekends),
+        dayOfMonth: task.dayOfMonth != null ? Value(task.dayOfMonth) : const Value.absent(),
+        weekOfMonth: task.weekOfMonth != null ? Value(task.weekOfMonth) : const Value.absent(),
       );
       await (update(tasks)..where((tbl) => tbl.id.equals(task.id))).write(taskCompanion);
     } catch (e) {
       print('Error updating task: $e');
       throw DatabaseException('Error updating task: $e');
+    }
+  }
+
+  // Update all future instances of a recurring task
+  Future<void> updateRecurringTaskSeries({
+    required String parentTaskId,
+    String? title,
+    String? name,
+    String? description,
+    String? category,
+    String? priority,
+    String? customCategory,
+    bool updateFutureOnly = true,
+  }) async {
+    try {
+      final updateQuery = update(tasks)..where((tbl) => tbl.parentTaskId.equals(parentTaskId));
+      
+      if (updateFutureOnly) {
+        updateQuery.where((tbl) => tbl.dueDate.isBiggerThanValue(DateTime.now()));
+      }
+
+      final companion = TasksCompanion(
+        title: title != null ? Value(title) : const Value.absent(),
+        name: name != null ? Value(name) : const Value.absent(),
+        description: description != null ? Value(description) : const Value.absent(),
+        category: category != null ? Value(category) : const Value.absent(),
+        priority: priority != null ? Value(priority) : const Value.absent(),
+        customCategory: customCategory != null ? Value(customCategory) : const Value.absent(),
+      );
+
+      await updateQuery.write(companion);
+    } catch (e) {
+      print('Error updating recurring task series: $e');
+      throw DatabaseException('Error updating recurring task series: $e');
     }
   }
 

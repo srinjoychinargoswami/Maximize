@@ -84,6 +84,74 @@ class $TasksTable extends Tasks with TableInfo<$TasksTable, TaskData> {
   late final GeneratedColumn<String> day = GeneratedColumn<String>(
       'day', aliasedName, true,
       type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _isRecurringMeta =
+      const VerificationMeta('isRecurring');
+  @override
+  late final GeneratedColumn<bool> isRecurring = GeneratedColumn<bool>(
+      'is_recurring', aliasedName, false,
+      type: DriftSqlType.bool,
+      requiredDuringInsert: false,
+      defaultConstraints: GeneratedColumn.constraintIsAlways(
+          'CHECK ("is_recurring" IN (0, 1))'),
+      defaultValue: Constant(false));
+  static const VerificationMeta _recurrenceRuleMeta =
+      const VerificationMeta('recurrenceRule');
+  @override
+  late final GeneratedColumn<String> recurrenceRule = GeneratedColumn<String>(
+      'recurrence_rule', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _recurrenceIntervalMeta =
+      const VerificationMeta('recurrenceInterval');
+  @override
+  late final GeneratedColumn<int> recurrenceInterval = GeneratedColumn<int>(
+      'recurrence_interval', aliasedName, true,
+      type: DriftSqlType.int, requiredDuringInsert: false);
+  static const VerificationMeta _daysOfWeekMeta =
+      const VerificationMeta('daysOfWeek');
+  @override
+  late final GeneratedColumn<String> daysOfWeek = GeneratedColumn<String>(
+      'days_of_week', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _recurrenceEndDateMeta =
+      const VerificationMeta('recurrenceEndDate');
+  @override
+  late final GeneratedColumn<DateTime> recurrenceEndDate =
+      GeneratedColumn<DateTime>('recurrence_end_date', aliasedName, true,
+          type: DriftSqlType.dateTime, requiredDuringInsert: false);
+  static const VerificationMeta _parentTaskIdMeta =
+      const VerificationMeta('parentTaskId');
+  @override
+  late final GeneratedColumn<String> parentTaskId = GeneratedColumn<String>(
+      'parent_task_id', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _maxOccurrencesMeta =
+      const VerificationMeta('maxOccurrences');
+  @override
+  late final GeneratedColumn<int> maxOccurrences = GeneratedColumn<int>(
+      'max_occurrences', aliasedName, true,
+      type: DriftSqlType.int, requiredDuringInsert: false);
+  static const VerificationMeta _skipWeekendsMeta =
+      const VerificationMeta('skipWeekends');
+  @override
+  late final GeneratedColumn<bool> skipWeekends = GeneratedColumn<bool>(
+      'skip_weekends', aliasedName, false,
+      type: DriftSqlType.bool,
+      requiredDuringInsert: false,
+      defaultConstraints: GeneratedColumn.constraintIsAlways(
+          'CHECK ("skip_weekends" IN (0, 1))'),
+      defaultValue: Constant(false));
+  static const VerificationMeta _dayOfMonthMeta =
+      const VerificationMeta('dayOfMonth');
+  @override
+  late final GeneratedColumn<int> dayOfMonth = GeneratedColumn<int>(
+      'day_of_month', aliasedName, true,
+      type: DriftSqlType.int, requiredDuringInsert: false);
+  static const VerificationMeta _weekOfMonthMeta =
+      const VerificationMeta('weekOfMonth');
+  @override
+  late final GeneratedColumn<int> weekOfMonth = GeneratedColumn<int>(
+      'week_of_month', aliasedName, true,
+      type: DriftSqlType.int, requiredDuringInsert: false);
   @override
   List<GeneratedColumn> get $columns => [
         id,
@@ -96,7 +164,17 @@ class $TasksTable extends Tasks with TableInfo<$TasksTable, TaskData> {
         priority,
         customCategory,
         pageId,
-        day
+        day,
+        isRecurring,
+        recurrenceRule,
+        recurrenceInterval,
+        daysOfWeek,
+        recurrenceEndDate,
+        parentTaskId,
+        maxOccurrences,
+        skipWeekends,
+        dayOfMonth,
+        weekOfMonth
       ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -163,6 +241,66 @@ class $TasksTable extends Tasks with TableInfo<$TasksTable, TaskData> {
       context.handle(
           _dayMeta, day.isAcceptableOrUnknown(data['day']!, _dayMeta));
     }
+    if (data.containsKey('is_recurring')) {
+      context.handle(
+          _isRecurringMeta,
+          isRecurring.isAcceptableOrUnknown(
+              data['is_recurring']!, _isRecurringMeta));
+    }
+    if (data.containsKey('recurrence_rule')) {
+      context.handle(
+          _recurrenceRuleMeta,
+          recurrenceRule.isAcceptableOrUnknown(
+              data['recurrence_rule']!, _recurrenceRuleMeta));
+    }
+    if (data.containsKey('recurrence_interval')) {
+      context.handle(
+          _recurrenceIntervalMeta,
+          recurrenceInterval.isAcceptableOrUnknown(
+              data['recurrence_interval']!, _recurrenceIntervalMeta));
+    }
+    if (data.containsKey('days_of_week')) {
+      context.handle(
+          _daysOfWeekMeta,
+          daysOfWeek.isAcceptableOrUnknown(
+              data['days_of_week']!, _daysOfWeekMeta));
+    }
+    if (data.containsKey('recurrence_end_date')) {
+      context.handle(
+          _recurrenceEndDateMeta,
+          recurrenceEndDate.isAcceptableOrUnknown(
+              data['recurrence_end_date']!, _recurrenceEndDateMeta));
+    }
+    if (data.containsKey('parent_task_id')) {
+      context.handle(
+          _parentTaskIdMeta,
+          parentTaskId.isAcceptableOrUnknown(
+              data['parent_task_id']!, _parentTaskIdMeta));
+    }
+    if (data.containsKey('max_occurrences')) {
+      context.handle(
+          _maxOccurrencesMeta,
+          maxOccurrences.isAcceptableOrUnknown(
+              data['max_occurrences']!, _maxOccurrencesMeta));
+    }
+    if (data.containsKey('skip_weekends')) {
+      context.handle(
+          _skipWeekendsMeta,
+          skipWeekends.isAcceptableOrUnknown(
+              data['skip_weekends']!, _skipWeekendsMeta));
+    }
+    if (data.containsKey('day_of_month')) {
+      context.handle(
+          _dayOfMonthMeta,
+          dayOfMonth.isAcceptableOrUnknown(
+              data['day_of_month']!, _dayOfMonthMeta));
+    }
+    if (data.containsKey('week_of_month')) {
+      context.handle(
+          _weekOfMonthMeta,
+          weekOfMonth.isAcceptableOrUnknown(
+              data['week_of_month']!, _weekOfMonthMeta));
+    }
     return context;
   }
 
@@ -194,6 +332,26 @@ class $TasksTable extends Tasks with TableInfo<$TasksTable, TaskData> {
           .read(DriftSqlType.string, data['${effectivePrefix}page_id']),
       day: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}day']),
+      isRecurring: attachedDatabase.typeMapping
+          .read(DriftSqlType.bool, data['${effectivePrefix}is_recurring'])!,
+      recurrenceRule: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}recurrence_rule']),
+      recurrenceInterval: attachedDatabase.typeMapping.read(
+          DriftSqlType.int, data['${effectivePrefix}recurrence_interval']),
+      daysOfWeek: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}days_of_week']),
+      recurrenceEndDate: attachedDatabase.typeMapping.read(
+          DriftSqlType.dateTime, data['${effectivePrefix}recurrence_end_date']),
+      parentTaskId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}parent_task_id']),
+      maxOccurrences: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}max_occurrences']),
+      skipWeekends: attachedDatabase.typeMapping
+          .read(DriftSqlType.bool, data['${effectivePrefix}skip_weekends'])!,
+      dayOfMonth: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}day_of_month']),
+      weekOfMonth: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}week_of_month']),
     );
   }
 
@@ -215,6 +373,16 @@ class TaskData extends DataClass implements Insertable<TaskData> {
   final String? customCategory;
   final String? pageId;
   final String? day;
+  final bool isRecurring;
+  final String? recurrenceRule;
+  final int? recurrenceInterval;
+  final String? daysOfWeek;
+  final DateTime? recurrenceEndDate;
+  final String? parentTaskId;
+  final int? maxOccurrences;
+  final bool skipWeekends;
+  final int? dayOfMonth;
+  final int? weekOfMonth;
   const TaskData(
       {required this.id,
       required this.name,
@@ -226,7 +394,17 @@ class TaskData extends DataClass implements Insertable<TaskData> {
       required this.priority,
       this.customCategory,
       this.pageId,
-      this.day});
+      this.day,
+      required this.isRecurring,
+      this.recurrenceRule,
+      this.recurrenceInterval,
+      this.daysOfWeek,
+      this.recurrenceEndDate,
+      this.parentTaskId,
+      this.maxOccurrences,
+      required this.skipWeekends,
+      this.dayOfMonth,
+      this.weekOfMonth});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -251,6 +429,32 @@ class TaskData extends DataClass implements Insertable<TaskData> {
     if (!nullToAbsent || day != null) {
       map['day'] = Variable<String>(day);
     }
+    map['is_recurring'] = Variable<bool>(isRecurring);
+    if (!nullToAbsent || recurrenceRule != null) {
+      map['recurrence_rule'] = Variable<String>(recurrenceRule);
+    }
+    if (!nullToAbsent || recurrenceInterval != null) {
+      map['recurrence_interval'] = Variable<int>(recurrenceInterval);
+    }
+    if (!nullToAbsent || daysOfWeek != null) {
+      map['days_of_week'] = Variable<String>(daysOfWeek);
+    }
+    if (!nullToAbsent || recurrenceEndDate != null) {
+      map['recurrence_end_date'] = Variable<DateTime>(recurrenceEndDate);
+    }
+    if (!nullToAbsent || parentTaskId != null) {
+      map['parent_task_id'] = Variable<String>(parentTaskId);
+    }
+    if (!nullToAbsent || maxOccurrences != null) {
+      map['max_occurrences'] = Variable<int>(maxOccurrences);
+    }
+    map['skip_weekends'] = Variable<bool>(skipWeekends);
+    if (!nullToAbsent || dayOfMonth != null) {
+      map['day_of_month'] = Variable<int>(dayOfMonth);
+    }
+    if (!nullToAbsent || weekOfMonth != null) {
+      map['week_of_month'] = Variable<int>(weekOfMonth);
+    }
     return map;
   }
 
@@ -274,6 +478,32 @@ class TaskData extends DataClass implements Insertable<TaskData> {
       pageId:
           pageId == null && nullToAbsent ? const Value.absent() : Value(pageId),
       day: day == null && nullToAbsent ? const Value.absent() : Value(day),
+      isRecurring: Value(isRecurring),
+      recurrenceRule: recurrenceRule == null && nullToAbsent
+          ? const Value.absent()
+          : Value(recurrenceRule),
+      recurrenceInterval: recurrenceInterval == null && nullToAbsent
+          ? const Value.absent()
+          : Value(recurrenceInterval),
+      daysOfWeek: daysOfWeek == null && nullToAbsent
+          ? const Value.absent()
+          : Value(daysOfWeek),
+      recurrenceEndDate: recurrenceEndDate == null && nullToAbsent
+          ? const Value.absent()
+          : Value(recurrenceEndDate),
+      parentTaskId: parentTaskId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(parentTaskId),
+      maxOccurrences: maxOccurrences == null && nullToAbsent
+          ? const Value.absent()
+          : Value(maxOccurrences),
+      skipWeekends: Value(skipWeekends),
+      dayOfMonth: dayOfMonth == null && nullToAbsent
+          ? const Value.absent()
+          : Value(dayOfMonth),
+      weekOfMonth: weekOfMonth == null && nullToAbsent
+          ? const Value.absent()
+          : Value(weekOfMonth),
     );
   }
 
@@ -292,6 +522,17 @@ class TaskData extends DataClass implements Insertable<TaskData> {
       customCategory: serializer.fromJson<String?>(json['customCategory']),
       pageId: serializer.fromJson<String?>(json['pageId']),
       day: serializer.fromJson<String?>(json['day']),
+      isRecurring: serializer.fromJson<bool>(json['isRecurring']),
+      recurrenceRule: serializer.fromJson<String?>(json['recurrenceRule']),
+      recurrenceInterval: serializer.fromJson<int?>(json['recurrenceInterval']),
+      daysOfWeek: serializer.fromJson<String?>(json['daysOfWeek']),
+      recurrenceEndDate:
+          serializer.fromJson<DateTime?>(json['recurrenceEndDate']),
+      parentTaskId: serializer.fromJson<String?>(json['parentTaskId']),
+      maxOccurrences: serializer.fromJson<int?>(json['maxOccurrences']),
+      skipWeekends: serializer.fromJson<bool>(json['skipWeekends']),
+      dayOfMonth: serializer.fromJson<int?>(json['dayOfMonth']),
+      weekOfMonth: serializer.fromJson<int?>(json['weekOfMonth']),
     );
   }
   @override
@@ -309,6 +550,16 @@ class TaskData extends DataClass implements Insertable<TaskData> {
       'customCategory': serializer.toJson<String?>(customCategory),
       'pageId': serializer.toJson<String?>(pageId),
       'day': serializer.toJson<String?>(day),
+      'isRecurring': serializer.toJson<bool>(isRecurring),
+      'recurrenceRule': serializer.toJson<String?>(recurrenceRule),
+      'recurrenceInterval': serializer.toJson<int?>(recurrenceInterval),
+      'daysOfWeek': serializer.toJson<String?>(daysOfWeek),
+      'recurrenceEndDate': serializer.toJson<DateTime?>(recurrenceEndDate),
+      'parentTaskId': serializer.toJson<String?>(parentTaskId),
+      'maxOccurrences': serializer.toJson<int?>(maxOccurrences),
+      'skipWeekends': serializer.toJson<bool>(skipWeekends),
+      'dayOfMonth': serializer.toJson<int?>(dayOfMonth),
+      'weekOfMonth': serializer.toJson<int?>(weekOfMonth),
     };
   }
 
@@ -323,7 +574,17 @@ class TaskData extends DataClass implements Insertable<TaskData> {
           String? priority,
           Value<String?> customCategory = const Value.absent(),
           Value<String?> pageId = const Value.absent(),
-          Value<String?> day = const Value.absent()}) =>
+          Value<String?> day = const Value.absent(),
+          bool? isRecurring,
+          Value<String?> recurrenceRule = const Value.absent(),
+          Value<int?> recurrenceInterval = const Value.absent(),
+          Value<String?> daysOfWeek = const Value.absent(),
+          Value<DateTime?> recurrenceEndDate = const Value.absent(),
+          Value<String?> parentTaskId = const Value.absent(),
+          Value<int?> maxOccurrences = const Value.absent(),
+          bool? skipWeekends,
+          Value<int?> dayOfMonth = const Value.absent(),
+          Value<int?> weekOfMonth = const Value.absent()}) =>
       TaskData(
         id: id ?? this.id,
         name: name ?? this.name,
@@ -337,6 +598,23 @@ class TaskData extends DataClass implements Insertable<TaskData> {
             customCategory.present ? customCategory.value : this.customCategory,
         pageId: pageId.present ? pageId.value : this.pageId,
         day: day.present ? day.value : this.day,
+        isRecurring: isRecurring ?? this.isRecurring,
+        recurrenceRule:
+            recurrenceRule.present ? recurrenceRule.value : this.recurrenceRule,
+        recurrenceInterval: recurrenceInterval.present
+            ? recurrenceInterval.value
+            : this.recurrenceInterval,
+        daysOfWeek: daysOfWeek.present ? daysOfWeek.value : this.daysOfWeek,
+        recurrenceEndDate: recurrenceEndDate.present
+            ? recurrenceEndDate.value
+            : this.recurrenceEndDate,
+        parentTaskId:
+            parentTaskId.present ? parentTaskId.value : this.parentTaskId,
+        maxOccurrences:
+            maxOccurrences.present ? maxOccurrences.value : this.maxOccurrences,
+        skipWeekends: skipWeekends ?? this.skipWeekends,
+        dayOfMonth: dayOfMonth.present ? dayOfMonth.value : this.dayOfMonth,
+        weekOfMonth: weekOfMonth.present ? weekOfMonth.value : this.weekOfMonth,
       );
   TaskData copyWithCompanion(TasksCompanion data) {
     return TaskData(
@@ -354,6 +632,32 @@ class TaskData extends DataClass implements Insertable<TaskData> {
           : this.customCategory,
       pageId: data.pageId.present ? data.pageId.value : this.pageId,
       day: data.day.present ? data.day.value : this.day,
+      isRecurring:
+          data.isRecurring.present ? data.isRecurring.value : this.isRecurring,
+      recurrenceRule: data.recurrenceRule.present
+          ? data.recurrenceRule.value
+          : this.recurrenceRule,
+      recurrenceInterval: data.recurrenceInterval.present
+          ? data.recurrenceInterval.value
+          : this.recurrenceInterval,
+      daysOfWeek:
+          data.daysOfWeek.present ? data.daysOfWeek.value : this.daysOfWeek,
+      recurrenceEndDate: data.recurrenceEndDate.present
+          ? data.recurrenceEndDate.value
+          : this.recurrenceEndDate,
+      parentTaskId: data.parentTaskId.present
+          ? data.parentTaskId.value
+          : this.parentTaskId,
+      maxOccurrences: data.maxOccurrences.present
+          ? data.maxOccurrences.value
+          : this.maxOccurrences,
+      skipWeekends: data.skipWeekends.present
+          ? data.skipWeekends.value
+          : this.skipWeekends,
+      dayOfMonth:
+          data.dayOfMonth.present ? data.dayOfMonth.value : this.dayOfMonth,
+      weekOfMonth:
+          data.weekOfMonth.present ? data.weekOfMonth.value : this.weekOfMonth,
     );
   }
 
@@ -370,14 +674,45 @@ class TaskData extends DataClass implements Insertable<TaskData> {
           ..write('priority: $priority, ')
           ..write('customCategory: $customCategory, ')
           ..write('pageId: $pageId, ')
-          ..write('day: $day')
+          ..write('day: $day, ')
+          ..write('isRecurring: $isRecurring, ')
+          ..write('recurrenceRule: $recurrenceRule, ')
+          ..write('recurrenceInterval: $recurrenceInterval, ')
+          ..write('daysOfWeek: $daysOfWeek, ')
+          ..write('recurrenceEndDate: $recurrenceEndDate, ')
+          ..write('parentTaskId: $parentTaskId, ')
+          ..write('maxOccurrences: $maxOccurrences, ')
+          ..write('skipWeekends: $skipWeekends, ')
+          ..write('dayOfMonth: $dayOfMonth, ')
+          ..write('weekOfMonth: $weekOfMonth')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(id, name, title, description, dueDate,
-      completed, category, priority, customCategory, pageId, day);
+  int get hashCode => Object.hashAll([
+        id,
+        name,
+        title,
+        description,
+        dueDate,
+        completed,
+        category,
+        priority,
+        customCategory,
+        pageId,
+        day,
+        isRecurring,
+        recurrenceRule,
+        recurrenceInterval,
+        daysOfWeek,
+        recurrenceEndDate,
+        parentTaskId,
+        maxOccurrences,
+        skipWeekends,
+        dayOfMonth,
+        weekOfMonth
+      ]);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -392,7 +727,17 @@ class TaskData extends DataClass implements Insertable<TaskData> {
           other.priority == this.priority &&
           other.customCategory == this.customCategory &&
           other.pageId == this.pageId &&
-          other.day == this.day);
+          other.day == this.day &&
+          other.isRecurring == this.isRecurring &&
+          other.recurrenceRule == this.recurrenceRule &&
+          other.recurrenceInterval == this.recurrenceInterval &&
+          other.daysOfWeek == this.daysOfWeek &&
+          other.recurrenceEndDate == this.recurrenceEndDate &&
+          other.parentTaskId == this.parentTaskId &&
+          other.maxOccurrences == this.maxOccurrences &&
+          other.skipWeekends == this.skipWeekends &&
+          other.dayOfMonth == this.dayOfMonth &&
+          other.weekOfMonth == this.weekOfMonth);
 }
 
 class TasksCompanion extends UpdateCompanion<TaskData> {
@@ -407,6 +752,16 @@ class TasksCompanion extends UpdateCompanion<TaskData> {
   final Value<String?> customCategory;
   final Value<String?> pageId;
   final Value<String?> day;
+  final Value<bool> isRecurring;
+  final Value<String?> recurrenceRule;
+  final Value<int?> recurrenceInterval;
+  final Value<String?> daysOfWeek;
+  final Value<DateTime?> recurrenceEndDate;
+  final Value<String?> parentTaskId;
+  final Value<int?> maxOccurrences;
+  final Value<bool> skipWeekends;
+  final Value<int?> dayOfMonth;
+  final Value<int?> weekOfMonth;
   final Value<int> rowid;
   const TasksCompanion({
     this.id = const Value.absent(),
@@ -420,6 +775,16 @@ class TasksCompanion extends UpdateCompanion<TaskData> {
     this.customCategory = const Value.absent(),
     this.pageId = const Value.absent(),
     this.day = const Value.absent(),
+    this.isRecurring = const Value.absent(),
+    this.recurrenceRule = const Value.absent(),
+    this.recurrenceInterval = const Value.absent(),
+    this.daysOfWeek = const Value.absent(),
+    this.recurrenceEndDate = const Value.absent(),
+    this.parentTaskId = const Value.absent(),
+    this.maxOccurrences = const Value.absent(),
+    this.skipWeekends = const Value.absent(),
+    this.dayOfMonth = const Value.absent(),
+    this.weekOfMonth = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   TasksCompanion.insert({
@@ -434,6 +799,16 @@ class TasksCompanion extends UpdateCompanion<TaskData> {
     this.customCategory = const Value.absent(),
     this.pageId = const Value.absent(),
     this.day = const Value.absent(),
+    this.isRecurring = const Value.absent(),
+    this.recurrenceRule = const Value.absent(),
+    this.recurrenceInterval = const Value.absent(),
+    this.daysOfWeek = const Value.absent(),
+    this.recurrenceEndDate = const Value.absent(),
+    this.parentTaskId = const Value.absent(),
+    this.maxOccurrences = const Value.absent(),
+    this.skipWeekends = const Value.absent(),
+    this.dayOfMonth = const Value.absent(),
+    this.weekOfMonth = const Value.absent(),
     this.rowid = const Value.absent(),
   })  : name = Value(name),
         title = Value(title),
@@ -451,6 +826,16 @@ class TasksCompanion extends UpdateCompanion<TaskData> {
     Expression<String>? customCategory,
     Expression<String>? pageId,
     Expression<String>? day,
+    Expression<bool>? isRecurring,
+    Expression<String>? recurrenceRule,
+    Expression<int>? recurrenceInterval,
+    Expression<String>? daysOfWeek,
+    Expression<DateTime>? recurrenceEndDate,
+    Expression<String>? parentTaskId,
+    Expression<int>? maxOccurrences,
+    Expression<bool>? skipWeekends,
+    Expression<int>? dayOfMonth,
+    Expression<int>? weekOfMonth,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -465,6 +850,16 @@ class TasksCompanion extends UpdateCompanion<TaskData> {
       if (customCategory != null) 'custom_category': customCategory,
       if (pageId != null) 'page_id': pageId,
       if (day != null) 'day': day,
+      if (isRecurring != null) 'is_recurring': isRecurring,
+      if (recurrenceRule != null) 'recurrence_rule': recurrenceRule,
+      if (recurrenceInterval != null) 'recurrence_interval': recurrenceInterval,
+      if (daysOfWeek != null) 'days_of_week': daysOfWeek,
+      if (recurrenceEndDate != null) 'recurrence_end_date': recurrenceEndDate,
+      if (parentTaskId != null) 'parent_task_id': parentTaskId,
+      if (maxOccurrences != null) 'max_occurrences': maxOccurrences,
+      if (skipWeekends != null) 'skip_weekends': skipWeekends,
+      if (dayOfMonth != null) 'day_of_month': dayOfMonth,
+      if (weekOfMonth != null) 'week_of_month': weekOfMonth,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -481,6 +876,16 @@ class TasksCompanion extends UpdateCompanion<TaskData> {
       Value<String?>? customCategory,
       Value<String?>? pageId,
       Value<String?>? day,
+      Value<bool>? isRecurring,
+      Value<String?>? recurrenceRule,
+      Value<int?>? recurrenceInterval,
+      Value<String?>? daysOfWeek,
+      Value<DateTime?>? recurrenceEndDate,
+      Value<String?>? parentTaskId,
+      Value<int?>? maxOccurrences,
+      Value<bool>? skipWeekends,
+      Value<int?>? dayOfMonth,
+      Value<int?>? weekOfMonth,
       Value<int>? rowid}) {
     return TasksCompanion(
       id: id ?? this.id,
@@ -494,6 +899,16 @@ class TasksCompanion extends UpdateCompanion<TaskData> {
       customCategory: customCategory ?? this.customCategory,
       pageId: pageId ?? this.pageId,
       day: day ?? this.day,
+      isRecurring: isRecurring ?? this.isRecurring,
+      recurrenceRule: recurrenceRule ?? this.recurrenceRule,
+      recurrenceInterval: recurrenceInterval ?? this.recurrenceInterval,
+      daysOfWeek: daysOfWeek ?? this.daysOfWeek,
+      recurrenceEndDate: recurrenceEndDate ?? this.recurrenceEndDate,
+      parentTaskId: parentTaskId ?? this.parentTaskId,
+      maxOccurrences: maxOccurrences ?? this.maxOccurrences,
+      skipWeekends: skipWeekends ?? this.skipWeekends,
+      dayOfMonth: dayOfMonth ?? this.dayOfMonth,
+      weekOfMonth: weekOfMonth ?? this.weekOfMonth,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -534,6 +949,36 @@ class TasksCompanion extends UpdateCompanion<TaskData> {
     if (day.present) {
       map['day'] = Variable<String>(day.value);
     }
+    if (isRecurring.present) {
+      map['is_recurring'] = Variable<bool>(isRecurring.value);
+    }
+    if (recurrenceRule.present) {
+      map['recurrence_rule'] = Variable<String>(recurrenceRule.value);
+    }
+    if (recurrenceInterval.present) {
+      map['recurrence_interval'] = Variable<int>(recurrenceInterval.value);
+    }
+    if (daysOfWeek.present) {
+      map['days_of_week'] = Variable<String>(daysOfWeek.value);
+    }
+    if (recurrenceEndDate.present) {
+      map['recurrence_end_date'] = Variable<DateTime>(recurrenceEndDate.value);
+    }
+    if (parentTaskId.present) {
+      map['parent_task_id'] = Variable<String>(parentTaskId.value);
+    }
+    if (maxOccurrences.present) {
+      map['max_occurrences'] = Variable<int>(maxOccurrences.value);
+    }
+    if (skipWeekends.present) {
+      map['skip_weekends'] = Variable<bool>(skipWeekends.value);
+    }
+    if (dayOfMonth.present) {
+      map['day_of_month'] = Variable<int>(dayOfMonth.value);
+    }
+    if (weekOfMonth.present) {
+      map['week_of_month'] = Variable<int>(weekOfMonth.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -554,6 +999,16 @@ class TasksCompanion extends UpdateCompanion<TaskData> {
           ..write('customCategory: $customCategory, ')
           ..write('pageId: $pageId, ')
           ..write('day: $day, ')
+          ..write('isRecurring: $isRecurring, ')
+          ..write('recurrenceRule: $recurrenceRule, ')
+          ..write('recurrenceInterval: $recurrenceInterval, ')
+          ..write('daysOfWeek: $daysOfWeek, ')
+          ..write('recurrenceEndDate: $recurrenceEndDate, ')
+          ..write('parentTaskId: $parentTaskId, ')
+          ..write('maxOccurrences: $maxOccurrences, ')
+          ..write('skipWeekends: $skipWeekends, ')
+          ..write('dayOfMonth: $dayOfMonth, ')
+          ..write('weekOfMonth: $weekOfMonth, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -2513,6 +2968,16 @@ typedef $$TasksTableCreateCompanionBuilder = TasksCompanion Function({
   Value<String?> customCategory,
   Value<String?> pageId,
   Value<String?> day,
+  Value<bool> isRecurring,
+  Value<String?> recurrenceRule,
+  Value<int?> recurrenceInterval,
+  Value<String?> daysOfWeek,
+  Value<DateTime?> recurrenceEndDate,
+  Value<String?> parentTaskId,
+  Value<int?> maxOccurrences,
+  Value<bool> skipWeekends,
+  Value<int?> dayOfMonth,
+  Value<int?> weekOfMonth,
   Value<int> rowid,
 });
 typedef $$TasksTableUpdateCompanionBuilder = TasksCompanion Function({
@@ -2527,6 +2992,16 @@ typedef $$TasksTableUpdateCompanionBuilder = TasksCompanion Function({
   Value<String?> customCategory,
   Value<String?> pageId,
   Value<String?> day,
+  Value<bool> isRecurring,
+  Value<String?> recurrenceRule,
+  Value<int?> recurrenceInterval,
+  Value<String?> daysOfWeek,
+  Value<DateTime?> recurrenceEndDate,
+  Value<String?> parentTaskId,
+  Value<int?> maxOccurrences,
+  Value<bool> skipWeekends,
+  Value<int?> dayOfMonth,
+  Value<int?> weekOfMonth,
   Value<int> rowid,
 });
 
@@ -2590,6 +3065,40 @@ class $$TasksTableFilterComposer extends Composer<_$AppDatabase, $TasksTable> {
 
   ColumnFilters<String> get day => $composableBuilder(
       column: $table.day, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<bool> get isRecurring => $composableBuilder(
+      column: $table.isRecurring, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get recurrenceRule => $composableBuilder(
+      column: $table.recurrenceRule,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get recurrenceInterval => $composableBuilder(
+      column: $table.recurrenceInterval,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get daysOfWeek => $composableBuilder(
+      column: $table.daysOfWeek, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get recurrenceEndDate => $composableBuilder(
+      column: $table.recurrenceEndDate,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get parentTaskId => $composableBuilder(
+      column: $table.parentTaskId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get maxOccurrences => $composableBuilder(
+      column: $table.maxOccurrences,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<bool> get skipWeekends => $composableBuilder(
+      column: $table.skipWeekends, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get dayOfMonth => $composableBuilder(
+      column: $table.dayOfMonth, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get weekOfMonth => $composableBuilder(
+      column: $table.weekOfMonth, builder: (column) => ColumnFilters(column));
 
   Expression<bool> subtasksRefs(
       Expression<bool> Function($$SubtasksTableFilterComposer f) f) {
@@ -2655,6 +3164,42 @@ class $$TasksTableOrderingComposer
 
   ColumnOrderings<String> get day => $composableBuilder(
       column: $table.day, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<bool> get isRecurring => $composableBuilder(
+      column: $table.isRecurring, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get recurrenceRule => $composableBuilder(
+      column: $table.recurrenceRule,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get recurrenceInterval => $composableBuilder(
+      column: $table.recurrenceInterval,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get daysOfWeek => $composableBuilder(
+      column: $table.daysOfWeek, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get recurrenceEndDate => $composableBuilder(
+      column: $table.recurrenceEndDate,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get parentTaskId => $composableBuilder(
+      column: $table.parentTaskId,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get maxOccurrences => $composableBuilder(
+      column: $table.maxOccurrences,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<bool> get skipWeekends => $composableBuilder(
+      column: $table.skipWeekends,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get dayOfMonth => $composableBuilder(
+      column: $table.dayOfMonth, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get weekOfMonth => $composableBuilder(
+      column: $table.weekOfMonth, builder: (column) => ColumnOrderings(column));
 }
 
 class $$TasksTableAnnotationComposer
@@ -2698,6 +3243,36 @@ class $$TasksTableAnnotationComposer
 
   GeneratedColumn<String> get day =>
       $composableBuilder(column: $table.day, builder: (column) => column);
+
+  GeneratedColumn<bool> get isRecurring => $composableBuilder(
+      column: $table.isRecurring, builder: (column) => column);
+
+  GeneratedColumn<String> get recurrenceRule => $composableBuilder(
+      column: $table.recurrenceRule, builder: (column) => column);
+
+  GeneratedColumn<int> get recurrenceInterval => $composableBuilder(
+      column: $table.recurrenceInterval, builder: (column) => column);
+
+  GeneratedColumn<String> get daysOfWeek => $composableBuilder(
+      column: $table.daysOfWeek, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get recurrenceEndDate => $composableBuilder(
+      column: $table.recurrenceEndDate, builder: (column) => column);
+
+  GeneratedColumn<String> get parentTaskId => $composableBuilder(
+      column: $table.parentTaskId, builder: (column) => column);
+
+  GeneratedColumn<int> get maxOccurrences => $composableBuilder(
+      column: $table.maxOccurrences, builder: (column) => column);
+
+  GeneratedColumn<bool> get skipWeekends => $composableBuilder(
+      column: $table.skipWeekends, builder: (column) => column);
+
+  GeneratedColumn<int> get dayOfMonth => $composableBuilder(
+      column: $table.dayOfMonth, builder: (column) => column);
+
+  GeneratedColumn<int> get weekOfMonth => $composableBuilder(
+      column: $table.weekOfMonth, builder: (column) => column);
 
   Expression<T> subtasksRefs<T extends Object>(
       Expression<T> Function($$SubtasksTableAnnotationComposer a) f) {
@@ -2755,6 +3330,16 @@ class $$TasksTableTableManager extends RootTableManager<
             Value<String?> customCategory = const Value.absent(),
             Value<String?> pageId = const Value.absent(),
             Value<String?> day = const Value.absent(),
+            Value<bool> isRecurring = const Value.absent(),
+            Value<String?> recurrenceRule = const Value.absent(),
+            Value<int?> recurrenceInterval = const Value.absent(),
+            Value<String?> daysOfWeek = const Value.absent(),
+            Value<DateTime?> recurrenceEndDate = const Value.absent(),
+            Value<String?> parentTaskId = const Value.absent(),
+            Value<int?> maxOccurrences = const Value.absent(),
+            Value<bool> skipWeekends = const Value.absent(),
+            Value<int?> dayOfMonth = const Value.absent(),
+            Value<int?> weekOfMonth = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
               TasksCompanion(
@@ -2769,6 +3354,16 @@ class $$TasksTableTableManager extends RootTableManager<
             customCategory: customCategory,
             pageId: pageId,
             day: day,
+            isRecurring: isRecurring,
+            recurrenceRule: recurrenceRule,
+            recurrenceInterval: recurrenceInterval,
+            daysOfWeek: daysOfWeek,
+            recurrenceEndDate: recurrenceEndDate,
+            parentTaskId: parentTaskId,
+            maxOccurrences: maxOccurrences,
+            skipWeekends: skipWeekends,
+            dayOfMonth: dayOfMonth,
+            weekOfMonth: weekOfMonth,
             rowid: rowid,
           ),
           createCompanionCallback: ({
@@ -2783,6 +3378,16 @@ class $$TasksTableTableManager extends RootTableManager<
             Value<String?> customCategory = const Value.absent(),
             Value<String?> pageId = const Value.absent(),
             Value<String?> day = const Value.absent(),
+            Value<bool> isRecurring = const Value.absent(),
+            Value<String?> recurrenceRule = const Value.absent(),
+            Value<int?> recurrenceInterval = const Value.absent(),
+            Value<String?> daysOfWeek = const Value.absent(),
+            Value<DateTime?> recurrenceEndDate = const Value.absent(),
+            Value<String?> parentTaskId = const Value.absent(),
+            Value<int?> maxOccurrences = const Value.absent(),
+            Value<bool> skipWeekends = const Value.absent(),
+            Value<int?> dayOfMonth = const Value.absent(),
+            Value<int?> weekOfMonth = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
               TasksCompanion.insert(
@@ -2797,6 +3402,16 @@ class $$TasksTableTableManager extends RootTableManager<
             customCategory: customCategory,
             pageId: pageId,
             day: day,
+            isRecurring: isRecurring,
+            recurrenceRule: recurrenceRule,
+            recurrenceInterval: recurrenceInterval,
+            daysOfWeek: daysOfWeek,
+            recurrenceEndDate: recurrenceEndDate,
+            parentTaskId: parentTaskId,
+            maxOccurrences: maxOccurrences,
+            skipWeekends: skipWeekends,
+            dayOfMonth: dayOfMonth,
+            weekOfMonth: weekOfMonth,
             rowid: rowid,
           ),
           withReferenceMapper: (p0) => p0
