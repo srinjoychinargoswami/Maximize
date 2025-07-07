@@ -6,6 +6,7 @@ import 'package:maximize/screens/add_task_page.dart'; // Import the AddTaskPage
 import 'package:maximize/utils/task_utils.dart';
 import 'package:maximize/models/database.dart'; // Import your Drift database file
 import 'package:shared_preferences/shared_preferences.dart'; // Import SharedPreferences
+import 'package:intl/intl.dart';
 
 class TaskListScreen extends StatefulWidget {
   final AppDatabase database; // Add this line to accept the database
@@ -16,21 +17,43 @@ class TaskListScreen extends StatefulWidget {
   _TaskListScreenState createState() => _TaskListScreenState();
 }
 
-class _TaskListScreenState extends State<TaskListScreen> {
+class _TaskListScreenState extends State<TaskListScreen> with TickerProviderStateMixin {
   List<TaskModel> _tasks = [];
   late final TaskService _taskService; // Declare TaskService
   bool _isLoading = true;
+  late AnimationController _animationController;
+  late Animation<double> _fadeAnimation;
 
   // Filter variables
   String _selectedCategory = 'All';
   String _selectedPriority = 'All';
   DateTime? _selectedDueDate;
+  String _selectedRecurrenceFilter = 'All'; // New filter for recurring tasks
+  
+  // Expansion state for recurring tasks
+  Map<String, bool> _expandedRecurringTasks = {};
+  
+  // Filter visibility
+  bool _showFilters = false;
 
   @override
   void initState() {
     super.initState();
     _taskService = TaskService(widget.database); // Initialize TaskService with the database
+    _animationController = AnimationController(
+      duration: const Duration(milliseconds: 300),
+      vsync: this,
+    );
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
+    );
     _loadTasks();
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadTasks() async {
@@ -39,6 +62,7 @@ class _TaskListScreenState extends State<TaskListScreen> {
     await _loadTaskCompletionStatus(); // Load completion status
     _updateFilterOptions();
     setState(() => _isLoading = false);
+    _animationController.forward();
   }
 
   Future<void> _loadTaskCompletionStatus() async {
@@ -54,7 +78,10 @@ class _TaskListScreenState extends State<TaskListScreen> {
       final matchesCategory = _selectedCategory == 'All' || task.category == _selectedCategory;
       final matchesPriority = _selectedPriority == 'All' || task.priority == _selectedPriority;
       final matchesDueDate = _selectedDueDate == null || _isSameDate(task.dueDate, _selectedDueDate);
-      return matchesCategory && matchesPriority && matchesDueDate;
+      final matchesRecurrence = _selectedRecurrenceFilter == 'All' || 
+          (_selectedRecurrenceFilter == 'Recurring' && task.isRecurring) ||
+          (_selectedRecurrenceFilter == 'One-time' && !task.isRecurring);
+      return matchesCategory && matchesPriority && matchesDueDate && matchesRecurrence;
     }).toList();
   }
 
@@ -63,87 +90,912 @@ class _TaskListScreenState extends State<TaskListScreen> {
     return date1.year == date2.year && date1.month == date2.month && date1.day == date2.day;
   }
 
+  // Clear all filters
+  void _clearAllFilters() {
+    setState(() {
+      _selectedCategory = 'All';
+      _selectedPriority = 'All';
+      _selectedDueDate = null;
+      _selectedRecurrenceFilter = 'All';
+    });
+  }
+
+  // Check if any filters are active
+  bool get _hasActiveFilters {
+    return _selectedCategory != 'All' || 
+           _selectedPriority != 'All' || 
+           _selectedDueDate != null || 
+           _selectedRecurrenceFilter != 'All';
+  }
+
+  // Generate upcoming instances for recurring tasks
+  List<DateTime> _generateUpcomingInstances(TaskModel task, {int maxInstances = 5}) {
+    if (!task.isRecurring || task.recurrenceRule == null) return [];
+    
+    List<DateTime> instances = [];
+    DateTime currentDate = task.dueDate;
+    DateTime endDate = task.recurrenceEndDate ?? DateTime.now().add(const Duration(days: 365));
+    int count = 0;
+    
+    while (currentDate.isBefore(endDate) && count < maxInstances && 
+           (task.maxOccurrences == null || count < task.maxOccurrences!)) {
+      instances.add(currentDate);
+      count++;
+      
+      switch (task.recurrenceRule?.toLowerCase()) {
+        case 'daily':
+          currentDate = currentDate.add(Duration(days: task.recurrenceInterval ?? 1));
+          if (task.skipWeekends) {
+            while (currentDate.weekday == 6 || currentDate.weekday == 7) {
+              currentDate = currentDate.add(const Duration(days: 1));
+            }
+          }
+          break;
+        case 'weekly':
+          currentDate = currentDate.add(Duration(days: 7 * (task.recurrenceInterval ?? 1)));
+          break;
+        case 'monthly':
+          currentDate = DateTime(
+            currentDate.year,
+            currentDate.month + (task.recurrenceInterval ?? 1),
+            task.dayOfMonth ?? currentDate.day,
+          );
+          break;
+        case 'yearly':
+          currentDate = DateTime(
+            currentDate.year + (task.recurrenceInterval ?? 1),
+            currentDate.month,
+            currentDate.day,
+          );
+          break;
+        default:
+          break;
+      }
+    }
+    
+    return instances;
+  }
+
   @override
   Widget build(BuildContext context) {
     final filteredTasks = _filterTasks();
 
     return Scaffold(
+      backgroundColor: Colors.grey[850],
       appBar: AppBar(
-        title: const Text('Task List'),
+        title: const Text('Task List', style: TextStyle(fontWeight: FontWeight.bold)),
+        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+        elevation: 0,
+        actions: [
+          IconButton(
+            icon: Icon(_showFilters ? Icons.filter_list_off : Icons.filter_list),
+            onPressed: () {
+              setState(() {
+                _showFilters = !_showFilters;
+              });
+            },
+            tooltip: _showFilters ? 'Hide Filters' : 'Show Filters',
+          ),
+          if (_hasActiveFilters)
+            IconButton(
+              icon: const Icon(Icons.clear_all),
+              onPressed: _clearAllFilters,
+              tooltip: 'Clear All Filters',
+            ),
+        ],
       ),
-      body: Column(
-        children: [
-          _buildFilterOptions(),
-          Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : filteredTasks.isEmpty
-                    ? const Center(child: Text('No tasks available'))
-                    : ListView.builder(
-                        itemCount: filteredTasks.length,
-                        itemBuilder: (context, index) {
-                          final task = filteredTasks[index];
-                          return Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              TaskWidget(
-                                task: task,
-                                onDelete: () => _deleteTask(task),
-                                onEdit: () => _editTask(task),
-                                onToggleComplete: (isCompleted) => _toggleTaskCompletion(task, isCompleted),
-                              ),
-                              // Fetch and display subtasks for the current task
-                              FutureBuilder<List<SubtaskModel>>(
-                                future: widget.database.getAllSubtasks(task.id), // Fetch subtasks
-                                builder: (context, snapshot) {
-                                  if (snapshot.connectionState == ConnectionState.waiting) {
-                                    return const Padding(
-                                      padding: EdgeInsets.only(left: 16.0),
-                                      child: CircularProgressIndicator(),
-                                    );
-                                  } else if (snapshot.hasError) {
-                                    return Padding(
-                                      padding: const EdgeInsets.only(left: 16.0),
-                                      child: Text('Error fetching subtasks: ${snapshot.error}'),
-                                    );
-                                  } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                                    return const Padding(
-                                      padding: EdgeInsets.only(left: 16.0),
-                                      child: Text('No subtasks available.'),
-                                    );
-                                  }
+      body: RefreshIndicator(
+        onRefresh: _loadTasks,
+        child: Column(
+          children: [
+            // Filter section with animation
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 300),
+              height: _showFilters ? null : 0,
+              child: _showFilters ? _buildFilterSection() : null,
+            ),
+            
+            // Active filters indicator
+            if (_hasActiveFilters) _buildActiveFiltersIndicator(),
+            
+            // Task list
+            Expanded(
+              child: _isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : filteredTasks.isEmpty
+                      ? _buildEmptyState()
+                      : FadeTransition(
+                          opacity: _fadeAnimation,
+                          child: _buildTaskList(filteredTasks),
+                        ),
+            ),
+          ],
+        ),
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _addTask,
+        tooltip: 'Add Task',
+        icon: const Icon(Icons.add),
+        label: const Text('Add Task'),
+        elevation: 4,
+      ),
+    );
+  }
 
-                                  final subtasks = snapshot.data!;
-                                  return Padding(
-                                    padding: const EdgeInsets.only(left: 16.0),
-                                    child: Column(
-                                      children: subtasks.map((subtask) {
-                                        return ListTile(
-                                          title: Text(subtask.title),
-                                          trailing: Checkbox(
-                                            value: subtask.completed,
-                                            onChanged: (value) {
-                                              // Handle completion toggle
-                                              _toggleSubtaskCompletion(subtask, value);
-                                            },
-                                          ),
-                                        );
-                                      }).toList(),
-                                    ),
-                                  );
-                                },
-                              ),
-                            ],
-                          );
-                        },
-                      ),
+  Widget _buildActiveFiltersIndicator() {
+    List<String> activeFilters = [];
+    if (_selectedCategory != 'All') activeFilters.add('Category: $_selectedCategory');
+    if (_selectedPriority != 'All') activeFilters.add('Priority: $_selectedPriority');
+    if (_selectedDueDate != null) activeFilters.add('Due: ${DateFormat('MMM dd').format(_selectedDueDate!)}');
+    if (_selectedRecurrenceFilter != 'All') activeFilters.add('Type: $_selectedRecurrenceFilter');
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+      decoration: BoxDecoration(
+        color: Colors.blue[50],
+        border: Border(bottom: BorderSide(color: Colors.blue[100]!)),
+      ),
+      child: Wrap(
+        spacing: 8.0,
+        runSpacing: 4.0,
+        children: [
+          ...activeFilters.map((filter) => Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: Colors.blue[100],
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(
+              filter,
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.blue[800],
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          )),
+          GestureDetector(
+            onTap: _clearAllFilters,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.red[100],
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.clear, size: 14, color: Colors.red[800]),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Clear All',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.red[800],
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _addTask,
-        tooltip: 'Add Task',
-        child: const Icon(Icons.add),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.task_alt,
+            size: 80,
+            color: Colors.grey[850],
+          ),
+          const SizedBox(height: 24),
+          Text(
+            _hasActiveFilters ? 'No tasks match your filters' : 'No tasks available',
+            style: TextStyle(
+              fontSize: 20,
+              color: Colors.grey[850],
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            _hasActiveFilters 
+                ? 'Try adjusting your filters or create a new task'
+                : 'Tap the + button to create your first task',
+            style: TextStyle(
+              fontSize: 16,
+              color: Colors.grey[850],
+            ),
+            textAlign: TextAlign.center,
+          ),
+          if (_hasActiveFilters) ...[
+            const SizedBox(height: 16),
+            ElevatedButton.icon(
+              onPressed: _clearAllFilters,
+              icon: const Icon(Icons.clear_all),
+              label: const Text('Clear Filters'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blue[100],
+                foregroundColor: Colors.blue[800],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTaskList(List<TaskModel> filteredTasks) {
+    return ListView.builder(
+      padding: const EdgeInsets.all(16.0),
+      itemCount: filteredTasks.length,
+      itemBuilder: (context, index) {
+        final task = filteredTasks[index];
+        return AnimatedContainer(
+          duration: Duration(milliseconds: 300 + (index * 50)),
+          child: _buildTaskCard(task),
+        );
+      },
+    );
+  }
+
+  Widget _buildTaskCard(TaskModel task) {
+    final isExpanded = _expandedRecurringTasks[task.id] ?? false;
+    
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12.0),
+      elevation: 3,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: Column(
+          children: [
+            // Main task
+            _buildMainTaskTile(task, isExpanded),
+            
+            // Recurring instances (if expanded)
+            if (task.isRecurring && isExpanded) _buildRecurringInstances(task),
+            
+            // Subtasks
+            _buildSubtasksSection(task),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMainTaskTile(TaskModel task, bool isExpanded) {
+    return Container(
+      decoration: BoxDecoration(
+        color: task.completed ? Colors.grey[700] : null, // Grey background when complete
+      ),
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 12.0),
+        leading: _buildTaskLeading(task),
+        title: Row(
+          children: [
+            Expanded(
+              child: Text(
+                task.title,
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 16,
+                  decoration: task.completed ? TextDecoration.lineThrough : null,
+                  color: task.completed ? Colors.white : Colors.white, // White text always
+                ),
+              ),
+            ),
+            if (task.isRecurring) _buildRecurringIndicator(task),
+          ],
+        ),
+        subtitle: _buildTaskSubtitle(task),
+        trailing: _buildTaskTrailing(task, isExpanded),
+        onTap: () => _editTask(task),
+      ),
+    );
+  }
+
+  Widget _buildTaskLeading(TaskModel task) {
+    return Container(
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(
+          color: task.completed ? Colors.green : Colors.grey[400]!,
+          width: 2,
+        ),
+      ),
+      child: Checkbox(
+        value: task.completed,
+        onChanged: (value) => _toggleTaskCompletion(task, value),
+        shape: const CircleBorder(),
+        activeColor: Colors.green,
+        checkColor: Colors.white,
+      ),
+    );
+  }
+
+  Widget _buildRecurringIndicator(TaskModel task) {
+    IconData icon;
+    Color color;
+    String tooltip;
+    
+    switch (task.recurrenceRule?.toLowerCase()) {
+      case 'daily':
+        icon = Icons.today;
+        color = Colors.blue;
+        tooltip = 'Daily';
+        break;
+      case 'weekly':
+        icon = Icons.date_range;
+        color = Colors.green;
+        tooltip = 'Weekly';
+        break;
+      case 'monthly':
+        icon = Icons.calendar_month;
+        color = Colors.orange;
+        tooltip = 'Monthly';
+        break;
+      case 'yearly':
+        icon = Icons.event_repeat;
+        color = Colors.purple;
+        tooltip = 'Yearly';
+        break;
+      default:
+        icon = Icons.repeat;
+        color = Colors.grey;
+        tooltip = 'Recurring';
+    }
+    
+    return Tooltip(
+      message: tooltip,
+      child: Container(
+        padding: const EdgeInsets.all(6),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.15),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: color.withOpacity(0.4)),
+        ),
+        child: Icon(
+          icon,
+          size: 18,
+          color: color,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTaskSubtitle(TaskModel task) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 8.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (task.description?.isNotEmpty == true)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8.0),
+              child: Text(
+                task.description!,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: Colors.white, // White text always
+                  fontSize: 14,
+                  height: 1.3,
+                ),
+              ),
+            ),
+          Wrap(
+            spacing: 8.0,
+            runSpacing: 4.0,
+            children: [
+              _buildPriorityChip(task.priority),
+              _buildDueDateChip(task.dueDate),
+              if (task.category?.isNotEmpty == true) _buildCategoryChip(task.category!),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPriorityChip(String priority) {
+    Color color;
+    switch (priority.toLowerCase()) {
+      case 'high':
+        color = Colors.red;
+        break;
+      case 'medium':
+        color = Colors.orange;
+        break;
+      case 'low':
+        color = Colors.green;
+        break;
+      default:
+        color = Colors.grey;
+    }
+    
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.15),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withOpacity(0.4)),
+      ),
+      child: Text(
+        priority,
+        style: TextStyle(
+          color: color,
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDueDateChip(DateTime dueDate) {
+    final now = DateTime.now();
+    final isOverdue = dueDate.isBefore(DateTime(now.year, now.month, now.day));
+    final isToday = _isSameDate(dueDate, now);
+    
+    Color color = isOverdue ? Colors.red : (isToday ? Colors.orange : Colors.blue);
+    String text = isToday ? 'Today' : DateFormat('MMM dd').format(dueDate);
+    
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.15),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withOpacity(0.4)),
+      ),
+      child: Text(
+        text,
+        style: TextStyle(
+          color: color,
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCategoryChip(String category) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.purple.withOpacity(0.15),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.purple.withOpacity(0.4)),
+      ),
+      child: Text(
+        category,
+        style: const TextStyle(
+          color: Colors.purple,
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTaskTrailing(TaskModel task, bool isExpanded) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (task.isRecurring)
+          IconButton(
+            icon: Icon(
+              isExpanded ? Icons.expand_less : Icons.expand_more,
+              color: task.completed ? Colors.white : Colors.grey[850], // White when task complete
+            ),
+            onPressed: () {
+              setState(() {
+                _expandedRecurringTasks[task.id] = !isExpanded;
+              });
+            },
+            tooltip: isExpanded ? 'Collapse instances' : 'Show upcoming instances',
+          ),
+        PopupMenuButton<String>(
+          onSelected: (value) {
+            switch (value) {
+              case 'edit':
+                _editTask(task);
+                break;
+              case 'delete':
+                _deleteTask(task);
+                break;
+            }
+          },
+          itemBuilder: (context) => [
+            const PopupMenuItem(
+              value: 'edit',
+              child: Row(
+                children: [
+                  Icon(Icons.edit, size: 20),
+                  SizedBox(width: 12),
+                  Text('Edit'),
+                ],
+              ),
+            ),
+            const PopupMenuItem(
+              value: 'delete',
+              child: Row(
+                children: [
+                  Icon(Icons.delete, size: 20, color: Colors.red),
+                  SizedBox(width: 12),
+                  Text('Delete', style: TextStyle(color: Colors.red)),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildRecurringInstances(TaskModel task) {
+    final instances = _generateUpcomingInstances(task);
+    
+    if (instances.isEmpty) return const SizedBox.shrink();
+    
+    return Container(
+      margin: const EdgeInsets.fromLTRB(20.0, 0, 20.0, 16.0),
+      padding: const EdgeInsets.all(16.0),
+      decoration: BoxDecoration(
+        color: Colors.grey[850],
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey[200]!),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.schedule, size: 18, color: Colors.grey[600]),
+              const SizedBox(width: 8),
+              Text(
+                'Upcoming Instances',
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  color: Colors.grey[700],
+                  fontSize: 14,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          ...instances.map((date) => Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4.0),
+            child: Row(
+              children: [
+                Container(
+                  width: 8,
+                  height: 8,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[400],
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  DateFormat('EEE, MMM dd, yyyy').format(date),
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Colors.grey[600],
+                  ),
+                ),
+              ],
+            ),
+          )),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSubtasksSection(TaskModel task) {
+    return FutureBuilder<List<SubtaskModel>>(
+      future: widget.database.getAllSubtasks(task.id),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Padding(
+            padding: EdgeInsets.all(20.0),
+            child: Center(child: SizedBox(
+              height: 24,
+              width: 24,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )),
+          );
+        }
+        
+        if (snapshot.hasError) {
+          return Padding(
+            padding: const EdgeInsets.all(20.0),
+            child: Text(
+              'Error loading subtasks',
+              style: TextStyle(color: Colors.red[600], fontSize: 13),
+            ),
+          );
+        }
+        
+        final subtasks = snapshot.data ?? [];
+        if (subtasks.isEmpty) return const SizedBox.shrink();
+        
+        return Container(
+          margin: const EdgeInsets.fromLTRB(20.0, 0, 20.0, 16.0),
+          padding: const EdgeInsets.all(16.0),
+          decoration: BoxDecoration(
+            color: task.completed ? Colors.grey[700] : Colors.blue[50], // Grey when task complete
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: task.completed ? Colors.grey[500]! : Colors.blue[100]!),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.subdirectory_arrow_right, size: 18, color: task.completed ? Colors.white : Colors.blue[600]),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Subtasks (${subtasks.length})',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: task.completed ? Colors.white : Colors.blue[700], // White when task complete
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              ...subtasks.map((subtask) => _buildSubtaskTile(subtask, task)),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildSubtaskTile(SubtaskModel subtask, TaskModel task) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4.0),
+      child: Row(
+        children: [
+          SizedBox(
+            height: 24,
+            width: 24,
+            child: Checkbox(
+              value: subtask.completed,
+              onChanged: (value) => _toggleSubtaskCompletion(subtask, value),
+              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              subtask.title,
+              style: TextStyle(
+                fontSize: 13,
+                decoration: subtask.completed ? TextDecoration.lineThrough : null,
+                color: task.completed 
+                    ? Colors.white // White text when parent task is complete
+                    : (subtask.completed ? Colors.grey[500] : Colors.grey[700]), // Original logic when parent not complete
+              ),
+            ),
+          ),
+          // Delete subtask button
+          IconButton(
+            icon: Icon(Icons.delete_outline, size: 18, color: Colors.red[400]),
+            onPressed: () => _deleteSubtask(subtask),
+            tooltip: 'Delete subtask',
+            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFilterSection() {
+    return Container(
+      padding: const EdgeInsets.all(20.0),
+      decoration: BoxDecoration(
+        color: Colors.grey[850],
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            spreadRadius: 1,
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.tune, size: 22, color: Colors.grey[700]),
+              const SizedBox(width: 12),
+              Text(
+                'Filter Tasks',
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
+                  fontSize: 16,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          _buildFilterRow1(),
+          const SizedBox(height: 12),
+          _buildFilterRow2(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFilterRow1() {
+    final categories = _tasks.map((task) => task.customCategory ?? task.category).toSet().toList();
+    categories.removeWhere((element) => element == null || element.isEmpty);
+    categories.sort();
+    if (!categories.contains('All')) categories.insert(0, 'All');
+
+    return Row(
+      children: [
+        Expanded(
+          child: _buildFilterDropdown(
+            'Category',
+            _selectedCategory,
+            categories.cast<String>(),
+            (value) => setState(() => _selectedCategory = value!),
+          ),
+        ),
+        const SizedBox(width: 16),
+        Expanded(
+          child: _buildFilterDropdown(
+            'Priority',
+            _selectedPriority,
+            ['All', 'Low', 'Medium', 'High'],
+            (value) => setState(() => _selectedPriority = value!),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildFilterRow2() {
+    return Row(
+      children: [
+        Expanded(
+          child: _buildFilterDropdown(
+            'Type',
+            _selectedRecurrenceFilter,
+            ['All', 'Recurring', 'One-time'],
+            (value) => setState(() => _selectedRecurrenceFilter = value!),
+          ),
+        ),
+        const SizedBox(width: 16),
+        Expanded(
+          child: _buildDateFilterButton(),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildFilterDropdown(String label, String value, List<String> items, ValueChanged<String?> onChanged) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.grey[400]!),
+        borderRadius: BorderRadius.circular(12),
+        color: Colors.grey[700], // Grey background
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          value: value,
+          onChanged: onChanged,
+          isExpanded: true,
+          hint: Text(label, style: const TextStyle(color: Colors.white)), // White text for hint
+          dropdownColor: Colors.grey[700], // Grey dropdown menu background
+          style: const TextStyle(color: Colors.white), // White text for selected value
+          items: items.map((item) => DropdownMenuItem(
+            value: item,
+            child: Text(
+              item,
+              style: const TextStyle(fontSize: 14, color: Colors.white), // White text for dropdown items
+            ),
+          )).toList(),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDateFilterButton() {
+    return Container(
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.grey[400]!),
+        borderRadius: BorderRadius.circular(12),
+        color: Colors.grey[700], // Grey background
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: () async {
+            final DateTime? pickedDate = await showDatePicker(
+              context: context,
+              initialDate: _selectedDueDate ?? DateTime.now(),
+              firstDate: DateTime(2022),
+              lastDate: DateTime(2030),
+            );
+
+            if (pickedDate != null) {
+              setState(() {
+                _selectedDueDate = pickedDate;
+              });
+            }
+          },
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            child: Row(
+              children: [
+                const Icon(Icons.calendar_today, size: 18, color: Colors.white), // White icon
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    _selectedDueDate == null 
+                        ? 'Select Due Date' 
+                        : DateFormat('MMM dd, yyyy').format(_selectedDueDate!),
+                    style: const TextStyle(
+                      fontSize: 14,
+                      color: Colors.white, // White text
+                    ),
+                  ),
+                ),
+                if (_selectedDueDate != null) ...[
+                  const SizedBox(width: 8),
+                  GestureDetector(
+                    onTap: () => setState(() => _selectedDueDate = null),
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: const BoxDecoration(
+                        color: Colors.white, // White background for clear button
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.close, size: 12, color: Colors.grey), // Grey icon on white background
+                    ),
+                  ),
+                ],
+                // Reset button (always visible)
+                const SizedBox(width: 8),
+                GestureDetector(
+                  onTap: () => setState(() => _selectedDueDate = null),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.white.withOpacity(0.3)),
+                    ),
+                    child: const Text(
+                      'Reset',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.white,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -154,39 +1006,80 @@ class _TaskListScreenState extends State<TaskListScreen> {
       MaterialPageRoute(builder: (context) => const AddTaskPage()),
     ).then((value) {
       if (value != null) {
-        // Reload tasks after adding a new task
         _loadTasks();
       }
     });
   }
 
   void _deleteTask(TaskModel task) {
-    // Show a confirmation dialog before deleting
     showDialog(
       context: context,
       builder: (context) {
         return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           title: const Text('Confirm Deletion'),
-          content: const Text('Are you sure you want to delete this task?'),
+          content: Text(
+            task.isRecurring 
+                ? 'Are you sure you want to delete this recurring task? This will delete all instances.'
+                : 'Are you sure you want to delete this task?'
+          ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.of(context).pop(), // Cancel
-              child: const Text('Cancel '),
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
             ),
-            TextButton(
+            ElevatedButton(
               onPressed: () {
-                Navigator.of(context).pop(); // Close the dialog
+                Navigator.of(context).pop();
                 _taskService.deleteTask(task.id).then((_) {
-                  // Reload tasks after deletion
                   _loadTasks();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Task deleted successfully')),
+                  );
                 }).catchError((error) {
-                  // Handle any errors that occur during deletion
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(content: Text('Failed to delete task: $error')),
                   );
                 });
               },
-              child: const Text('Delete'),
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+              child: const Text('Delete', style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _deleteSubtask(SubtaskModel subtask) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Text('Delete Subtask'),
+          content: Text('Are you sure you want to delete "${subtask.title}"?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _taskService.deleteSubtask(subtask.id).then((_) {
+                  _loadTasks();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Subtask deleted successfully')),
+                  );
+                }).catchError((error) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Failed to delete subtask: $error')),
+                  );
+                });
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+              child: const Text('Delete', style: TextStyle(color: Colors.white)),
             ),
           ],
         );
@@ -202,7 +1095,6 @@ class _TaskListScreenState extends State<TaskListScreen> {
       ),
     ).then((value) {
       if (value != null) {
-        // Reload tasks after editing
         _loadTasks();
       }
     });
@@ -211,13 +1103,10 @@ class _TaskListScreenState extends State<TaskListScreen> {
   void _toggleTaskCompletion(TaskModel task, bool? isCompleted) async {
     final updatedTask = task.copyWith(completed: isCompleted ?? false);
     await _taskService.updateTask(updatedTask).then((_) async {
-      // Save the updated completion status in SharedPreferences
       SharedPreferences prefs = await SharedPreferences.getInstance();
       await prefs.setBool(task.id, updatedTask.completed);
-      // Reload tasks after updating
       _loadTasks();
     }).catchError((error) {
-      // Handle any errors that occur during update
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Failed to update task: $error')),
       );
@@ -227,10 +1116,8 @@ class _TaskListScreenState extends State<TaskListScreen> {
   void _toggleSubtaskCompletion(SubtaskModel subtask, bool? isCompleted) async {
     final updatedSubtask = subtask.copyWith(completed: isCompleted ?? false);
     await _taskService.updateSubtask(updatedSubtask).then((_) {
-      // Reload tasks after updating
       _loadTasks();
     }).catchError((error) {
-      // Handle any errors that occur during update
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Failed to update subtask: $error')),
       );
@@ -239,71 +1126,14 @@ class _TaskListScreenState extends State<TaskListScreen> {
 
   void _updateFilterOptions() {
     final categories = _tasks.map((task) => task.customCategory ?? task.category).toSet().toList();
+    categories.removeWhere((element) => element == null || element.isEmpty);
     categories.sort();
     if (!categories.contains('All')) categories.insert(0, 'All');
 
     setState(() {
-      _selectedCategory = categories.isNotEmpty ? categories.first! : 'All'; // Update _selectedCategory
+      if (!categories.contains(_selectedCategory)) {
+        _selectedCategory = 'All';
+      }
     });
-  }
-
-  Widget _buildFilterOptions() {
-    final categories = _tasks.map((task) => task.customCategory ?? task.category).toSet().toList();
-    categories.sort();
-    if (!categories.contains('All')) categories.insert(0, 'All');
-
-    return Padding(
-      padding: const EdgeInsets.all(8.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          DropdownButton(
-            value: _selectedCategory,
-            onChanged: (value) {
-              if (value != null && categories.contains(value)) {
-                setState(() {
-                  _selectedCategory = value;
-                });
-              }
-            },
-            items: categories.map((category) => DropdownMenuItem(
-              value: category,
-              child: Text(category ?? ''),
-            )).toList(),
-          ),
-          DropdownButton(
-            value: _selectedPriority,
-            onChanged: (value) {
-              if (value != null) {
-                setState(() {
-                  _selectedPriority = value;
-                });
-              }
-            },
-            items: ['All', 'Low', 'Medium', 'High'].map((priority) => DropdownMenuItem(
-              value: priority,
-              child: Text(priority),
-            )).toList(),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              final DateTime? pickedDate = await showDatePicker(
-                context: context,
-                initialDate: DateTime.now(),
-                firstDate: DateTime(2022),
-                lastDate: DateTime(2030),
-              );
-
-              if (pickedDate != null) {
-                setState(() {
-                  _selectedDueDate = pickedDate;
-                });
-              }
-            },
-            child: Text(_selectedDueDate == null ? 'Select Due Date' : 'Due Date: ${_selectedDueDate!.day}/${_selectedDueDate!.month}/${_selectedDueDate!.year}'),
-          ),
-        ],
-      ),
-    );
   }
 }
