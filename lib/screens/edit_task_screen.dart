@@ -21,11 +21,13 @@ class _EditTaskScreenState extends State<EditTaskScreen> {
   late String _taskDescription;
   late DateTime _dueDate;
   late bool _completed;
-  late String _category; // Add category
+  late List<String> _categories; // Changed to List<String> for chips
   late String _priority; // Add priority
   late TaskService _taskService; // Declare TaskService
-  final List<SubtaskModel> _subtasks = []; // List to hold subtasks
+  late List<SubtaskModel> _subtasks; // List to hold subtasks
   final TextEditingController _subtaskController = TextEditingController();
+  final TextEditingController _categoryController = TextEditingController(); // Add category controller
+  String _newCategory = ''; // For adding new categories
 
   // Recurring task fields
   late bool _isRecurring;
@@ -48,9 +50,10 @@ class _EditTaskScreenState extends State<EditTaskScreen> {
     _taskDescription = widget.task.description ?? '';
     _dueDate = widget.task.dueDate;
     _completed = widget.task.completed;
-    _category = widget.task.category ?? ''; // Initialize category
+    _categories = widget.task.category?.split(', ') ?? []; // Initialize categories as list
     _priority = widget.task.priority; // Initialize priority
     _taskService = TaskService(widget.database); // Initialize TaskService with the database
+    _subtasks = [];
 
     // Initialize recurring fields
     _isRecurring = widget.task.isRecurring;
@@ -68,12 +71,16 @@ class _EditTaskScreenState extends State<EditTaskScreen> {
   }
 
   Future<void> _loadSubtasks() async {
-    final subtasks = await _taskService.getSubtasks(widget.task.id);
-    setState(() {
-      _subtasks.clear();
-      _subtasks.addAll(subtasks);
-    });
-  }
+  final subtasks = await _taskService.getSubtasks(widget.task.id);
+  print('Fetched Subtasks: $subtasks');
+  setState(() {
+    _subtasks
+    ..clear()
+    ..addAll(subtasks);
+  });
+}
+
+
 
   Future<void> _selectDueDate(BuildContext context) async {
     final DateTime? picked = await showDatePicker(
@@ -214,38 +221,25 @@ class _EditTaskScreenState extends State<EditTaskScreen> {
                         onSaved: (value) => _taskDescription = value!,
                       ),
                       const SizedBox(height: 16),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: TextFormField(
-                              initialValue: _category,
-                              decoration: InputDecoration(
-                                labelText: 'Category',
-                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                                prefixIcon: const Icon(Icons.category),
-                              ),
-                              onSaved: (value) => _category = value ?? '',
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: DropdownButtonFormField<String>(
-                              value: _priority,
-                              decoration: InputDecoration(
-                                labelText: 'Priority',
-                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                                prefixIcon: const Icon(Icons.priority_high),
-                              ),
-                              items: ['Low', 'Medium', 'High'].map((priority) {
-                                return DropdownMenuItem(
-                                  value: priority,
-                                  child: Text(priority),
-                                );
-                              }).toList(),
-                              onChanged: (value) => _priority = value!,
-                            ),
-                          ),
-                        ],
+                      
+                      // Categories Section (Updated to show chips)
+                      _buildCategoriesField(),
+                      
+                      const SizedBox(height: 16),
+                      DropdownButtonFormField<String>(
+                        value: _priority,
+                        decoration: InputDecoration(
+                          labelText: 'Priority',
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                          prefixIcon: const Icon(Icons.priority_high),
+                        ),
+                        items: ['Low', 'Medium', 'High'].map((priority) {
+                          return DropdownMenuItem(
+                            value: priority,
+                            child: Text(priority),
+                          );
+                        }).toList(),
+                        onChanged: (value) => _priority = value!,
                       ),
                       const SizedBox(height: 16),
                       Container(
@@ -329,7 +323,7 @@ class _EditTaskScreenState extends State<EditTaskScreen> {
                         description: _taskDescription,
                         dueDate: _dueDate,
                         completed: _completed,
-                        category: _category, // Pass category
+                        category: _categories.join(', '), // Join categories back to string
                         priority: _priority, // Pass priority
                         // Recurring fields
                         isRecurring: _isRecurring,
@@ -384,6 +378,92 @@ class _EditTaskScreenState extends State<EditTaskScreen> {
     );
   }
 
+  // Categories field with chips and delete functionality (like add_task_page.dart)
+  Widget _buildCategoriesField() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(Icons.category, color: Colors.purple[600], size: 20),
+            const SizedBox(width: 8),
+            const Text(
+              'Categories:',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        if (_categories.isNotEmpty)
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.purple[50],
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.purple[200]!),
+            ),
+            child: Wrap(
+              spacing: 8.0,
+              runSpacing: 8.0,
+              children: _categories.map((category) {
+                return Chip(
+                  label: Text(
+                    category,
+                    style: TextStyle(
+                      color: Colors.purple[800],
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  backgroundColor: Colors.purple[100],
+                  deleteIconColor: Colors.purple[700],
+                  onDeleted: () {
+                    setState(() {
+                      _categories.remove(category);
+                    });
+                  },
+                );
+              }).toList(),
+            ),
+          ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: TextField(
+                onChanged: (value) {
+                  _newCategory = value;
+                },
+                decoration: InputDecoration(
+                  hintText: 'Enter new category',
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                  prefixIcon: const Icon(Icons.add),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            ElevatedButton.icon(
+              onPressed: () {
+                if (_newCategory.isNotEmpty && !_categories.contains(_newCategory)) {
+                  setState(() {
+                    _categories.add(_newCategory);
+                    _newCategory = '';
+                  });
+                }
+              },
+              icon: const Icon(Icons.add),
+              label: const Text('Add'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.purple[600],
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
   Widget _buildSubtasksSection() {
     return Card(
       elevation: 3,
@@ -407,6 +487,47 @@ class _EditTaskScreenState extends State<EditTaskScreen> {
               ],
             ),
             const SizedBox(height: 16),
+            
+            // Display existing subtasks as chips with delete buttons
+            if (_subtasks.isNotEmpty) ...[
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.orange[50],
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.orange[200]!),
+                ),
+                child: Wrap(
+                  spacing: 8.0,
+                  runSpacing: 8.0,
+                  children: _subtasks.map((subtask) {
+                    return Chip(
+                      avatar: Checkbox(
+                        value: subtask.completed,
+                        onChanged: (value) {
+                          setState(() {
+                            subtask.completed = value ?? false;
+                          });
+                        },
+                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      label: Text(
+                        subtask.title,
+                        style: TextStyle(
+                          decoration: subtask.completed ? TextDecoration.lineThrough : null,
+                          color: subtask.completed ? Colors.grey[600] : Colors.orange[800],
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      backgroundColor: subtask.completed ? Colors.grey[200] : Colors.orange[100],
+                      deleteIconColor: Colors.red[600],
+                      onDeleted: () => _deleteSubtask(subtask),
+                    );
+                  }).toList(),
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
             
             // Add new subtask
             Container(
@@ -458,9 +579,7 @@ class _EditTaskScreenState extends State<EditTaskScreen> {
               ),
             ),
             
-            const SizedBox(height: 16),
-            
-            // Display existing subtasks
+            // Empty state message
             if (_subtasks.isEmpty)
               Container(
                 padding: const EdgeInsets.all(20),
@@ -491,68 +610,6 @@ class _EditTaskScreenState extends State<EditTaskScreen> {
                       ),
                     ],
                   ),
-                ),
-              )
-            else
-              Container(
-                decoration: BoxDecoration(
-                  border: Border.all(color: Colors.grey[300]!),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: ListView.separated(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: _subtasks.length,
-                  separatorBuilder: (context, index) => Divider(
-                    height: 1,
-                    color: Colors.grey[200],
-                  ),
-                  itemBuilder: (context, index) {
-                    final subtask = _subtasks[index];
-                    return Container(
-                      decoration: BoxDecoration(
-                        color: subtask.completed ? Colors.green[50] : Colors.white,
-                      ),
-                      child: ListTile(
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                        leading: Checkbox(
-                          value: subtask.completed,
-                          onChanged: (value) {
-                            setState(() {
-                              subtask.completed = value ?? false;
-                            });
-                          },
-                          activeColor: Colors.green,
-                        ),
-                        title: Text(
-                          subtask.title,
-                          style: TextStyle(
-                            decoration: subtask.completed ? TextDecoration.lineThrough : null,
-                            color: subtask.completed ? Colors.grey[600] : Colors.black,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            IconButton(
-                              icon: Icon(Icons.edit, color: Colors.blue[600], size: 20),
-                              onPressed: () {
-                                // Edit subtask functionality
-                                _editSubtask(subtask, index);
-                              },
-                              tooltip: 'Edit subtask',
-                            ),
-                            IconButton(
-                              icon: Icon(Icons.delete_outline, color: Colors.red[600], size: 20),
-                              onPressed: () => _deleteSubtask(subtask),
-                              tooltip: 'Delete subtask',
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  },
                 ),
               ),
           ],

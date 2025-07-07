@@ -18,6 +18,20 @@ TaskModel _$TaskModelFromJson(Map<String, dynamic> json) => TaskModel(
       customCategory: json['customCategory'] as String?,
       pageId: json['pageId'] as String?,
       day: json['day'] as String?,
+      isRecurring: json['isRecurring'] as bool? ?? false,
+      recurrenceRule: json['recurrenceRule'] as String?,
+      recurrenceInterval: (json['recurrenceInterval'] as num?)?.toInt(),
+      daysOfWeek: (json['daysOfWeek'] as List<dynamic>?)
+          ?.map((e) => (e as num).toInt())
+          .toList(),
+      recurrenceEndDate: json['recurrenceEndDate'] == null
+          ? null
+          : DateTime.parse(json['recurrenceEndDate'] as String),
+      parentTaskId: json['parentTaskId'] as String?,
+      maxOccurrences: (json['maxOccurrences'] as num?)?.toInt(),
+      skipWeekends: json['skipWeekends'] as bool? ?? false,
+      dayOfMonth: (json['dayOfMonth'] as num?)?.toInt(),
+      weekOfMonth: (json['weekOfMonth'] as num?)?.toInt(),
     );
 
 Map<String, dynamic> _$TaskModelToJson(TaskModel instance) => <String, dynamic>{
@@ -32,6 +46,16 @@ Map<String, dynamic> _$TaskModelToJson(TaskModel instance) => <String, dynamic>{
       'customCategory': instance.customCategory,
       'pageId': instance.pageId,
       'day': instance.day,
+      'isRecurring': instance.isRecurring,
+      'recurrenceRule': instance.recurrenceRule,
+      'recurrenceInterval': instance.recurrenceInterval,
+      'daysOfWeek': instance.daysOfWeek,
+      'recurrenceEndDate': instance.recurrenceEndDate?.toIso8601String(),
+      'parentTaskId': instance.parentTaskId,
+      'maxOccurrences': instance.maxOccurrences,
+      'skipWeekends': instance.skipWeekends,
+      'dayOfMonth': instance.dayOfMonth,
+      'weekOfMonth': instance.weekOfMonth,
     };
 
 SubtaskModel _$SubtaskModelFromJson(Map<String, dynamic> json) => SubtaskModel(

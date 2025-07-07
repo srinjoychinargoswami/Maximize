@@ -29,6 +29,7 @@ dependencies:
   http: ^1.4.0
   flutter_local_notifications: ^17.2.1 
   win_toast: ^0.3.1
+  flutter_quill: ^9.3.4
 
   # The following adds the Cupertino Icons font to your application.
   cupertino_icons: ^1.0.8
