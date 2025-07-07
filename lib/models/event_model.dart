@@ -279,15 +279,9 @@ class RecurrencePattern {
     return RecurrencePattern(
       frequency: RecurrenceFrequency.values[map['frequency']],
       interval: map['interval'] ?? 1,
-      byWeekDay: map['byWeekDay'] != null 
-          ? map['byWeekDay'].split(',').map<int>((e) => int.parse(e)).toList()
-          : null,
-      byMonthDay: map['byMonthDay'] != null 
-          ? map['byMonthDay'].split(',').map<int>((e) => int.parse(e)).toList()
-          : null,
-      byMonth: map['byMonth'] != null 
-          ? map['byMonth'].split(',').map<int>((e) => int.parse(e)).toList()
-          : null,
+      byWeekDay: map['byWeekDay']?.split(',').map<int>((e) => int.parse(e)).toList(),
+      byMonthDay: map['byMonthDay']?.split(',').map<int>((e) => int.parse(e)).toList(),
+      byMonth: map['byMonth']?.split(',').map<int>((e) => int.parse(e)).toList(),
       bySetPos: map['bySetPos'],
     );
   }
