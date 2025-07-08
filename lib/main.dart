@@ -1,13 +1,16 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:maximize/models/database.dart';
 import 'package:maximize/screens/calendar_page.dart';
-import 'package:maximize/services/calendar_service.dart';
 import 'package:maximize/screens/task_list_screen.dart';
-import 'package:maximize/models/event_model.dart';
-import 'package:maximize/models/task_model.dart';
 import 'package:maximize/screens/reminder_page.dart';
+import 'package:maximize/services/calendar_service.dart';
 import 'package:maximize/models/task_model.dart';
+import 'package:maximize/models/event_model.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:maximize/services/reminder_service.dart';
+import 'package:timezone/data/latest.dart' as tz;
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() async {
