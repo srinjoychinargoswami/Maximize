@@ -13,6 +13,7 @@ import 'package:maximize/services/reminder_service.dart'; // <-- where Notificat
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:shared_preferences/shared_preferences.dart';
 
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 

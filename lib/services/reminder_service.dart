@@ -212,6 +212,7 @@ class NotificationService {
         platformChannelSpecifics,
         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
         uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
+        payload: reminder.notificationId // fixing for samsung 
       );
       
       print('[NotificationService] Flutter notification scheduled successfully');
