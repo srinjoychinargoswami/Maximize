@@ -169,7 +169,12 @@ class NotificationService {
 
   Future<void> _scheduleFlutterNotification(ReminderModel reminder) async {
     try {
-      final notificationIdInt = int.parse(reminder.notificationId);
+      final notificationIdInt = int.tryParse(reminder.notificationId);
+      if (notificationIdInt == null) { 
+        print('[Error] Invalid notificationId: ${reminder.notificationId}');
+        return;
+      }
+
       
       const androidDetails = AndroidNotificationDetails(
         'reminder_channel_id',
@@ -236,26 +241,55 @@ class NotificationService {
     }
   }
 
-  // Cancel all notifications
-  Future<void> cancelAllNotifications() async {
+ Future<void> cancelNotifications(ReminderModel reminder) async {
     try {
-      // Cancel all Windows timers
-      for (final timer in _windowsTimers.values) {
-        timer.cancel();
-      }
-      _windowsTimers.clear();
-      
-      // Cancel all Flutter notifications
+      // Cancel Windows timer
+      _windowsTimers[reminder.id]?.cancel();
+      _windowsTimers.remove(reminder.id);
+
+      // Cancel Flutter notification
       if (_flutterLocalNotificationsPlugin != null) {
-        await _flutterLocalNotificationsPlugin!.cancelAll();
+        final notificationId = int.tryParse(reminder.notificationId);
+        if (notificationId != null) {
+          await _flutterLocalNotificationsPlugin!.cancel(notificationId);
+        }
       }
-      
-      print('[NotificationService] Cancelled all notifications');
+
+      print('[NotificationService] Cancelled notification: ${reminder.notificationId}');
     } catch (e) {
-      print('[NotificationService] Error cancelling all notifications: $e');
+      print('[NotificationService] Error cancelling notification: $e');
     }
   }
 
+  // ✅ NEW: Cancel all recurring instances generated from a base reminder
+  Future<void> cancelRecurringInstances(String baseNotificationId, {int maxInstances = 10}) async {
+    for (int i = 0; i < maxInstances; i++) {
+      final instanceId = '$baseNotificationId\_$i';
+      final parsedId = int.tryParse(instanceId);
+
+      // Cancel scheduled Android/iOS notification
+      if (_flutterLocalNotificationsPlugin != null && parsedId != null) {
+        await _flutterLocalNotificationsPlugin!.cancel(parsedId);
+        print('[NotificationService] Cancelled recurring Flutter notification ID: $parsedId');
+      }
+
+      // Cancel Windows timer if exists
+      _windowsTimers.removeWhere((key, _) => key == instanceId);
+    }
+
+    print('[NotificationService] Cancelled all recurring instances of: $baseNotificationId');
+  }
+
+  // ✅ Suggestion for DB cleanup: Example usage flow
+  Future<void> deleteReminderWithCleanup(ReminderModel reminder) async {
+    await cancelNotification(reminder.notificationId);
+    if (reminder.isRecurring) {
+      await cancelRecurringInstances(reminder.notificationId);
+    }
+
+    // Then: delete from your database
+    // await db.deleteReminder(reminder.id);  ← this should be called from your UI/controller
+  }
   List<DateTime> _generateRecurrenceOccurrences(
     DateTime startDate,
     String rrule,

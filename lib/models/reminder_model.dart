@@ -30,7 +30,7 @@ class ReminderModel {
     this.recurrenceEndDate,
     this.recurrenceCount,
   })  : id = id ?? const Uuid().v4(),
-        notificationId = notificationId ?? (id ?? const Uuid().v4()).hashCode.toString();
+        notificationId = notificationId ?? DateTime.now().millisecondsSinceEpoch.toString();
 
   Map<String, dynamic> toMap() => {
         'id': id,

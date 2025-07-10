@@ -9,13 +9,31 @@ import 'package:maximize/services/calendar_service.dart';
 import 'package:maximize/models/task_model.dart';
 import 'package:maximize/models/event_model.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:maximize/services/reminder_service.dart';
+import 'package:maximize/services/reminder_service.dart'; // <-- where NotificationService is
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  final database = AppDatabase.instance;          // Drift singleton
+
+  // ✅ Initialize timezone for notifications
+  tz.initializeTimeZones();
+
+  // ✅ Initialize your NotificationService (singleton)
+  await NotificationService.instance.initialize();
+
+  // ✅ Request POST_NOTIFICATIONS permission for Android 13+
+  if (Platform.isAndroid) {
+    final flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
+    final androidPlugin = flutterLocalNotificationsPlugin
+        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+    await androidPlugin?.requestNotificationsPermission(); // <--- important!
+  }
+
+  // ✅ Initialize Drift database
+  final database = AppDatabase.instance;
+
+  // ✅ Start the app
   runApp(MyApp(database: database));
 }
 
@@ -36,7 +54,7 @@ class MyApp extends StatelessWidget {
           titleTextStyle: const TextStyle(color: Colors.white, fontSize: 20),
         ),
         textTheme: const TextTheme(
-          bodyLarge:  TextStyle(color: Colors.grey, fontSize: 16),
+          bodyLarge: TextStyle(color: Colors.grey, fontSize: 16),
           bodyMedium: TextStyle(color: Colors.grey, fontSize: 14),
         ),
       ),
@@ -44,6 +62,7 @@ class MyApp extends StatelessWidget {
     );
   }
 }
+
 
 /* ────────────────────────────────────────────────────────────────────────── */
 /* HOME PAGE – Drawer, Bottom Nav, and IndexedStack                         */
