@@ -6,13 +6,14 @@ import 'package:maximize/screens/calendar_page.dart';
 import 'package:maximize/screens/task_list_screen.dart';
 import 'package:maximize/screens/reminder_page.dart';
 import 'package:maximize/services/calendar_service.dart';
+import 'package:maximize/services/task_service.dart'; // ADDED: Import TaskService
+import 'package:maximize/services/reminder_service.dart'; // ADDED: Import ReminderService
 import 'package:maximize/models/task_model.dart';
 import 'package:maximize/models/event_model.dart';
+import 'package:maximize/models/reminder_model.dart'; // ADDED: Import ReminderModel
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:maximize/services/reminder_service.dart'; // <-- where NotificationService is
+// REMOVED: SharedPreferences import - no longer needed for checkboxes
 import 'package:timezone/data/latest.dart' as tz;
-import 'package:shared_preferences/shared_preferences.dart';
-
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -63,7 +64,6 @@ class MyApp extends StatelessWidget {
     );
   }
 }
-
 
 /* ────────────────────────────────────────────────────────────────────────── */
 /* HOME PAGE – Drawer, Bottom Nav, and IndexedStack                         */
@@ -126,7 +126,7 @@ class _MyHomePageState extends State<MyHomePage> {
       ),
 
       /* ─────────── MAIN CONTENT ─────────── */
-      body: IndexedStack(index: _currentIndex, children: _screens),
+      body: IndexedStack(index: _currentIndex, children: _screens), 
 
       /* ───────── BOTTOM NAVIGATION ──────── */
       bottomNavigationBar: BottomNavigationBar(
@@ -165,7 +165,7 @@ class _MyHomePageState extends State<MyHomePage> {
 }
 
 /* ────────────────────────────────────────────────────────────────────────── */
-/* OVERVIEW PAGE – unchanged except imports                                  */
+/* OVERVIEW PAGE – UPDATED with unified checkbox system                      */
 /* ────────────────────────────────────────────────────────────────────────── */
 
 class OverviewPage extends StatefulWidget {
@@ -176,44 +176,37 @@ class OverviewPage extends StatefulWidget {
 }
 
 class _OverviewPageState extends State<OverviewPage> {
-  List<String> completedTaskIds = [];
-  List<String> completedEventIds = [];
-  List<String> completedReminderIds = [];
-  SharedPreferences? _prefs;
+  // ADDED: Service instances for unified completion handling
+  late final TaskService _taskService;
+  late final CalendarService _calendarService;
+  late final ReminderService _reminderService;
+
+  // REMOVED: SharedPreferences variables - no longer needed
 
   @override
   void initState() {
     super.initState();
-    _initPrefs();
+    // ADDED: Initialize service instances
+    _taskService = TaskService(widget.database);
+    _calendarService = CalendarService(widget.database);
+    _reminderService = ReminderService(widget.database);
   }
 
-  Future<void> _initPrefs() async {
-    _prefs = await SharedPreferences.getInstance();
-    completedTaskIds = _prefs?.getStringList('completedTasks') ?? [];
-    completedEventIds = _prefs?.getStringList('completedEvents') ?? [];
-    completedReminderIds = _prefs?.getStringList('completedReminders') ?? [];
-    setState(() {}); // refresh UI after loading
-  }
-
-  void _toggleId(List<String> list, String id, String key) {
-    setState(() {
-      list.contains(id) ? list.remove(id) : list.add(id);
-      _prefs?.setStringList(key, list);
-    });
-  }
+  // REMOVED: _initPrefs method - no longer needed
+  // REMOVED: _toggleId method - replaced with service methods
 
   @override
   Widget build(BuildContext context) {
-    final today = DateFormat('MM/dd/yyyy').format(DateTime.now());
+    final today = DateTime.now();
 
     return SingleChildScrollView(
       padding: const EdgeInsets.only(bottom: 32),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _sectionHeader('Tasks'),
+          _sectionHeader('Today\'s Tasks'),
           _taskSection(today),
-          _sectionHeader('Calendar Events'),
+          _sectionHeader('Today\'s Events'),
           _eventSection(today),
           _sectionHeader('Today\'s Reminders'),
           _reminderSection(today),
@@ -226,60 +219,109 @@ class _OverviewPageState extends State<OverviewPage> {
 
   Padding _sectionHeader(String text) => Padding(
     padding: const EdgeInsets.all(16),
-    child: Text(text, style: Theme.of(context).textTheme.titleMedium),
+    child: Text(text, style: Theme.of(context).textTheme.titleMedium?.copyWith(
+      color: Colors.white,
+      fontWeight: FontWeight.bold,
+      fontSize: 18,
+    )),
   );
 
-  /* ---------- TASKS ---------- */
-  SizedBox _taskSection(String today) {
+  /* ---------- TASKS SECTION - UPDATED with unified completion system ---------- */
+  SizedBox _taskSection(DateTime today) {
     return SizedBox(
       height: 250,
-      child: FutureBuilder<List<TaskData>>(
-        future: widget.database.getAllTasks(),
+      child: FutureBuilder<List<TaskModel>>(
+        future: _taskService.getTodaysTasks(), // ENHANCED: Use service method for today's tasks
         builder: (context, snapshot) {
-          if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
-          final tasks = snapshot.data!;
-          final filtered = tasks.where((t) =>
-            t.priority == 'High' || DateFormat('MM/dd/yyyy').format(t.dueDate) == today
-          ).toList();
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          
+          if (snapshot.hasError) {
+            return Center(child: Text('Error loading tasks: ${snapshot.error}'));
+          }
 
-          if (filtered.isEmpty) return const Center(child: Text('No tasks.'));
+          final tasks = snapshot.data ?? [];
+          
+          if (tasks.isEmpty) {
+            return const Center(
+              child: Text(
+                'No tasks for today!',
+                style: TextStyle(color: Colors.grey, fontSize: 16),
+              ),
+            );
+          }
 
           return ListView.builder(
-            itemCount: filtered.length,
+            itemCount: tasks.length,
             itemBuilder: (_, i) {
-              final t = filtered[i];
-              final checked = completedTaskIds.contains(t.id);
+              final task = tasks[i];
               return Card(
+                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                color: task.completed ? Colors.grey[700] : Colors.grey[800], // ENHANCED: Visual feedback for completion
                 child: Column(
                   children: [
                     ListTile(
-                      title: Text(t.name),
-                      subtitle: Text(DateFormat('MM/dd/yyyy').format(t.dueDate)),
-                      trailing: Checkbox(
-                        value: checked,
-                        onChanged: (_) => _toggleId(completedTaskIds, t.id, 'completedTasks'),
+                      leading: Checkbox(
+                        value: task.completed, // ENHANCED: Use database completion status
+                        onChanged: (value) => _toggleTaskCompletion(task.id, value), // ENHANCED: Use service method
+                        activeColor: Colors.green,
                       ),
+                      title: Text(
+                        task.title,
+                        style: TextStyle(
+                          color: Colors.white,
+                          decoration: task.completed ? TextDecoration.lineThrough : null, // ENHANCED: Visual feedback
+                        ),
+                      ),
+                      subtitle: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Due: ${DateFormat('MMM dd, yyyy').format(task.dueDate)}',
+                            style: const TextStyle(color: Colors.grey),
+                          ),
+                          if (task.description?.isNotEmpty == true)
+                            Text(
+                              task.description!,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(color: Colors.grey),
+                            ),
+                        ],
+                      ),
+                      trailing: _buildPriorityIndicator(task.priority), // ENHANCED: Priority indicator
                     ),
+                    // ENHANCED: Show subtasks with unified completion
                     FutureBuilder<List<SubtaskModel>>(
-                      future: widget.database.getAllSubtasks(t.id),
+                      future: _taskService.getSubtasks(task.id),
                       builder: (_, subSnap) {
                         if (!subSnap.hasData || subSnap.data!.isEmpty) return const SizedBox.shrink();
-                        final subs = subSnap.data!;
-                        return ListView.builder(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          itemCount: subs.length,
-                          itemBuilder: (_, j) {
-                            final s = subs[j];
-                            final subChecked = completedTaskIds.contains(s.id);
-                            return ListTile(
-                              title: Text(s.title),
-                              trailing: Checkbox(
-                                value: subChecked,
-                                onChanged: (_) => _toggleId(completedTaskIds, s.id, 'completedTasks'),
+                        final subtasks = subSnap.data!;
+                        return Container(
+                          padding: const EdgeInsets.only(left: 16, right: 16, bottom: 8),
+                          child: Column(
+                            children: subtasks.map((subtask) => ListTile(
+                              dense: true,
+                              leading: SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: Checkbox(
+                                  value: subtask.completed, // ENHANCED: Use database completion status
+                                  onChanged: (value) => _toggleSubtaskCompletion(subtask.id, value), // ENHANCED: Use service method
+                                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                ),
                               ),
-                            );
-                          },
+                              title: Text(
+                                subtask.title,
+                                style: TextStyle(
+                                  color: Colors.grey[300],
+                                  fontSize: 14,
+                                  decoration: subtask.completed ? TextDecoration.lineThrough : null, // ENHANCED: Visual feedback
+                                ),
+                              ),
+                            )).toList(),
+                          ),
                         );
                       },
                     ),
@@ -293,36 +335,66 @@ class _OverviewPageState extends State<OverviewPage> {
     );
   }
 
-  /* ---------- EVENTS ---------- */
-  SizedBox _eventSection(String today) {
+  /* ---------- EVENTS SECTION - UPDATED with unified completion system ---------- */
+  SizedBox _eventSection(DateTime today) {
     return SizedBox(
       height: 200,
       child: FutureBuilder<List<Event>>(
-        future: CalendarService(widget.database).getEvents(),
+        future: _calendarService.getTodaysEvents(), // ENHANCED: Use service method for today's events
         builder: (context, snapshot) {
-          if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
-          final events = snapshot.data!
-              .where((e) => DateFormat('MM/dd/yyyy').format(e.startDateTime) == today)
-              .toList();
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
 
-          if (events.isEmpty) return const Center(child: Text('No events.'));
+          if (snapshot.hasError) {
+            return Center(child: Text('Error loading events: ${snapshot.error}'));
+          }
+
+          final events = snapshot.data ?? [];
+
+          if (events.isEmpty) {
+            return const Center(
+              child: Text(
+                'No events today!',
+                style: TextStyle(color: Colors.grey, fontSize: 16),
+              ),
+            );
+          }
 
           return ListView.builder(
             itemCount: events.length,
             itemBuilder: (_, i) {
-              final e = events[i];
-              final checked = completedEventIds.contains(e.id);
+              final event = events[i];
               return Card(
+                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                color: event.completed ? Colors.grey[700] : Colors.grey[800], // ENHANCED: Visual feedback for completion
                 child: ListTile(
-                  title: Text(e.title),
-                  subtitle: Text(
-                    '${DateFormat('MM/dd/yyyy').format(e.startDateTime)} '
-                    '${DateFormat('hh:mm a').format(e.startDateTime)} '
-                    '– ${DateFormat('hh:mm a').format(e.endDateTime)}',
+                  leading: Checkbox(
+                    value: event.completed, // ENHANCED: Use database completion status
+                    onChanged: (value) => _toggleEventCompletion(event.id, value), // ENHANCED: Use service method
+                    activeColor: Colors.green,
                   ),
-                  trailing: Checkbox(
-                    value: checked,
-                    onChanged: (_) => _toggleId(completedEventIds, e.id, 'completedEvents'),
+                  title: Text(
+                    event.title,
+                    style: TextStyle(
+                      color: Colors.white,
+                      decoration: event.completed ? TextDecoration.lineThrough : null, // ENHANCED: Visual feedback
+                    ),
+                  ),
+                  subtitle: Text(
+                    '${DateFormat('hh:mm a').format(event.startDateTime)} – ${DateFormat('hh:mm a').format(event.endDateTime)}',
+                    style: const TextStyle(color: Colors.grey),
+                  ),
+                  trailing: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Text(
+                      'Event',
+                      style: TextStyle(color: Colors.blue, fontSize: 12),
+                    ),
                   ),
                 ),
               );
@@ -333,33 +405,75 @@ class _OverviewPageState extends State<OverviewPage> {
     );
   }
 
-  /* ---------- REMINDERS ---------- */
-  SizedBox _reminderSection(String today) {
+  /* ---------- REMINDERS SECTION - UPDATED with unified completion system ---------- */
+  SizedBox _reminderSection(DateTime today) {
     return SizedBox(
       height: 200,
-      child: FutureBuilder<List<ReminderData>>(
-        future: widget.database.getAllReminders(),
+      child: FutureBuilder<List<ReminderModel>>(
+        future: _reminderService.getTodaysReminders(), // ENHANCED: Use service method for today's reminders
         builder: (context, snapshot) {
-          if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
-          final reminders = snapshot.data!
-              .where((r) => DateFormat('MM/dd/yyyy').format(r.scheduledTime) == today)
-              .toList();
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
 
-          if (reminders.isEmpty) return const Center(child: Text('No reminders today.'));
+          if (snapshot.hasError) {
+            return Center(child: Text('Error loading reminders: ${snapshot.error}'));
+          }
+
+          final reminders = snapshot.data ?? [];
+
+          if (reminders.isEmpty) {
+            return const Center(
+              child: Text(
+                'No reminders today!',
+                style: TextStyle(color: Colors.grey, fontSize: 16),
+              ),
+            );
+          }
 
           return ListView.builder(
             itemCount: reminders.length,
             itemBuilder: (_, i) {
-              final r = reminders[i];
-              final checked = completedReminderIds.contains(r.id);
+              final reminder = reminders[i];
               return Card(
+                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                color: reminder.completed ? Colors.grey[700] : Colors.grey[800], // ENHANCED: Visual feedback for completion
                 child: ListTile(
-                  leading: const Icon(Icons.alarm, color: Colors.orange),
-                  title: Text(r.title),
-                  subtitle: Text('Scheduled: ${DateFormat('hh:mm a').format(r.scheduledTime)}'),
-                  trailing: Checkbox(
-                    value: checked,
-                    onChanged: (_) => _toggleId(completedReminderIds, r.id, 'completedReminders'),
+                  leading: Checkbox(
+                    value: reminder.completed, // ENHANCED: Use database completion status
+                    onChanged: (value) => _toggleReminderCompletion(reminder.id, value), // ENHANCED: Use service method
+                    activeColor: Colors.green,
+                  ),
+                  title: Text(
+                    reminder.title,
+                    style: TextStyle(
+                      color: Colors.white,
+                      decoration: reminder.completed ? TextDecoration.lineThrough : null, // ENHANCED: Visual feedback
+                    ),
+                  ),
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Scheduled: ${DateFormat('hh:mm a').format(reminder.scheduledTime)}',
+                        style: const TextStyle(color: Colors.grey),
+                      ),
+                      if (reminder.body.isNotEmpty)
+                        Text(
+                          reminder.body,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(color: Colors.grey),
+                        ),
+                    ],
+                  ),
+                  trailing: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(Icons.alarm, color: Colors.orange, size: 16),
                   ),
                 ),
               );
@@ -368,6 +482,114 @@ class _OverviewPageState extends State<OverviewPage> {
         },
       ),
     );
+  }
+
+  /* ---------- ENHANCED: Helper methods for unified completion handling ---------- */
+
+  // ADDED: Priority indicator widget
+  Widget _buildPriorityIndicator(String priority) {
+    Color color;
+    switch (priority.toLowerCase()) {
+      case 'high':
+        color = Colors.red;
+        break;
+      case 'medium':
+        color = Colors.orange;
+        break;
+      case 'low':
+        color = Colors.green;
+        break;
+      default:
+        color = Colors.grey;
+    }
+    
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.2),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Text(
+        priority,
+        style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.bold),
+      ),
+    );
+  }
+
+  // ADDED: Task completion toggle using TaskService
+  Future<void> _toggleTaskCompletion(String taskId, bool? isCompleted) async {
+    try {
+      if (isCompleted == true) {
+        await _taskService.markTaskCompleted(taskId);
+      } else {
+        await _taskService.markTaskIncomplete(taskId);
+      }
+      setState(() {}); // Refresh the UI
+    } catch (error) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to update task: $error')),
+      );
+    }
+  }
+
+  // ADDED: Subtask completion toggle using TaskService
+  Future<void> _toggleSubtaskCompletion(String subtaskId, bool? isCompleted) async {
+    try {
+      if (isCompleted == true) {
+        await _taskService.markSubtaskCompleted(subtaskId);
+      } else {
+        // Create incomplete method or use direct update
+        final subtasks = await widget.database.getAllSubtasks('');
+        final subtaskData = subtasks.firstWhere((s) => s.id == subtaskId);
+        final subtask = SubtaskModel(
+          id: subtaskData.id,
+          taskId: subtaskData.taskId,
+          title: subtaskData.title,
+          completed: subtaskData.completed,
+          completedAt: subtaskData.completedAt,
+        );
+        
+        final updatedSubtask = subtask.copyWith(completed: false, completedAt: null);
+        await _taskService.updateSubtask(updatedSubtask);
+      }
+      setState(() {}); // Refresh the UI
+    } catch (error) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to update subtask: $error')),
+      );
+    }
+  }
+
+  // ADDED: Event completion toggle using CalendarService
+  Future<void> _toggleEventCompletion(String eventId, bool? isCompleted) async {
+    try {
+      if (isCompleted == true) {
+        await _calendarService.markEventCompleted(eventId);
+      } else {
+        await _calendarService.markEventIncomplete(eventId);
+      }
+      setState(() {}); // Refresh the UI
+    } catch (error) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to update event: $error')),
+      );
+    }
+  }
+
+  // ADDED: Reminder completion toggle using ReminderService
+  Future<void> _toggleReminderCompletion(String reminderId, bool? isCompleted) async {
+    try {
+      if (isCompleted == true) {
+        await _reminderService.markReminderCompleted(reminderId);
+      } else {
+        await _reminderService.markReminderIncomplete(reminderId);
+      }
+      setState(() {}); // Refresh the UI
+    } catch (error) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to update reminder: $error')),
+      );
+    }
   }
 }
 
