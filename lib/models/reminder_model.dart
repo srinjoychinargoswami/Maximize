@@ -1,4 +1,5 @@
 import 'package:uuid/uuid.dart';
+import 'package:maximize/models/database.dart'; // ADDED: Import for ReminderData
 
 class ReminderModel {
   final String id; // UUID for internal tracking
@@ -6,6 +7,10 @@ class ReminderModel {
   final String body; // Body/content of the notification
   final DateTime scheduledTime; // Exact time to trigger notification
   final String notificationId; // Changed to String to match flutter_local_notifications
+  
+  // ADDED: Completion tracking fields for checkbox functionality
+  bool completed; // Completion status of the reminder (made mutable)
+  final DateTime? completedAt; // When the reminder was completed
   
   // Recurring reminder fields
   final bool isRecurring;
@@ -22,6 +27,8 @@ class ReminderModel {
     required this.body,
     required this.scheduledTime,
     String? notificationId,
+    this.completed = false, // ADDED: Default to false for checkbox functionality
+    this.completedAt, // ADDED: Track completion timestamp
     this.isRecurring = false,
     this.recurrencePattern,
     this.recurrenceRule,
@@ -32,12 +39,36 @@ class ReminderModel {
   })  : id = id ?? const Uuid().v4(),
         notificationId = notificationId ?? ((DateTime.now().millisecondsSinceEpoch % 2147483647).toString());
 
+  // ADDED: Factory constructor for converting from ReminderData (database class)
+  factory ReminderModel.fromData(ReminderData data) {
+    return ReminderModel(
+      id: data.id,
+      title: data.title,
+      body: data.body,
+      scheduledTime: data.scheduledTime,
+      notificationId: data.notificationId,
+      completed: data.completed ?? false, // ADDED: Map completion status from database
+      completedAt: data.completedAt, // ADDED: Map completion timestamp from database
+      isRecurring: data.isRecurring ?? false,
+      recurrenceRule: data.recurrenceRule,
+      parentReminderId: data.parentReminderId,
+      recurrenceExceptionDates: data.recurrenceExceptionDates?.split(',')
+          .where((d) => d.isNotEmpty)
+          .map<DateTime>((d) => DateTime.parse(d))
+          .toList(),
+      recurrenceEndDate: data.recurrenceEndDate,
+      recurrenceCount: data.recurrenceCount,
+    );
+  }
+
   Map<String, dynamic> toMap() => {
         'id': id,
         'title': title,
         'body': body,
         'scheduledTime': scheduledTime.toIso8601String(),
         'notificationId': notificationId,
+        'completed': completed, // ADDED: Include completion status in map
+        'completedAt': completedAt?.toIso8601String(), // ADDED: Include completion timestamp
         'isRecurring': isRecurring,
         'recurrenceRule': recurrenceRule,
         'parentReminderId': parentReminderId,
@@ -53,6 +84,10 @@ class ReminderModel {
       body: map['body'],
       scheduledTime: DateTime.parse(map['scheduledTime']),
       notificationId: map['notificationId'],
+      completed: map['completed'] ?? false, // ADDED: Parse completion status from map
+      completedAt: map['completedAt'] != null // ADDED: Parse completion timestamp from map
+          ? DateTime.parse(map['completedAt'])
+          : null,
       isRecurring: map['isRecurring'] ?? false,
       recurrenceRule: map['recurrenceRule'],
       parentReminderId: map['parentReminderId'],
@@ -75,6 +110,8 @@ class ReminderModel {
     String? body,
     DateTime? scheduledTime,
     String? notificationId,
+    bool? completed, // ADDED: Allow updating completion status
+    DateTime? completedAt, // ADDED: Allow updating completion timestamp
     bool? isRecurring,
     ReminderRecurrencePattern? recurrencePattern,
     String? recurrenceRule,
@@ -89,6 +126,8 @@ class ReminderModel {
       body: body ?? this.body,
       scheduledTime: scheduledTime ?? this.scheduledTime,
       notificationId: notificationId ?? this.notificationId,
+      completed: completed ?? this.completed, // ADDED: Update completion status
+      completedAt: completedAt ?? this.completedAt, // ADDED: Update completion timestamp
       isRecurring: isRecurring ?? this.isRecurring,
       recurrencePattern: recurrencePattern ?? this.recurrencePattern,
       recurrenceRule: recurrenceRule ?? this.recurrenceRule,
@@ -98,6 +137,23 @@ class ReminderModel {
       recurrenceCount: recurrenceCount ?? this.recurrenceCount,
     );
   }
+
+  // ADDED: Method to toggle completion status (for checkbox functionality)
+  ReminderModel toggleCompletion() {
+    return copyWith(
+      completed: !completed,
+      completedAt: !completed ? DateTime.now() : null, // Set timestamp when completing
+    );
+  }
+
+  // ADDED: Helper methods for checkbox functionality
+  bool get isCompleted => completed;
+  bool get isPastDue => DateTime.now().isAfter(scheduledTime) && !completed;
+  bool get isToday => DateTime.now().day == scheduledTime.day && 
+                     DateTime.now().month == scheduledTime.month && 
+                     DateTime.now().year == scheduledTime.year;
+  bool get isUpcoming => DateTime.now().isBefore(scheduledTime);
+  bool get isDismissed => completed; // Alias for UI clarity
 
   // Generate RRULE string based on pattern
   String generateRRule() {
@@ -234,7 +290,7 @@ class ReminderModel {
   }
 }
 
-// Recurrence pattern class specifically for reminders
+// Recurrence pattern class specifically for reminders - NO CHANGES NEEDED
 class ReminderRecurrencePattern {
   final ReminderRecurrenceFrequency frequency;
   final int interval; // Every N hours/days/weeks/months/years
@@ -277,7 +333,7 @@ class ReminderRecurrencePattern {
   }
 }
 
-// Enum for reminder recurrence frequencies
+// Enum for reminder recurrence frequencies - NO CHANGES NEEDED
 enum ReminderRecurrenceFrequency {
   hourly,
   daily,
@@ -287,7 +343,7 @@ enum ReminderRecurrenceFrequency {
   custom, // For complex custom patterns
 }
 
-// Predefined common reminder recurrence patterns
+// Predefined common reminder recurrence patterns - NO CHANGES NEEDED
 class CommonReminderPatterns {
   static ReminderRecurrencePattern hourly() => ReminderRecurrencePattern(frequency: ReminderRecurrenceFrequency.hourly);
   

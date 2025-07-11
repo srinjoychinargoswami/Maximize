@@ -10,7 +10,7 @@ class TaskModel {
   final String title; // Title of the task
   final String? description; // Description of the task (optional)
   final DateTime dueDate; // Due date of the task
-  bool completed; // Completion status of the task (made non-final)
+  bool completed; // Completion status of the task (made non-final) - ALREADY PERFECT FOR CHECKBOXES
   final String? category; // Category of the task (optional)
   final String priority; // Priority of the task
   final String? customCategory; // Custom category (optional)
@@ -29,13 +29,17 @@ class TaskModel {
   final int? dayOfMonth; // Specific day of month for monthly recurrence
   final int? weekOfMonth; // Week of month for monthly recurrence (1-4, or -1 for last)
 
+  // ADDED: Completion tracking fields for better functionality
+  final DateTime? completedAt; // When the task was completed (NEW)
+  final List<SubtaskModel>? subtasks; // List of subtasks (ADDED for better integration)
+
   TaskModel({
     required this.id,
     required this.name,
     required this.title,
     this.description,
     required this.dueDate,
-    this.completed = false, // Default to false
+    this.completed = false, // Default to false - PERFECT FOR CHECKBOXES
     this.category,
     required this.priority,
     this.customCategory,
@@ -51,6 +55,8 @@ class TaskModel {
     this.skipWeekends = false, // Default to false
     this.dayOfMonth,
     this.weekOfMonth,
+    this.completedAt, // ADDED: Track completion timestamp
+    this.subtasks, // ADDED: Include subtasks in model
   });
 
   factory TaskModel.fromData(TaskData data) {
@@ -60,7 +66,7 @@ class TaskModel {
       title: data.title,
       description: data.description,
       dueDate: data.dueDate,
-      completed: data.completed, // Ensure this is correctly mapped
+      completed: data.completed, // Ensure this is correctly mapped - ALREADY PERFECT
       category: data.category,
       priority: data.priority,
       customCategory: data.customCategory,
@@ -76,6 +82,8 @@ class TaskModel {
       skipWeekends: data.skipWeekends ?? false,
       dayOfMonth: data.dayOfMonth,
       weekOfMonth: data.weekOfMonth,
+      completedAt: data.completedAt, // ADDED: Map completion timestamp
+      // Note: subtasks will be loaded separately via service layer
     );
   }
 
@@ -90,7 +98,7 @@ class TaskModel {
       'title': title,
       'description': description,
       'dueDate': dueDate.toIso8601String(),
-      'completed': completed,
+      'completed': completed, // ALREADY PERFECT FOR DATABASE STORAGE
       'category': category,
       'priority': priority,
       'customCategory': customCategory,
@@ -106,6 +114,7 @@ class TaskModel {
       'skipWeekends': skipWeekends,
       'dayOfMonth': dayOfMonth,
       'weekOfMonth': weekOfMonth,
+      'completedAt': completedAt?.toIso8601String(), // ADDED: Include completion timestamp
     };
   }
 
@@ -117,7 +126,7 @@ class TaskModel {
       title: map['title'] ?? '',
       description: map['description'],
       dueDate: DateTime.parse(map['dueDate']),
-      completed: map['completed'] ?? false,
+      completed: map['completed'] ?? false, // ALREADY PERFECT FOR CHECKBOXES
       category: map['category'],
       priority: map['priority'] ?? 'medium',
       customCategory: map['customCategory'],
@@ -137,6 +146,9 @@ class TaskModel {
       skipWeekends: map['skipWeekends'] ?? false,
       dayOfMonth: map['dayOfMonth'],
       weekOfMonth: map['weekOfMonth'],
+      completedAt: map['completedAt'] != null // ADDED: Parse completion timestamp
+          ? DateTime.parse(map['completedAt'])
+          : null,
     );
   }
 
@@ -146,7 +158,7 @@ class TaskModel {
     String? title,
     String? description,
     DateTime? dueDate,
-    bool? completed, // Make this optional
+    bool? completed, // Make this optional - ALREADY PERFECT FOR CHECKBOX UPDATES
     String? category,
     String? priority,
     String? customCategory,
@@ -162,6 +174,8 @@ class TaskModel {
     bool? skipWeekends,
     int? dayOfMonth,
     int? weekOfMonth,
+    DateTime? completedAt, // ADDED: Allow updating completion timestamp
+    List<SubtaskModel>? subtasks, // ADDED: Allow updating subtasks
   }) {
     return TaskModel(
       id: id ?? this.id,
@@ -169,7 +183,7 @@ class TaskModel {
       title: title ?? this.title,
       description: description ?? this.description,
       dueDate: dueDate ?? this.dueDate,
-      completed: completed ?? this.completed, // Ensure this is correctly updated
+      completed: completed ?? this.completed, // Ensure this is correctly updated - PERFECT
       category: category ?? this.category,
       priority: priority ?? this.priority,
       customCategory: customCategory ?? this.customCategory,
@@ -185,12 +199,31 @@ class TaskModel {
       skipWeekends: skipWeekends ?? this.skipWeekends,
       dayOfMonth: dayOfMonth ?? this.dayOfMonth,
       weekOfMonth: weekOfMonth ?? this.weekOfMonth,
+      completedAt: completedAt ?? this.completedAt, // ADDED: Update completion timestamp
+      subtasks: subtasks ?? this.subtasks, // ADDED: Update subtasks
     );
   }
 
   // Helper methods for recurring tasks
   bool get isRecurringInstance => parentTaskId != null;
   bool get isRecurringParent => isRecurring && parentTaskId == null;
+  
+  // ADDED: Helper methods for checkbox functionality
+  bool get hasSubtasks => subtasks != null && subtasks!.isNotEmpty;
+  bool get allSubtasksCompleted => hasSubtasks ? subtasks!.every((subtask) => subtask.completed) : true;
+  double get completionPercentage {
+    if (!hasSubtasks) return completed ? 1.0 : 0.0;
+    int completedCount = subtasks!.where((subtask) => subtask.completed).length;
+    return completedCount / subtasks!.length;
+  }
+  
+  // ADDED: Method to toggle completion status (for checkbox functionality)
+  TaskModel toggleCompletion() {
+    return copyWith(
+      completed: !completed,
+      completedAt: !completed ? DateTime.now() : null, // Set timestamp when completing
+    );
+  }
   
   // Check if this task should recur on a specific date
   bool shouldRecurOnDate(DateTime date) {
@@ -218,19 +251,21 @@ class TaskModel {
   }
 }
 
-// New Subtask Model
+// Updated Subtask Model
 @JsonSerializable()
 class SubtaskModel {
   final String id; // Non-optional ID for the subtask
-  String taskId; // ID of the parent task
+  final String taskId; // ID of the parent task (made final for consistency)
   String title; // Title of the subtask
-  bool completed; // Completion status of the subtask
+  bool completed; // Completion status of the subtask - ALREADY PERFECT FOR CHECKBOXES
+  final DateTime? completedAt; // ADDED: When the subtask was completed
 
   SubtaskModel({
     required this.id,
     required this.taskId,
     required this.title,
-    this.completed = false, // Default to false
+    this.completed = false, // Default to false - PERFECT FOR CHECKBOXES
+    this.completedAt, // ADDED: Track completion timestamp
   });
 
   factory SubtaskModel.fromJson(Map<String, dynamic> json) => _$SubtaskModelFromJson(json);
@@ -242,7 +277,8 @@ class SubtaskModel {
       'id': id,
       'taskId': taskId,
       'title': title,
-      'completed': completed,
+      'completed': completed, // ALREADY PERFECT FOR DATABASE STORAGE
+      'completedAt': completedAt?.toIso8601String(), // ADDED: Include completion timestamp
     };
   }
 
@@ -252,7 +288,10 @@ class SubtaskModel {
       id: map['id'] ?? '',
       taskId: map['taskId'] ?? '',
       title: map['title'] ?? '',
-      completed: map['completed'] ?? false,
+      completed: map['completed'] ?? false, // ALREADY PERFECT FOR CHECKBOXES
+      completedAt: map['completedAt'] != null // ADDED: Parse completion timestamp
+          ? DateTime.parse(map['completedAt'])
+          : null,
     );
   }
 
@@ -260,13 +299,23 @@ class SubtaskModel {
     String? id,
     String? taskId,
     String? title,
-    bool? completed, // Make this optional
+    bool? completed, // Make this optional - PERFECT FOR CHECKBOX UPDATES
+    DateTime? completedAt, // ADDED: Allow updating completion timestamp
   }) {
     return SubtaskModel(
       id: id ?? this.id,
       taskId: taskId ?? this.taskId,
       title: title ?? this.title,
-      completed: completed ?? this.completed, // Ensure this is correctly updated
+      completed: completed ?? this.completed, // Ensure this is correctly updated - PERFECT
+      completedAt: completedAt ?? this.completedAt, // ADDED: Update completion timestamp
+    );
+  }
+
+  // ADDED: Method to toggle completion status (for checkbox functionality)
+  SubtaskModel toggleCompletion() {
+    return copyWith(
+      completed: !completed,
+      completedAt: !completed ? DateTime.now() : null, // Set timestamp when completing
     );
   }
 }

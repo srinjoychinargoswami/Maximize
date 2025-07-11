@@ -32,6 +32,12 @@ TaskModel _$TaskModelFromJson(Map<String, dynamic> json) => TaskModel(
       skipWeekends: json['skipWeekends'] as bool? ?? false,
       dayOfMonth: (json['dayOfMonth'] as num?)?.toInt(),
       weekOfMonth: (json['weekOfMonth'] as num?)?.toInt(),
+      completedAt: json['completedAt'] == null
+          ? null
+          : DateTime.parse(json['completedAt'] as String),
+      subtasks: (json['subtasks'] as List<dynamic>?)
+          ?.map((e) => SubtaskModel.fromJson(e as Map<String, dynamic>))
+          .toList(),
     );
 
 Map<String, dynamic> _$TaskModelToJson(TaskModel instance) => <String, dynamic>{
@@ -56,6 +62,8 @@ Map<String, dynamic> _$TaskModelToJson(TaskModel instance) => <String, dynamic>{
       'skipWeekends': instance.skipWeekends,
       'dayOfMonth': instance.dayOfMonth,
       'weekOfMonth': instance.weekOfMonth,
+      'completedAt': instance.completedAt?.toIso8601String(),
+      'subtasks': instance.subtasks,
     };
 
 SubtaskModel _$SubtaskModelFromJson(Map<String, dynamic> json) => SubtaskModel(
@@ -63,6 +71,9 @@ SubtaskModel _$SubtaskModelFromJson(Map<String, dynamic> json) => SubtaskModel(
       taskId: json['taskId'] as String,
       title: json['title'] as String,
       completed: json['completed'] as bool? ?? false,
+      completedAt: json['completedAt'] == null
+          ? null
+          : DateTime.parse(json['completedAt'] as String),
     );
 
 Map<String, dynamic> _$SubtaskModelToJson(SubtaskModel instance) =>
@@ -71,4 +82,5 @@ Map<String, dynamic> _$SubtaskModelToJson(SubtaskModel instance) =>
       'taskId': instance.taskId,
       'title': instance.title,
       'completed': instance.completed,
+      'completedAt': instance.completedAt?.toIso8601String(),
     };

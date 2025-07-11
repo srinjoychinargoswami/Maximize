@@ -12,6 +12,8 @@ class Event {
   DateTime date;
   String? customCategory; // Make customCategory nullable to match usage
   String color; // New field for event color
+  bool completed; // CHANGED: Made mutable for checkbox functionality
+  final DateTime? completedAt; // ALREADY GOOD: Track completion timestamp
   
   // Recurring event fields
   bool isRecurring;
@@ -32,6 +34,8 @@ class Event {
     required this.date,
     this.customCategory, // Remove required since it's nullable
     required this.color, // New required field for color
+    this.completed = false, // CHANGED: Made mutable and default to false
+    this.completedAt, // ALREADY GOOD: Track completion timestamp
     this.isRecurring = false,
     this.recurrencePattern,
     this.recurrenceRule,
@@ -53,6 +57,8 @@ class Event {
       date: eventData.startDateTime, // Use eventDateTime as the date
       customCategory: eventData.customCategory, // Keep nullable
       color: eventData.color ?? '#FFFFFF', // Map color from EventData (default to white)
+      completed: eventData.completed ?? false, // ADDED: Map completion status from database
+      completedAt: eventData.completedAt, // ADDED: Map completion timestamp from database
       isRecurring: eventData.isRecurring ?? false,
       recurrenceRule: eventData.recurrenceRule,
       parentEventId: eventData.parentEventId,
@@ -77,6 +83,8 @@ class Event {
       'date': date.toIso8601String(),
       'category': customCategory, // Include custom category
       'color': color, // Include color
+      'completed': completed, // ADDED: Include completion status in map
+      'completedAt': completedAt?.toIso8601String(), // ADDED: Include completion timestamp
       'isRecurring': isRecurring,
       'recurrenceRule': recurrenceRule,
       'parentEventId': parentEventId,
@@ -98,6 +106,10 @@ class Event {
       date: DateTime.parse(map['date']),
       customCategory: map['category'], // Parse category from map (nullable)
       color: map['color'] ?? '#FFFFFF', // Parse color from map (default to white)
+      completed: map['completed'] ?? false, // ADDED: Parse completion status from map
+      completedAt: map['completedAt'] != null // ADDED: Parse completion timestamp from map
+          ? DateTime.parse(map['completedAt'])
+          : null,
       isRecurring: map['isRecurring'] ?? false,
       recurrenceRule: map['recurrenceRule'],
       parentEventId: map['parentEventId'],
@@ -125,6 +137,8 @@ class Event {
     DateTime? date,
     String? customCategory,
     String? color,
+    bool? completed, // ADDED: Allow updating completion status
+    DateTime? completedAt, // ADDED: Allow updating completion timestamp
     bool? isRecurring,
     RecurrencePattern? recurrencePattern,
     String? recurrenceRule,
@@ -143,6 +157,8 @@ class Event {
       date: date ?? this.date,
       customCategory: customCategory ?? this.customCategory,
       color: color ?? this.color,
+      completed: completed ?? this.completed, // ADDED: Update completion status
+      completedAt: completedAt ?? this.completedAt, // ADDED: Update completion timestamp
       isRecurring: isRecurring ?? this.isRecurring,
       recurrencePattern: recurrencePattern ?? this.recurrencePattern,
       recurrenceRule: recurrenceRule ?? this.recurrenceRule,
@@ -152,6 +168,22 @@ class Event {
       recurrenceCount: recurrenceCount ?? this.recurrenceCount,
     );
   }
+
+  // ADDED: Method to toggle completion status (for checkbox functionality)
+  Event toggleCompletion() {
+    return copyWith(
+      completed: !completed,
+      completedAt: !completed ? DateTime.now() : null, // Set timestamp when completing
+    );
+  }
+
+  // ADDED: Helper methods for checkbox functionality
+  bool get isCompleted => completed;
+  bool get isPastDue => DateTime.now().isAfter(endDateTime) && !completed;
+  bool get isToday => DateTime.now().day == date.day && 
+                     DateTime.now().month == date.month && 
+                     DateTime.now().year == date.year;
+  bool get isUpcoming => DateTime.now().isBefore(startDateTime);
 
   // Generate RRULE string based on pattern
   String generateRRule() {
@@ -246,7 +278,7 @@ class Event {
   }
 }
 
-// Recurrence pattern class for structured recurrence rules
+// Recurrence pattern class for structured recurrence rules - NO CHANGES NEEDED
 class RecurrencePattern {
   final RecurrenceFrequency frequency;
   final int interval; // Every N days/weeks/months/years
@@ -287,7 +319,7 @@ class RecurrencePattern {
   }
 }
 
-// Enum for recurrence frequencies
+// Enum for recurrence frequencies - NO CHANGES NEEDED
 enum RecurrenceFrequency {
   daily,
   weekly,
@@ -296,7 +328,7 @@ enum RecurrenceFrequency {
   custom, // For complex custom patterns
 }
 
-// Predefined common recurrence patterns
+// Predefined common recurrence patterns - NO CHANGES NEEDED
 class CommonRecurrencePatterns {
   static RecurrencePattern daily() => RecurrencePattern(frequency: RecurrenceFrequency.daily);
   
