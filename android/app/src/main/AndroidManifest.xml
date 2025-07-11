@@ -55,12 +55,12 @@
         <!-- Receiver: For handling exact alarms -->
         <receiver
             android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver"
-            android:exported="false" />
+            android:exported="true" />
 
         <!-- Optional: Foreground service to ensure reliability (especially on Android 12+) -->
         <service
             android:name="com.dexterous.flutterlocalnotifications.ForegroundService"
-            android:exported="false"
+            android:exported="true"
             android:foregroundServiceType="dataSync|location" />
 
     </application>
