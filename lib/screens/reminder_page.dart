@@ -21,6 +21,7 @@ class _ReminderPageState extends State<ReminderPage> {
   List<ReminderModel> _expandedReminders = []; // For displaying recurring instances
 
   late final NotificationService _notificationService;
+  late final ReminderService _reminderService; // ADDED: ReminderService for unified completion handling
   bool _isNotificationServiceReady = false;
 
   @override
@@ -28,6 +29,7 @@ class _ReminderPageState extends State<ReminderPage> {
     super.initState();
     tz.initializeTimeZones();
     _notificationService = NotificationService.instance;
+    _reminderService = ReminderService(widget.database); // ADDED: Initialize ReminderService
     _initializeNotificationService();
     _loadRemindersFromDatabase();
   }
@@ -47,28 +49,36 @@ class _ReminderPageState extends State<ReminderPage> {
     }
   }
 
+  // ENHANCED: Load reminders using ReminderService with completion status
   Future<void> _loadRemindersFromDatabase() async {
     try {
-      final reminderDataList = await widget.database.getAllReminders();
+      _reminders = await _reminderService.getReminders(); // ENHANCED: Use service method
       setState(() {
-        _reminders = reminderDataList.map((data) {
-          return ReminderModel(
-            id: data.id,
-            title: data.title,
-            body: data.body,
-            scheduledTime: data.scheduledTime,
-            notificationId: data.notificationId,
-            isRecurring: data.isRecurring ?? false,
-            recurrenceRule: data.recurrenceRule,
-            parentReminderId: data.parentReminderId,
-            recurrenceEndDate: data.recurrenceEndDate,
-            recurrenceCount: data.recurrenceCount,
-          );
-        }).toList();
         _expandedReminders = _expandRecurringReminders(_reminders);
       });
     } catch (e) {
       print('[ReminderPage] Error loading reminders: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error loading reminders: $e')),
+      );
+    }
+  }
+
+  // ADDED: Toggle reminder completion using ReminderService (unified checkbox system)
+  Future<void> _toggleReminderCompletion(ReminderModel reminder, bool? isCompleted) async {
+    try {
+      if (isCompleted == true) {
+        await _reminderService.markReminderCompleted(reminder.id);
+      } else {
+        await _reminderService.markReminderIncomplete(reminder.id);
+      }
+      
+      // Reload reminders to get updated data from database
+      await _loadRemindersFromDatabase();
+    } catch (error) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to update reminder: $error')),
+      );
     }
   }
 
@@ -478,6 +488,7 @@ class _ReminderPageState extends State<ReminderPage> {
     );
   }
 
+  // ENHANCED: Save new reminder using ReminderService
   Future<void> _saveNewReminder(
     TextEditingController titleController,
     DateTime selectedDateTime,
@@ -489,6 +500,8 @@ class _ReminderPageState extends State<ReminderPage> {
         title: titleController.text.trim(),
         body: "It's time for: ${titleController.text.trim()}",
         scheduledTime: selectedDateTime,
+        completed: false, // ADDED: Initialize with completion status
+        completedAt: null, // ADDED: Initialize completion timestamp
         isRecurring: isRecurring,
         recurrencePattern: isRecurring ? ReminderRecurrencePattern(
           frequency: frequency,
@@ -502,14 +515,12 @@ class _ReminderPageState extends State<ReminderPage> {
         reminder.recurrenceRule = reminder.generateRRule();
       }
 
-      // Insert into database
-      await widget.database.insertReminder(reminder);
+      // ENHANCED: Use ReminderService instead of direct database access
+      await _reminderService.addReminder(reminder);
 
-      // Schedule notification(s)
+      // Schedule recurring notifications if needed
       if (isRecurring) {
         await _scheduleRecurringNotifications(reminder);
-      } else {
-        await _notificationService.scheduleNotification(reminder);
       }
 
       // Reload reminders from database
@@ -553,6 +564,7 @@ class _ReminderPageState extends State<ReminderPage> {
     }
   }
 
+  // ENHANCED: Add simple reminder using ReminderService
   Future<void> _addReminder() async {
     if (_titleController.text.isEmpty || _selectedDateTime == null) return;
 
@@ -569,13 +581,12 @@ class _ReminderPageState extends State<ReminderPage> {
         title: _titleController.text.trim(),
         body: "It's time for: ${_titleController.text.trim()}",
         scheduledTime: _selectedDateTime!,
+        completed: false, // ADDED: Initialize with completion status
+        completedAt: null, // ADDED: Initialize completion timestamp
       );
 
-      // Insert into database - the ReminderModel constructor will generate notificationId
-      await widget.database.insertReminder(reminder);
-
-      // Schedule notification using the generated notificationId
-      await _notificationService.scheduleNotification(reminder);
+      // ENHANCED: Use ReminderService instead of direct database access
+      await _reminderService.addReminder(reminder);
 
       // Reload reminders from database to get the saved version
       await _loadRemindersFromDatabase();
@@ -775,6 +786,7 @@ class _ReminderPageState extends State<ReminderPage> {
     );
   }
 
+  // ENHANCED: Save edited reminder using ReminderService
   Future<void> _saveEditedReminder(
     ReminderModel originalReminder,
     TextEditingController titleController,
@@ -789,11 +801,13 @@ class _ReminderPageState extends State<ReminderPage> {
         title: titleController.text.trim(),
         body: "It's time for: ${titleController.text.trim()}",
         scheduledTime: selectedDateTime,
+        completed: false, // ADDED: Initialize with completion status
+        completedAt: null, // ADDED: Initialize completion timestamp
         isRecurring: false,
       );
 
-      await widget.database.insertReminder(newSingleReminder);
-      await _notificationService.scheduleNotification(newSingleReminder);
+      // ENHANCED: Use ReminderService instead of direct database access
+      await _reminderService.addReminder(newSingleReminder);
 
       // Add exception to parent reminder
       ReminderModel? parentReminder = _reminders.firstWhere(
@@ -808,7 +822,7 @@ class _ReminderPageState extends State<ReminderPage> {
         recurrenceExceptionDates: exceptions,
       );
       
-      await widget.database.updateReminder(updatedParent);
+      await _reminderService.updateReminder(updatedParent);
     } else {
       // Cancel old notification
       await _notificationService.cancelNotification(originalReminder.notificationId);
@@ -831,13 +845,12 @@ class _ReminderPageState extends State<ReminderPage> {
         updatedReminder.recurrenceRule = updatedReminder.generateRRule();
       }
 
-      await widget.database.updateReminder(updatedReminder);
+      // ENHANCED: Use ReminderService instead of direct database access
+      await _reminderService.updateReminder(updatedReminder);
 
       // Schedule new notification(s)
       if (isRecurring) {
         await _scheduleRecurringNotifications(updatedReminder);
-      } else {
-        await _notificationService.scheduleNotification(updatedReminder);
       }
     }
     
@@ -916,6 +929,7 @@ class _ReminderPageState extends State<ReminderPage> {
     );
   }
 
+  // ENHANCED: Delete methods using ReminderService
   Future<void> _deleteSingleOccurrence(ReminderModel reminder) async {
     // Add this occurrence to the parent's exception list
     ReminderModel? parentReminder = _reminders.firstWhere(
@@ -930,7 +944,7 @@ class _ReminderPageState extends State<ReminderPage> {
       recurrenceExceptionDates: exceptions,
     );
     
-    await widget.database.updateReminder(updatedParent);
+    await _reminderService.updateReminder(updatedParent);
     await _loadRemindersFromDatabase();
 
     ScaffoldMessenger.of(context).showSnackBar(
@@ -940,8 +954,7 @@ class _ReminderPageState extends State<ReminderPage> {
 
   Future<void> _deleteEntireSeries(ReminderModel reminder) async {
     String parentId = reminder.parentReminderId ?? reminder.id;
-    await _notificationService.cancelNotification(parentId);
-    await widget.database.deleteReminder(parentId);
+    await _reminderService.deleteReminder(parentId); // ENHANCED: Use ReminderService
     await _loadRemindersFromDatabase();
 
     ScaffoldMessenger.of(context).showSnackBar(
@@ -958,11 +971,8 @@ class _ReminderPageState extends State<ReminderPage> {
     }
 
     try {
-      // Cancel the notification first
-      await _notificationService.cancelNotification(reminder.notificationId);
-      
-      // Delete from database
-      await widget.database.deleteReminder(reminder.id);
+      // ENHANCED: Use ReminderService which handles both notification cancellation and database deletion
+      await _reminderService.deleteReminder(reminder.id);
 
       // Reload reminders from database
       await _loadRemindersFromDatabase();
@@ -1076,6 +1086,8 @@ class _ReminderPageState extends State<ReminderPage> {
                   bool isRecurringInstance = reminder.parentReminderId != null;
                   
                   return Card(
+                    // ENHANCED: Visual feedback for completion
+                    color: reminder.completed ? Colors.grey[700] : Colors.grey[800],
                     child: ListTile(
                       leading: Row(
                         mainAxisSize: MainAxisSize.min,
@@ -1087,13 +1099,25 @@ class _ReminderPageState extends State<ReminderPage> {
                           if (isRecurringInstance) const SizedBox(width: 4),
                         ],
                       ),
-                      title: Text(reminder.title),
+                      title: Text(
+                        reminder.title,
+                        style: TextStyle(
+                          color: Colors.white,
+                          decoration: reminder.completed ? TextDecoration.lineThrough : null, // ENHANCED: Visual feedback
+                        ),
+                      ),
                       subtitle: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
                             'Scheduled: ${reminder.scheduledTime.toLocal().toString().substring(0, 16)}',
+                            style: const TextStyle(color: Colors.grey),
                           ),
+                          if (reminder.body.isNotEmpty)
+                            Text(
+                              reminder.body,
+                              style: const TextStyle(color: Colors.grey),
+                            ),
                           if (reminder.isRecurring && !isRecurringInstance)
                             Text(
                               reminder.recurrenceDescription,
@@ -1112,11 +1136,27 @@ class _ReminderPageState extends State<ReminderPage> {
                                 fontStyle: FontStyle.italic,
                               ),
                             ),
+                          // ADDED: Show completion status
+                          if (reminder.completed && reminder.completedAt != null)
+                            Text(
+                              'Completed: ${reminder.completedAt!.toLocal().toString().substring(0, 16)}',
+                              style: TextStyle(
+                                color: Colors.green[600],
+                                fontSize: 12,
+                                fontStyle: FontStyle.italic,
+                              ),
+                            ),
                         ],
                       ),
                       trailing: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
+                          // ADDED: Database-backed checkbox for completion/dismissal
+                          Checkbox(
+                            value: reminder.completed, // ENHANCED: Use database completion status
+                            onChanged: (value) => _toggleReminderCompletion(reminder, value), // ENHANCED: Use unified system
+                            activeColor: Colors.green,
+                          ),
                           IconButton(
                             icon: const Icon(Icons.edit),
                             onPressed: _isNotificationServiceReady 

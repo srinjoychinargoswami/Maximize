@@ -70,17 +70,23 @@ class _EditTaskScreenState extends State<EditTaskScreen> {
     _loadSubtasks();
   }
 
+  // ENHANCED: Load subtasks with proper error handling
   Future<void> _loadSubtasks() async {
-  final subtasks = await _taskService.getSubtasks(widget.task.id);
-  print('Fetched Subtasks: $subtasks');
-  setState(() {
-    _subtasks
-    ..clear()
-    ..addAll(subtasks);
-  });
-}
-
-
+    try {
+      final subtasks = await _taskService.getSubtasks(widget.task.id);
+      print('Fetched Subtasks: $subtasks');
+      setState(() {
+        _subtasks
+        ..clear()
+        ..addAll(subtasks);
+      });
+    } catch (e) {
+      print('Error loading subtasks: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to load subtasks: $e')),
+      );
+    }
+  }
 
   Future<void> _selectDueDate(BuildContext context) async {
     final DateTime? picked = await showDatePicker(
@@ -147,6 +153,57 @@ class _EditTaskScreenState extends State<EditTaskScreen> {
         );
       },
     );
+  }
+
+  // ADDED: Toggle subtask completion using TaskService (unified checkbox system)
+  Future<void> _toggleSubtaskCompletion(SubtaskModel subtask, bool? isCompleted) async {
+    try {
+      if (isCompleted == true) {
+        await _taskService.markSubtaskCompleted(subtask.id);
+      } else {
+        // Mark as incomplete
+        final updatedSubtask = subtask.copyWith(
+          completed: false,
+          completedAt: null,
+        );
+        await _taskService.updateSubtask(updatedSubtask);
+      }
+      
+      // Reload subtasks to get updated data from database
+      await _loadSubtasks();
+    } catch (error) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to update subtask: $error')),
+      );
+    }
+  }
+
+  // ENHANCED: Add new subtask with immediate database persistence
+  Future<void> _addNewSubtask() async {
+    if (_subtaskController.text.isNotEmpty) {
+      try {
+        // Add subtask to database immediately
+        await _taskService.addSubtask(
+          widget.task.id,
+          title: _subtaskController.text,
+          completed: false,
+        );
+        
+        // Reload subtasks to get updated data from database
+        await _loadSubtasks();
+        
+        // Clear the input field
+        _subtaskController.clear();
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Subtask added successfully')),
+        );
+      } catch (error) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to add subtask: $error')),
+        );
+      }
+    }
   }
 
   @override
@@ -325,6 +382,8 @@ class _EditTaskScreenState extends State<EditTaskScreen> {
                         completed: _completed,
                         category: _categories.join(', '), // Join categories back to string
                         priority: _priority, // Pass priority
+                        // ENHANCED: Include completion tracking
+                        completedAt: _completed ? (widget.task.completedAt ?? DateTime.now()) : null,
                         // Recurring fields
                         isRecurring: _isRecurring,
                         recurrenceRule: _isRecurring ? _recurrenceRule : null,
@@ -342,10 +401,8 @@ class _EditTaskScreenState extends State<EditTaskScreen> {
                         // Call updateTask with the updated TaskModel
                         await _taskService.updateTask(updatedTask);
                         
-                        // Update subtasks in the database
-                        for (var subtask in _subtasks) {
-                          await _taskService.updateSubtask(subtask);
-                        }
+                        // REMOVED: Manual subtask updates - they're already persisted to database
+                        // The subtasks are now updated immediately when modified through the UI
 
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(content: Text('Task updated successfully')),
@@ -464,6 +521,7 @@ class _EditTaskScreenState extends State<EditTaskScreen> {
     );
   }
 
+  // ENHANCED: Subtasks section with unified checkbox system
   Widget _buildSubtasksSection() {
     return Card(
       elevation: 3,
@@ -488,7 +546,7 @@ class _EditTaskScreenState extends State<EditTaskScreen> {
             ),
             const SizedBox(height: 16),
             
-            // Display existing subtasks as chips with delete buttons
+            // ENHANCED: Display existing subtasks with database-backed checkboxes
             if (_subtasks.isNotEmpty) ...[
               Container(
                 padding: const EdgeInsets.all(12),
@@ -497,31 +555,54 @@ class _EditTaskScreenState extends State<EditTaskScreen> {
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(color: Colors.orange[200]!),
                 ),
-                child: Wrap(
-                  spacing: 8.0,
-                  runSpacing: 8.0,
+                child: Column(
                   children: _subtasks.map((subtask) {
-                    return Chip(
-                      avatar: Checkbox(
-                        value: subtask.completed,
-                        onChanged: (value) {
-                          setState(() {
-                            subtask.completed = value ?? false;
-                          });
-                        },
-                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      ),
-                      label: Text(
-                        subtask.title,
-                        style: TextStyle(
-                          decoration: subtask.completed ? TextDecoration.lineThrough : null,
-                          color: subtask.completed ? Colors.grey[600] : Colors.orange[800],
-                          fontWeight: FontWeight.w500,
+                    return Container(
+                      margin: const EdgeInsets.symmetric(vertical: 4),
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: subtask.completed ? Colors.grey[200] : Colors.white,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: subtask.completed ? Colors.grey[400]! : Colors.orange[200]!,
                         ),
                       ),
-                      backgroundColor: subtask.completed ? Colors.grey[200] : Colors.orange[100],
-                      deleteIconColor: Colors.red[600],
-                      onDeleted: () => _deleteSubtask(subtask),
+                      child: Row(
+                        children: [
+                          // ENHANCED: Database-backed checkbox
+                          Checkbox(
+                            value: subtask.completed,
+                            onChanged: (value) => _toggleSubtaskCompletion(subtask, value), // ENHANCED: Use unified system
+                            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            activeColor: Colors.green,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              subtask.title,
+                              style: TextStyle(
+                                decoration: subtask.completed ? TextDecoration.lineThrough : null,
+                                color: subtask.completed ? Colors.grey[600] : Colors.orange[800],
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                          // Edit button
+                          IconButton(
+                            icon: Icon(Icons.edit, size: 18, color: Colors.blue[600]),
+                            onPressed: () => _editSubtask(subtask),
+                            tooltip: 'Edit subtask',
+                            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                          ),
+                          // Delete button
+                          IconButton(
+                            icon: Icon(Icons.delete_outline, size: 18, color: Colors.red[600]),
+                            onPressed: () => _deleteSubtask(subtask),
+                            tooltip: 'Delete subtask',
+                            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                          ),
+                        ],
+                      ),
                     );
                   }).toList(),
                 ),
@@ -553,19 +634,7 @@ class _EditTaskScreenState extends State<EditTaskScreen> {
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton.icon(
-                      onPressed: () {
-                        if (_subtaskController.text.isNotEmpty) {
-                          setState(() {
-                            _subtasks.add(SubtaskModel(
-                              id: const Uuid().v1(),
-                              taskId: widget.task.id,
-                              title: _subtaskController.text,
-                              completed: false,
-                            ));
-                            _subtaskController.clear();
-                          });
-                        }
-                      },
+                      onPressed: _addNewSubtask, // ENHANCED: Use new method with database persistence
                       icon: const Icon(Icons.add),
                       label: const Text('Add Subtask'),
                       style: ElevatedButton.styleFrom(
@@ -618,7 +687,8 @@ class _EditTaskScreenState extends State<EditTaskScreen> {
     );
   }
 
-  void _editSubtask(SubtaskModel subtask, int index) {
+  // ENHANCED: Edit subtask with database persistence
+  void _editSubtask(SubtaskModel subtask) {
     final controller = TextEditingController(text: subtask.title);
     showDialog(
       context: context,
@@ -640,12 +710,26 @@ class _EditTaskScreenState extends State<EditTaskScreen> {
               child: const Text('Cancel'),
             ),
             ElevatedButton(
-              onPressed: () {
+              onPressed: () async {
                 if (controller.text.isNotEmpty) {
-                  setState(() {
-                    _subtasks[index] = subtask.copyWith(title: controller.text);
-                  });
-                  Navigator.of(context).pop();
+                  try {
+                    // ENHANCED: Update subtask in database immediately
+                    final updatedSubtask = subtask.copyWith(title: controller.text);
+                    await _taskService.updateSubtask(updatedSubtask);
+                    
+                    // Reload subtasks to get updated data
+                    await _loadSubtasks();
+                    
+                    Navigator.of(context).pop();
+                    
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Subtask updated successfully')),
+                    );
+                  } catch (error) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Failed to update subtask: $error')),
+                    );
+                  }
                 }
               },
               child: const Text('Save'),

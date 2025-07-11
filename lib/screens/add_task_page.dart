@@ -599,11 +599,11 @@ class _AddTaskPageState extends State<AddTaskPage> {
                 await AppDatabase.instance.insertTask(taskModel);
               }
 
-              // Save subtasks
-              for (var subtask in _subtasks) {
-                subtask.taskId = taskModel.id; // Set the taskId for each subtask
-                await AppDatabase.instance.insertSubtask(subtask);
-              }
+              // FIXED: Save subtasks using copyWith() method
+for (var subtask in _subtasks) {
+  final updatedSubtask = subtask.copyWith(taskId: taskModel.id);
+  await AppDatabase.instance.insertSubtask(updatedSubtask);
+}
 
               Navigator.pop(context, taskModel);
             } catch (e) {

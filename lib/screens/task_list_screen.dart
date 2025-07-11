@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:maximize/models/task_model.dart';
 import 'package:maximize/services/task_service.dart';
-import 'package:maximize/widgets/task_widget.dart'; // Import the TaskWidget
 import 'package:maximize/screens/add_task_page.dart'; // Import the AddTaskPage
 import 'package:maximize/utils/task_utils.dart';
 import 'package:maximize/models/database.dart'; // Import your Drift database file
-import 'package:shared_preferences/shared_preferences.dart'; // Import SharedPreferences
+// REMOVED: SharedPreferences import - no longer needed for checkboxes
 import 'package:intl/intl.dart';
 
 class TaskListScreen extends StatefulWidget {
@@ -56,22 +55,24 @@ class _TaskListScreenState extends State<TaskListScreen> with TickerProviderStat
     super.dispose();
   }
 
+  // ENHANCED: Load tasks directly from database with completion status
   Future<void> _loadTasks() async {
     setState(() => _isLoading = true);
-    _tasks = await _taskService.getTasks();
-    await _loadTaskCompletionStatus(); // Load completion status
-    _updateFilterOptions();
-    setState(() => _isLoading = false);
-    _animationController.forward();
-  }
-
-  Future<void> _loadTaskCompletionStatus() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    for (var task in _tasks) {
-      bool isCompleted = prefs.getBool(task.id) ?? false; // Default to false
-      task.completed = isCompleted; // Update task's completion status
+    try {
+      _tasks = await _taskService.getTasks(); // SIMPLIFIED: No need for separate completion loading
+      _updateFilterOptions();
+      setState(() => _isLoading = false);
+      _animationController.forward();
+    } catch (e) {
+      print('Error loading tasks: $e');
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to load tasks: $e')),
+      );
     }
   }
+
+  // REMOVED: _loadTaskCompletionStatus method - no longer needed
 
   List<TaskModel> _filterTasks() {
     return _tasks.where((task) {
@@ -700,7 +701,7 @@ class _TaskListScreenState extends State<TaskListScreen> with TickerProviderStat
 
   Widget _buildSubtasksSection(TaskModel task) {
     return FutureBuilder<List<SubtaskModel>>(
-      future: widget.database.getAllSubtasks(task.id),
+      future: _taskService.getSubtasks(task.id), // ENHANCED: Use service method instead of direct database call
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Padding(
@@ -1100,28 +1101,41 @@ class _TaskListScreenState extends State<TaskListScreen> with TickerProviderStat
     });
   }
 
+  // ENHANCED: Use TaskService completion methods instead of SharedPreferences
   void _toggleTaskCompletion(TaskModel task, bool? isCompleted) async {
-    final updatedTask = task.copyWith(completed: isCompleted ?? false);
-    await _taskService.updateTask(updatedTask).then((_) async {
-      SharedPreferences prefs = await SharedPreferences.getInstance();
-      await prefs.setBool(task.id, updatedTask.completed);
-      _loadTasks();
-    }).catchError((error) {
+    try {
+      if (isCompleted == true) {
+        await _taskService.markTaskCompleted(task.id);
+      } else {
+        await _taskService.markTaskIncomplete(task.id);
+      }
+      _loadTasks(); // Reload to get updated data from database
+    } catch (error) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Failed to update task: $error')),
       );
-    });
+    }
   }
 
+  // ENHANCED: Use TaskService completion methods instead of direct database calls
   void _toggleSubtaskCompletion(SubtaskModel subtask, bool? isCompleted) async {
-    final updatedSubtask = subtask.copyWith(completed: isCompleted ?? false);
-    await _taskService.updateSubtask(updatedSubtask).then((_) {
-      _loadTasks();
-    }).catchError((error) {
+    try {
+      if (isCompleted == true) {
+        await _taskService.markSubtaskCompleted(subtask.id);
+      } else {
+        // Create a method in TaskService for marking subtask incomplete
+        final updatedSubtask = subtask.copyWith(
+          completed: false,
+          completedAt: null,
+        );
+        await _taskService.updateSubtask(updatedSubtask);
+      }
+      _loadTasks(); // Reload to get updated data from database
+    } catch (error) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Failed to update subtask: $error')),
       );
-    });
+    }
   }
 
   void _updateFilterOptions() {
