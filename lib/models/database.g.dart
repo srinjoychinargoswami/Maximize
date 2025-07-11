@@ -53,6 +53,12 @@ class $TasksTable extends Tasks with TableInfo<$TasksTable, TaskData> {
       defaultConstraints:
           GeneratedColumn.constraintIsAlways('CHECK ("completed" IN (0, 1))'),
       defaultValue: Constant(false));
+  static const VerificationMeta _completedAtMeta =
+      const VerificationMeta('completedAt');
+  @override
+  late final GeneratedColumn<DateTime> completedAt = GeneratedColumn<DateTime>(
+      'completed_at', aliasedName, true,
+      type: DriftSqlType.dateTime, requiredDuringInsert: false);
   static const VerificationMeta _categoryMeta =
       const VerificationMeta('category');
   @override
@@ -160,6 +166,7 @@ class $TasksTable extends Tasks with TableInfo<$TasksTable, TaskData> {
         description,
         dueDate,
         completed,
+        completedAt,
         category,
         priority,
         customCategory,
@@ -216,6 +223,12 @@ class $TasksTable extends Tasks with TableInfo<$TasksTable, TaskData> {
     if (data.containsKey('completed')) {
       context.handle(_completedMeta,
           completed.isAcceptableOrUnknown(data['completed']!, _completedMeta));
+    }
+    if (data.containsKey('completed_at')) {
+      context.handle(
+          _completedAtMeta,
+          completedAt.isAcceptableOrUnknown(
+              data['completed_at']!, _completedAtMeta));
     }
     if (data.containsKey('category')) {
       context.handle(_categoryMeta,
@@ -322,6 +335,8 @@ class $TasksTable extends Tasks with TableInfo<$TasksTable, TaskData> {
           .read(DriftSqlType.dateTime, data['${effectivePrefix}due_date'])!,
       completed: attachedDatabase.typeMapping
           .read(DriftSqlType.bool, data['${effectivePrefix}completed'])!,
+      completedAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}completed_at']),
       category: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}category']),
       priority: attachedDatabase.typeMapping
@@ -368,6 +383,7 @@ class TaskData extends DataClass implements Insertable<TaskData> {
   final String? description;
   final DateTime dueDate;
   final bool completed;
+  final DateTime? completedAt;
   final String? category;
   final String priority;
   final String? customCategory;
@@ -390,6 +406,7 @@ class TaskData extends DataClass implements Insertable<TaskData> {
       this.description,
       required this.dueDate,
       required this.completed,
+      this.completedAt,
       this.category,
       required this.priority,
       this.customCategory,
@@ -416,6 +433,9 @@ class TaskData extends DataClass implements Insertable<TaskData> {
     }
     map['due_date'] = Variable<DateTime>(dueDate);
     map['completed'] = Variable<bool>(completed);
+    if (!nullToAbsent || completedAt != null) {
+      map['completed_at'] = Variable<DateTime>(completedAt);
+    }
     if (!nullToAbsent || category != null) {
       map['category'] = Variable<String>(category);
     }
@@ -468,6 +488,9 @@ class TaskData extends DataClass implements Insertable<TaskData> {
           : Value(description),
       dueDate: Value(dueDate),
       completed: Value(completed),
+      completedAt: completedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(completedAt),
       category: category == null && nullToAbsent
           ? const Value.absent()
           : Value(category),
@@ -517,6 +540,7 @@ class TaskData extends DataClass implements Insertable<TaskData> {
       description: serializer.fromJson<String?>(json['description']),
       dueDate: serializer.fromJson<DateTime>(json['dueDate']),
       completed: serializer.fromJson<bool>(json['completed']),
+      completedAt: serializer.fromJson<DateTime?>(json['completedAt']),
       category: serializer.fromJson<String?>(json['category']),
       priority: serializer.fromJson<String>(json['priority']),
       customCategory: serializer.fromJson<String?>(json['customCategory']),
@@ -545,6 +569,7 @@ class TaskData extends DataClass implements Insertable<TaskData> {
       'description': serializer.toJson<String?>(description),
       'dueDate': serializer.toJson<DateTime>(dueDate),
       'completed': serializer.toJson<bool>(completed),
+      'completedAt': serializer.toJson<DateTime?>(completedAt),
       'category': serializer.toJson<String?>(category),
       'priority': serializer.toJson<String>(priority),
       'customCategory': serializer.toJson<String?>(customCategory),
@@ -570,6 +595,7 @@ class TaskData extends DataClass implements Insertable<TaskData> {
           Value<String?> description = const Value.absent(),
           DateTime? dueDate,
           bool? completed,
+          Value<DateTime?> completedAt = const Value.absent(),
           Value<String?> category = const Value.absent(),
           String? priority,
           Value<String?> customCategory = const Value.absent(),
@@ -592,6 +618,7 @@ class TaskData extends DataClass implements Insertable<TaskData> {
         description: description.present ? description.value : this.description,
         dueDate: dueDate ?? this.dueDate,
         completed: completed ?? this.completed,
+        completedAt: completedAt.present ? completedAt.value : this.completedAt,
         category: category.present ? category.value : this.category,
         priority: priority ?? this.priority,
         customCategory:
@@ -625,6 +652,8 @@ class TaskData extends DataClass implements Insertable<TaskData> {
           data.description.present ? data.description.value : this.description,
       dueDate: data.dueDate.present ? data.dueDate.value : this.dueDate,
       completed: data.completed.present ? data.completed.value : this.completed,
+      completedAt:
+          data.completedAt.present ? data.completedAt.value : this.completedAt,
       category: data.category.present ? data.category.value : this.category,
       priority: data.priority.present ? data.priority.value : this.priority,
       customCategory: data.customCategory.present
@@ -670,6 +699,7 @@ class TaskData extends DataClass implements Insertable<TaskData> {
           ..write('description: $description, ')
           ..write('dueDate: $dueDate, ')
           ..write('completed: $completed, ')
+          ..write('completedAt: $completedAt, ')
           ..write('category: $category, ')
           ..write('priority: $priority, ')
           ..write('customCategory: $customCategory, ')
@@ -697,6 +727,7 @@ class TaskData extends DataClass implements Insertable<TaskData> {
         description,
         dueDate,
         completed,
+        completedAt,
         category,
         priority,
         customCategory,
@@ -723,6 +754,7 @@ class TaskData extends DataClass implements Insertable<TaskData> {
           other.description == this.description &&
           other.dueDate == this.dueDate &&
           other.completed == this.completed &&
+          other.completedAt == this.completedAt &&
           other.category == this.category &&
           other.priority == this.priority &&
           other.customCategory == this.customCategory &&
@@ -747,6 +779,7 @@ class TasksCompanion extends UpdateCompanion<TaskData> {
   final Value<String?> description;
   final Value<DateTime> dueDate;
   final Value<bool> completed;
+  final Value<DateTime?> completedAt;
   final Value<String?> category;
   final Value<String> priority;
   final Value<String?> customCategory;
@@ -770,6 +803,7 @@ class TasksCompanion extends UpdateCompanion<TaskData> {
     this.description = const Value.absent(),
     this.dueDate = const Value.absent(),
     this.completed = const Value.absent(),
+    this.completedAt = const Value.absent(),
     this.category = const Value.absent(),
     this.priority = const Value.absent(),
     this.customCategory = const Value.absent(),
@@ -794,6 +828,7 @@ class TasksCompanion extends UpdateCompanion<TaskData> {
     this.description = const Value.absent(),
     required DateTime dueDate,
     this.completed = const Value.absent(),
+    this.completedAt = const Value.absent(),
     this.category = const Value.absent(),
     required String priority,
     this.customCategory = const Value.absent(),
@@ -821,6 +856,7 @@ class TasksCompanion extends UpdateCompanion<TaskData> {
     Expression<String>? description,
     Expression<DateTime>? dueDate,
     Expression<bool>? completed,
+    Expression<DateTime>? completedAt,
     Expression<String>? category,
     Expression<String>? priority,
     Expression<String>? customCategory,
@@ -845,6 +881,7 @@ class TasksCompanion extends UpdateCompanion<TaskData> {
       if (description != null) 'description': description,
       if (dueDate != null) 'due_date': dueDate,
       if (completed != null) 'completed': completed,
+      if (completedAt != null) 'completed_at': completedAt,
       if (category != null) 'category': category,
       if (priority != null) 'priority': priority,
       if (customCategory != null) 'custom_category': customCategory,
@@ -871,6 +908,7 @@ class TasksCompanion extends UpdateCompanion<TaskData> {
       Value<String?>? description,
       Value<DateTime>? dueDate,
       Value<bool>? completed,
+      Value<DateTime?>? completedAt,
       Value<String?>? category,
       Value<String>? priority,
       Value<String?>? customCategory,
@@ -894,6 +932,7 @@ class TasksCompanion extends UpdateCompanion<TaskData> {
       description: description ?? this.description,
       dueDate: dueDate ?? this.dueDate,
       completed: completed ?? this.completed,
+      completedAt: completedAt ?? this.completedAt,
       category: category ?? this.category,
       priority: priority ?? this.priority,
       customCategory: customCategory ?? this.customCategory,
@@ -933,6 +972,9 @@ class TasksCompanion extends UpdateCompanion<TaskData> {
     }
     if (completed.present) {
       map['completed'] = Variable<bool>(completed.value);
+    }
+    if (completedAt.present) {
+      map['completed_at'] = Variable<DateTime>(completedAt.value);
     }
     if (category.present) {
       map['category'] = Variable<String>(category.value);
@@ -994,6 +1036,7 @@ class TasksCompanion extends UpdateCompanion<TaskData> {
           ..write('description: $description, ')
           ..write('dueDate: $dueDate, ')
           ..write('completed: $completed, ')
+          ..write('completedAt: $completedAt, ')
           ..write('category: $category, ')
           ..write('priority: $priority, ')
           ..write('customCategory: $customCategory, ')
@@ -1053,8 +1096,15 @@ class $SubtasksTable extends Subtasks
       defaultConstraints:
           GeneratedColumn.constraintIsAlways('CHECK ("completed" IN (0, 1))'),
       defaultValue: Constant(false));
+  static const VerificationMeta _completedAtMeta =
+      const VerificationMeta('completedAt');
   @override
-  List<GeneratedColumn> get $columns => [id, taskId, title, completed];
+  late final GeneratedColumn<DateTime> completedAt = GeneratedColumn<DateTime>(
+      'completed_at', aliasedName, true,
+      type: DriftSqlType.dateTime, requiredDuringInsert: false);
+  @override
+  List<GeneratedColumn> get $columns =>
+      [id, taskId, title, completed, completedAt];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -1084,6 +1134,12 @@ class $SubtasksTable extends Subtasks
       context.handle(_completedMeta,
           completed.isAcceptableOrUnknown(data['completed']!, _completedMeta));
     }
+    if (data.containsKey('completed_at')) {
+      context.handle(
+          _completedAtMeta,
+          completedAt.isAcceptableOrUnknown(
+              data['completed_at']!, _completedAtMeta));
+    }
     return context;
   }
 
@@ -1101,6 +1157,8 @@ class $SubtasksTable extends Subtasks
           .read(DriftSqlType.string, data['${effectivePrefix}title'])!,
       completed: attachedDatabase.typeMapping
           .read(DriftSqlType.bool, data['${effectivePrefix}completed'])!,
+      completedAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}completed_at']),
     );
   }
 
@@ -1115,11 +1173,13 @@ class SubtaskData extends DataClass implements Insertable<SubtaskData> {
   final String taskId;
   final String title;
   final bool completed;
+  final DateTime? completedAt;
   const SubtaskData(
       {required this.id,
       required this.taskId,
       required this.title,
-      required this.completed});
+      required this.completed,
+      this.completedAt});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -1127,6 +1187,9 @@ class SubtaskData extends DataClass implements Insertable<SubtaskData> {
     map['task_id'] = Variable<String>(taskId);
     map['title'] = Variable<String>(title);
     map['completed'] = Variable<bool>(completed);
+    if (!nullToAbsent || completedAt != null) {
+      map['completed_at'] = Variable<DateTime>(completedAt);
+    }
     return map;
   }
 
@@ -1136,6 +1199,9 @@ class SubtaskData extends DataClass implements Insertable<SubtaskData> {
       taskId: Value(taskId),
       title: Value(title),
       completed: Value(completed),
+      completedAt: completedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(completedAt),
     );
   }
 
@@ -1147,6 +1213,7 @@ class SubtaskData extends DataClass implements Insertable<SubtaskData> {
       taskId: serializer.fromJson<String>(json['taskId']),
       title: serializer.fromJson<String>(json['title']),
       completed: serializer.fromJson<bool>(json['completed']),
+      completedAt: serializer.fromJson<DateTime?>(json['completedAt']),
     );
   }
   @override
@@ -1157,16 +1224,22 @@ class SubtaskData extends DataClass implements Insertable<SubtaskData> {
       'taskId': serializer.toJson<String>(taskId),
       'title': serializer.toJson<String>(title),
       'completed': serializer.toJson<bool>(completed),
+      'completedAt': serializer.toJson<DateTime?>(completedAt),
     };
   }
 
   SubtaskData copyWith(
-          {String? id, String? taskId, String? title, bool? completed}) =>
+          {String? id,
+          String? taskId,
+          String? title,
+          bool? completed,
+          Value<DateTime?> completedAt = const Value.absent()}) =>
       SubtaskData(
         id: id ?? this.id,
         taskId: taskId ?? this.taskId,
         title: title ?? this.title,
         completed: completed ?? this.completed,
+        completedAt: completedAt.present ? completedAt.value : this.completedAt,
       );
   SubtaskData copyWithCompanion(SubtasksCompanion data) {
     return SubtaskData(
@@ -1174,6 +1247,8 @@ class SubtaskData extends DataClass implements Insertable<SubtaskData> {
       taskId: data.taskId.present ? data.taskId.value : this.taskId,
       title: data.title.present ? data.title.value : this.title,
       completed: data.completed.present ? data.completed.value : this.completed,
+      completedAt:
+          data.completedAt.present ? data.completedAt.value : this.completedAt,
     );
   }
 
@@ -1183,13 +1258,14 @@ class SubtaskData extends DataClass implements Insertable<SubtaskData> {
           ..write('id: $id, ')
           ..write('taskId: $taskId, ')
           ..write('title: $title, ')
-          ..write('completed: $completed')
+          ..write('completed: $completed, ')
+          ..write('completedAt: $completedAt')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(id, taskId, title, completed);
+  int get hashCode => Object.hash(id, taskId, title, completed, completedAt);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -1197,7 +1273,8 @@ class SubtaskData extends DataClass implements Insertable<SubtaskData> {
           other.id == this.id &&
           other.taskId == this.taskId &&
           other.title == this.title &&
-          other.completed == this.completed);
+          other.completed == this.completed &&
+          other.completedAt == this.completedAt);
 }
 
 class SubtasksCompanion extends UpdateCompanion<SubtaskData> {
@@ -1205,12 +1282,14 @@ class SubtasksCompanion extends UpdateCompanion<SubtaskData> {
   final Value<String> taskId;
   final Value<String> title;
   final Value<bool> completed;
+  final Value<DateTime?> completedAt;
   final Value<int> rowid;
   const SubtasksCompanion({
     this.id = const Value.absent(),
     this.taskId = const Value.absent(),
     this.title = const Value.absent(),
     this.completed = const Value.absent(),
+    this.completedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   SubtasksCompanion.insert({
@@ -1218,6 +1297,7 @@ class SubtasksCompanion extends UpdateCompanion<SubtaskData> {
     required String taskId,
     required String title,
     this.completed = const Value.absent(),
+    this.completedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   })  : taskId = Value(taskId),
         title = Value(title);
@@ -1226,6 +1306,7 @@ class SubtasksCompanion extends UpdateCompanion<SubtaskData> {
     Expression<String>? taskId,
     Expression<String>? title,
     Expression<bool>? completed,
+    Expression<DateTime>? completedAt,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -1233,6 +1314,7 @@ class SubtasksCompanion extends UpdateCompanion<SubtaskData> {
       if (taskId != null) 'task_id': taskId,
       if (title != null) 'title': title,
       if (completed != null) 'completed': completed,
+      if (completedAt != null) 'completed_at': completedAt,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -1242,12 +1324,14 @@ class SubtasksCompanion extends UpdateCompanion<SubtaskData> {
       Value<String>? taskId,
       Value<String>? title,
       Value<bool>? completed,
+      Value<DateTime?>? completedAt,
       Value<int>? rowid}) {
     return SubtasksCompanion(
       id: id ?? this.id,
       taskId: taskId ?? this.taskId,
       title: title ?? this.title,
       completed: completed ?? this.completed,
+      completedAt: completedAt ?? this.completedAt,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -1267,6 +1351,9 @@ class SubtasksCompanion extends UpdateCompanion<SubtaskData> {
     if (completed.present) {
       map['completed'] = Variable<bool>(completed.value);
     }
+    if (completedAt.present) {
+      map['completed_at'] = Variable<DateTime>(completedAt.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -1280,6 +1367,7 @@ class SubtasksCompanion extends UpdateCompanion<SubtaskData> {
           ..write('taskId: $taskId, ')
           ..write('title: $title, ')
           ..write('completed: $completed, ')
+          ..write('completedAt: $completedAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -1341,6 +1429,22 @@ class $EventsTable extends Events with TableInfo<$EventsTable, EventData> {
   late final GeneratedColumn<String> color = GeneratedColumn<String>(
       'color', aliasedName, true,
       type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _completedMeta =
+      const VerificationMeta('completed');
+  @override
+  late final GeneratedColumn<bool> completed = GeneratedColumn<bool>(
+      'completed', aliasedName, false,
+      type: DriftSqlType.bool,
+      requiredDuringInsert: false,
+      defaultConstraints:
+          GeneratedColumn.constraintIsAlways('CHECK ("completed" IN (0, 1))'),
+      defaultValue: Constant(false));
+  static const VerificationMeta _completedAtMeta =
+      const VerificationMeta('completedAt');
+  @override
+  late final GeneratedColumn<DateTime> completedAt = GeneratedColumn<DateTime>(
+      'completed_at', aliasedName, true,
+      type: DriftSqlType.dateTime, requiredDuringInsert: false);
   static const VerificationMeta _isRecurringMeta =
       const VerificationMeta('isRecurring');
   @override
@@ -1391,6 +1495,8 @@ class $EventsTable extends Events with TableInfo<$EventsTable, EventData> {
         endDateTime,
         customCategory,
         color,
+        completed,
+        completedAt,
         isRecurring,
         recurrenceRule,
         parentEventId,
@@ -1452,6 +1558,16 @@ class $EventsTable extends Events with TableInfo<$EventsTable, EventData> {
     if (data.containsKey('color')) {
       context.handle(
           _colorMeta, color.isAcceptableOrUnknown(data['color']!, _colorMeta));
+    }
+    if (data.containsKey('completed')) {
+      context.handle(_completedMeta,
+          completed.isAcceptableOrUnknown(data['completed']!, _completedMeta));
+    }
+    if (data.containsKey('completed_at')) {
+      context.handle(
+          _completedAtMeta,
+          completedAt.isAcceptableOrUnknown(
+              data['completed_at']!, _completedAtMeta));
     }
     if (data.containsKey('is_recurring')) {
       context.handle(
@@ -1515,6 +1631,10 @@ class $EventsTable extends Events with TableInfo<$EventsTable, EventData> {
           .read(DriftSqlType.string, data['${effectivePrefix}custom_category']),
       color: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}color']),
+      completed: attachedDatabase.typeMapping
+          .read(DriftSqlType.bool, data['${effectivePrefix}completed'])!,
+      completedAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}completed_at']),
       isRecurring: attachedDatabase.typeMapping
           .read(DriftSqlType.bool, data['${effectivePrefix}is_recurring'])!,
       recurrenceRule: attachedDatabase.typeMapping
@@ -1546,6 +1666,8 @@ class EventData extends DataClass implements Insertable<EventData> {
   final DateTime endDateTime;
   final String? customCategory;
   final String? color;
+  final bool completed;
+  final DateTime? completedAt;
   final bool isRecurring;
   final String? recurrenceRule;
   final String? parentEventId;
@@ -1561,6 +1683,8 @@ class EventData extends DataClass implements Insertable<EventData> {
       required this.endDateTime,
       this.customCategory,
       this.color,
+      required this.completed,
+      this.completedAt,
       required this.isRecurring,
       this.recurrenceRule,
       this.parentEventId,
@@ -1585,6 +1709,10 @@ class EventData extends DataClass implements Insertable<EventData> {
     }
     if (!nullToAbsent || color != null) {
       map['color'] = Variable<String>(color);
+    }
+    map['completed'] = Variable<bool>(completed);
+    if (!nullToAbsent || completedAt != null) {
+      map['completed_at'] = Variable<DateTime>(completedAt);
     }
     map['is_recurring'] = Variable<bool>(isRecurring);
     if (!nullToAbsent || recurrenceRule != null) {
@@ -1623,6 +1751,10 @@ class EventData extends DataClass implements Insertable<EventData> {
           : Value(customCategory),
       color:
           color == null && nullToAbsent ? const Value.absent() : Value(color),
+      completed: Value(completed),
+      completedAt: completedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(completedAt),
       isRecurring: Value(isRecurring),
       recurrenceRule: recurrenceRule == null && nullToAbsent
           ? const Value.absent()
@@ -1654,6 +1786,8 @@ class EventData extends DataClass implements Insertable<EventData> {
       endDateTime: serializer.fromJson<DateTime>(json['endDateTime']),
       customCategory: serializer.fromJson<String?>(json['customCategory']),
       color: serializer.fromJson<String?>(json['color']),
+      completed: serializer.fromJson<bool>(json['completed']),
+      completedAt: serializer.fromJson<DateTime?>(json['completedAt']),
       isRecurring: serializer.fromJson<bool>(json['isRecurring']),
       recurrenceRule: serializer.fromJson<String?>(json['recurrenceRule']),
       parentEventId: serializer.fromJson<String?>(json['parentEventId']),
@@ -1676,6 +1810,8 @@ class EventData extends DataClass implements Insertable<EventData> {
       'endDateTime': serializer.toJson<DateTime>(endDateTime),
       'customCategory': serializer.toJson<String?>(customCategory),
       'color': serializer.toJson<String?>(color),
+      'completed': serializer.toJson<bool>(completed),
+      'completedAt': serializer.toJson<DateTime?>(completedAt),
       'isRecurring': serializer.toJson<bool>(isRecurring),
       'recurrenceRule': serializer.toJson<String?>(recurrenceRule),
       'parentEventId': serializer.toJson<String?>(parentEventId),
@@ -1695,6 +1831,8 @@ class EventData extends DataClass implements Insertable<EventData> {
           DateTime? endDateTime,
           Value<String?> customCategory = const Value.absent(),
           Value<String?> color = const Value.absent(),
+          bool? completed,
+          Value<DateTime?> completedAt = const Value.absent(),
           bool? isRecurring,
           Value<String?> recurrenceRule = const Value.absent(),
           Value<String?> parentEventId = const Value.absent(),
@@ -1711,6 +1849,8 @@ class EventData extends DataClass implements Insertable<EventData> {
         customCategory:
             customCategory.present ? customCategory.value : this.customCategory,
         color: color.present ? color.value : this.color,
+        completed: completed ?? this.completed,
+        completedAt: completedAt.present ? completedAt.value : this.completedAt,
         isRecurring: isRecurring ?? this.isRecurring,
         recurrenceRule:
             recurrenceRule.present ? recurrenceRule.value : this.recurrenceRule,
@@ -1742,6 +1882,9 @@ class EventData extends DataClass implements Insertable<EventData> {
           ? data.customCategory.value
           : this.customCategory,
       color: data.color.present ? data.color.value : this.color,
+      completed: data.completed.present ? data.completed.value : this.completed,
+      completedAt:
+          data.completedAt.present ? data.completedAt.value : this.completedAt,
       isRecurring:
           data.isRecurring.present ? data.isRecurring.value : this.isRecurring,
       recurrenceRule: data.recurrenceRule.present
@@ -1773,6 +1916,8 @@ class EventData extends DataClass implements Insertable<EventData> {
           ..write('endDateTime: $endDateTime, ')
           ..write('customCategory: $customCategory, ')
           ..write('color: $color, ')
+          ..write('completed: $completed, ')
+          ..write('completedAt: $completedAt, ')
           ..write('isRecurring: $isRecurring, ')
           ..write('recurrenceRule: $recurrenceRule, ')
           ..write('parentEventId: $parentEventId, ')
@@ -1793,6 +1938,8 @@ class EventData extends DataClass implements Insertable<EventData> {
       endDateTime,
       customCategory,
       color,
+      completed,
+      completedAt,
       isRecurring,
       recurrenceRule,
       parentEventId,
@@ -1811,6 +1958,8 @@ class EventData extends DataClass implements Insertable<EventData> {
           other.endDateTime == this.endDateTime &&
           other.customCategory == this.customCategory &&
           other.color == this.color &&
+          other.completed == this.completed &&
+          other.completedAt == this.completedAt &&
           other.isRecurring == this.isRecurring &&
           other.recurrenceRule == this.recurrenceRule &&
           other.parentEventId == this.parentEventId &&
@@ -1828,6 +1977,8 @@ class EventsCompanion extends UpdateCompanion<EventData> {
   final Value<DateTime> endDateTime;
   final Value<String?> customCategory;
   final Value<String?> color;
+  final Value<bool> completed;
+  final Value<DateTime?> completedAt;
   final Value<bool> isRecurring;
   final Value<String?> recurrenceRule;
   final Value<String?> parentEventId;
@@ -1844,6 +1995,8 @@ class EventsCompanion extends UpdateCompanion<EventData> {
     this.endDateTime = const Value.absent(),
     this.customCategory = const Value.absent(),
     this.color = const Value.absent(),
+    this.completed = const Value.absent(),
+    this.completedAt = const Value.absent(),
     this.isRecurring = const Value.absent(),
     this.recurrenceRule = const Value.absent(),
     this.parentEventId = const Value.absent(),
@@ -1861,6 +2014,8 @@ class EventsCompanion extends UpdateCompanion<EventData> {
     required DateTime endDateTime,
     this.customCategory = const Value.absent(),
     this.color = const Value.absent(),
+    this.completed = const Value.absent(),
+    this.completedAt = const Value.absent(),
     this.isRecurring = const Value.absent(),
     this.recurrenceRule = const Value.absent(),
     this.parentEventId = const Value.absent(),
@@ -1880,6 +2035,8 @@ class EventsCompanion extends UpdateCompanion<EventData> {
     Expression<DateTime>? endDateTime,
     Expression<String>? customCategory,
     Expression<String>? color,
+    Expression<bool>? completed,
+    Expression<DateTime>? completedAt,
     Expression<bool>? isRecurring,
     Expression<String>? recurrenceRule,
     Expression<String>? parentEventId,
@@ -1897,6 +2054,8 @@ class EventsCompanion extends UpdateCompanion<EventData> {
       if (endDateTime != null) 'end_date_time': endDateTime,
       if (customCategory != null) 'custom_category': customCategory,
       if (color != null) 'color': color,
+      if (completed != null) 'completed': completed,
+      if (completedAt != null) 'completed_at': completedAt,
       if (isRecurring != null) 'is_recurring': isRecurring,
       if (recurrenceRule != null) 'recurrence_rule': recurrenceRule,
       if (parentEventId != null) 'parent_event_id': parentEventId,
@@ -1917,6 +2076,8 @@ class EventsCompanion extends UpdateCompanion<EventData> {
       Value<DateTime>? endDateTime,
       Value<String?>? customCategory,
       Value<String?>? color,
+      Value<bool>? completed,
+      Value<DateTime?>? completedAt,
       Value<bool>? isRecurring,
       Value<String?>? recurrenceRule,
       Value<String?>? parentEventId,
@@ -1933,6 +2094,8 @@ class EventsCompanion extends UpdateCompanion<EventData> {
       endDateTime: endDateTime ?? this.endDateTime,
       customCategory: customCategory ?? this.customCategory,
       color: color ?? this.color,
+      completed: completed ?? this.completed,
+      completedAt: completedAt ?? this.completedAt,
       isRecurring: isRecurring ?? this.isRecurring,
       recurrenceRule: recurrenceRule ?? this.recurrenceRule,
       parentEventId: parentEventId ?? this.parentEventId,
@@ -1971,6 +2134,12 @@ class EventsCompanion extends UpdateCompanion<EventData> {
     if (color.present) {
       map['color'] = Variable<String>(color.value);
     }
+    if (completed.present) {
+      map['completed'] = Variable<bool>(completed.value);
+    }
+    if (completedAt.present) {
+      map['completed_at'] = Variable<DateTime>(completedAt.value);
+    }
     if (isRecurring.present) {
       map['is_recurring'] = Variable<bool>(isRecurring.value);
     }
@@ -2007,6 +2176,8 @@ class EventsCompanion extends UpdateCompanion<EventData> {
           ..write('endDateTime: $endDateTime, ')
           ..write('customCategory: $customCategory, ')
           ..write('color: $color, ')
+          ..write('completed: $completed, ')
+          ..write('completedAt: $completedAt, ')
           ..write('isRecurring: $isRecurring, ')
           ..write('recurrenceRule: $recurrenceRule, ')
           ..write('parentEventId: $parentEventId, ')
@@ -2370,6 +2541,22 @@ class $RemindersTable extends Reminders
   late final GeneratedColumn<String> notificationId = GeneratedColumn<String>(
       'notification_id', aliasedName, false,
       type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _completedMeta =
+      const VerificationMeta('completed');
+  @override
+  late final GeneratedColumn<bool> completed = GeneratedColumn<bool>(
+      'completed', aliasedName, false,
+      type: DriftSqlType.bool,
+      requiredDuringInsert: false,
+      defaultConstraints:
+          GeneratedColumn.constraintIsAlways('CHECK ("completed" IN (0, 1))'),
+      defaultValue: Constant(false));
+  static const VerificationMeta _completedAtMeta =
+      const VerificationMeta('completedAt');
+  @override
+  late final GeneratedColumn<DateTime> completedAt = GeneratedColumn<DateTime>(
+      'completed_at', aliasedName, true,
+      type: DriftSqlType.dateTime, requiredDuringInsert: false);
   static const VerificationMeta _isRecurringMeta =
       const VerificationMeta('isRecurring');
   @override
@@ -2417,6 +2604,8 @@ class $RemindersTable extends Reminders
         body,
         scheduledTime,
         notificationId,
+        completed,
+        completedAt,
         isRecurring,
         recurrenceRule,
         parentReminderId,
@@ -2464,6 +2653,16 @@ class $RemindersTable extends Reminders
               data['notification_id']!, _notificationIdMeta));
     } else if (isInserting) {
       context.missing(_notificationIdMeta);
+    }
+    if (data.containsKey('completed')) {
+      context.handle(_completedMeta,
+          completed.isAcceptableOrUnknown(data['completed']!, _completedMeta));
+    }
+    if (data.containsKey('completed_at')) {
+      context.handle(
+          _completedAtMeta,
+          completedAt.isAcceptableOrUnknown(
+              data['completed_at']!, _completedAtMeta));
     }
     if (data.containsKey('is_recurring')) {
       context.handle(
@@ -2521,6 +2720,10 @@ class $RemindersTable extends Reminders
           DriftSqlType.dateTime, data['${effectivePrefix}scheduled_time'])!,
       notificationId: attachedDatabase.typeMapping.read(
           DriftSqlType.string, data['${effectivePrefix}notification_id'])!,
+      completed: attachedDatabase.typeMapping
+          .read(DriftSqlType.bool, data['${effectivePrefix}completed'])!,
+      completedAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}completed_at']),
       isRecurring: attachedDatabase.typeMapping
           .read(DriftSqlType.bool, data['${effectivePrefix}is_recurring'])!,
       recurrenceRule: attachedDatabase.typeMapping
@@ -2549,6 +2752,8 @@ class ReminderData extends DataClass implements Insertable<ReminderData> {
   final String body;
   final DateTime scheduledTime;
   final String notificationId;
+  final bool completed;
+  final DateTime? completedAt;
   final bool isRecurring;
   final String? recurrenceRule;
   final String? parentReminderId;
@@ -2561,6 +2766,8 @@ class ReminderData extends DataClass implements Insertable<ReminderData> {
       required this.body,
       required this.scheduledTime,
       required this.notificationId,
+      required this.completed,
+      this.completedAt,
       required this.isRecurring,
       this.recurrenceRule,
       this.parentReminderId,
@@ -2575,6 +2782,10 @@ class ReminderData extends DataClass implements Insertable<ReminderData> {
     map['body'] = Variable<String>(body);
     map['scheduled_time'] = Variable<DateTime>(scheduledTime);
     map['notification_id'] = Variable<String>(notificationId);
+    map['completed'] = Variable<bool>(completed);
+    if (!nullToAbsent || completedAt != null) {
+      map['completed_at'] = Variable<DateTime>(completedAt);
+    }
     map['is_recurring'] = Variable<bool>(isRecurring);
     if (!nullToAbsent || recurrenceRule != null) {
       map['recurrence_rule'] = Variable<String>(recurrenceRule);
@@ -2602,6 +2813,10 @@ class ReminderData extends DataClass implements Insertable<ReminderData> {
       body: Value(body),
       scheduledTime: Value(scheduledTime),
       notificationId: Value(notificationId),
+      completed: Value(completed),
+      completedAt: completedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(completedAt),
       isRecurring: Value(isRecurring),
       recurrenceRule: recurrenceRule == null && nullToAbsent
           ? const Value.absent()
@@ -2630,6 +2845,8 @@ class ReminderData extends DataClass implements Insertable<ReminderData> {
       body: serializer.fromJson<String>(json['body']),
       scheduledTime: serializer.fromJson<DateTime>(json['scheduledTime']),
       notificationId: serializer.fromJson<String>(json['notificationId']),
+      completed: serializer.fromJson<bool>(json['completed']),
+      completedAt: serializer.fromJson<DateTime?>(json['completedAt']),
       isRecurring: serializer.fromJson<bool>(json['isRecurring']),
       recurrenceRule: serializer.fromJson<String?>(json['recurrenceRule']),
       parentReminderId: serializer.fromJson<String?>(json['parentReminderId']),
@@ -2649,6 +2866,8 @@ class ReminderData extends DataClass implements Insertable<ReminderData> {
       'body': serializer.toJson<String>(body),
       'scheduledTime': serializer.toJson<DateTime>(scheduledTime),
       'notificationId': serializer.toJson<String>(notificationId),
+      'completed': serializer.toJson<bool>(completed),
+      'completedAt': serializer.toJson<DateTime?>(completedAt),
       'isRecurring': serializer.toJson<bool>(isRecurring),
       'recurrenceRule': serializer.toJson<String?>(recurrenceRule),
       'parentReminderId': serializer.toJson<String?>(parentReminderId),
@@ -2665,6 +2884,8 @@ class ReminderData extends DataClass implements Insertable<ReminderData> {
           String? body,
           DateTime? scheduledTime,
           String? notificationId,
+          bool? completed,
+          Value<DateTime?> completedAt = const Value.absent(),
           bool? isRecurring,
           Value<String?> recurrenceRule = const Value.absent(),
           Value<String?> parentReminderId = const Value.absent(),
@@ -2677,6 +2898,8 @@ class ReminderData extends DataClass implements Insertable<ReminderData> {
         body: body ?? this.body,
         scheduledTime: scheduledTime ?? this.scheduledTime,
         notificationId: notificationId ?? this.notificationId,
+        completed: completed ?? this.completed,
+        completedAt: completedAt.present ? completedAt.value : this.completedAt,
         isRecurring: isRecurring ?? this.isRecurring,
         recurrenceRule:
             recurrenceRule.present ? recurrenceRule.value : this.recurrenceRule,
@@ -2704,6 +2927,9 @@ class ReminderData extends DataClass implements Insertable<ReminderData> {
       notificationId: data.notificationId.present
           ? data.notificationId.value
           : this.notificationId,
+      completed: data.completed.present ? data.completed.value : this.completed,
+      completedAt:
+          data.completedAt.present ? data.completedAt.value : this.completedAt,
       isRecurring:
           data.isRecurring.present ? data.isRecurring.value : this.isRecurring,
       recurrenceRule: data.recurrenceRule.present
@@ -2732,6 +2958,8 @@ class ReminderData extends DataClass implements Insertable<ReminderData> {
           ..write('body: $body, ')
           ..write('scheduledTime: $scheduledTime, ')
           ..write('notificationId: $notificationId, ')
+          ..write('completed: $completed, ')
+          ..write('completedAt: $completedAt, ')
           ..write('isRecurring: $isRecurring, ')
           ..write('recurrenceRule: $recurrenceRule, ')
           ..write('parentReminderId: $parentReminderId, ')
@@ -2749,6 +2977,8 @@ class ReminderData extends DataClass implements Insertable<ReminderData> {
       body,
       scheduledTime,
       notificationId,
+      completed,
+      completedAt,
       isRecurring,
       recurrenceRule,
       parentReminderId,
@@ -2764,6 +2994,8 @@ class ReminderData extends DataClass implements Insertable<ReminderData> {
           other.body == this.body &&
           other.scheduledTime == this.scheduledTime &&
           other.notificationId == this.notificationId &&
+          other.completed == this.completed &&
+          other.completedAt == this.completedAt &&
           other.isRecurring == this.isRecurring &&
           other.recurrenceRule == this.recurrenceRule &&
           other.parentReminderId == this.parentReminderId &&
@@ -2778,6 +3010,8 @@ class RemindersCompanion extends UpdateCompanion<ReminderData> {
   final Value<String> body;
   final Value<DateTime> scheduledTime;
   final Value<String> notificationId;
+  final Value<bool> completed;
+  final Value<DateTime?> completedAt;
   final Value<bool> isRecurring;
   final Value<String?> recurrenceRule;
   final Value<String?> parentReminderId;
@@ -2791,6 +3025,8 @@ class RemindersCompanion extends UpdateCompanion<ReminderData> {
     this.body = const Value.absent(),
     this.scheduledTime = const Value.absent(),
     this.notificationId = const Value.absent(),
+    this.completed = const Value.absent(),
+    this.completedAt = const Value.absent(),
     this.isRecurring = const Value.absent(),
     this.recurrenceRule = const Value.absent(),
     this.parentReminderId = const Value.absent(),
@@ -2805,6 +3041,8 @@ class RemindersCompanion extends UpdateCompanion<ReminderData> {
     required String body,
     required DateTime scheduledTime,
     required String notificationId,
+    this.completed = const Value.absent(),
+    this.completedAt = const Value.absent(),
     this.isRecurring = const Value.absent(),
     this.recurrenceRule = const Value.absent(),
     this.parentReminderId = const Value.absent(),
@@ -2822,6 +3060,8 @@ class RemindersCompanion extends UpdateCompanion<ReminderData> {
     Expression<String>? body,
     Expression<DateTime>? scheduledTime,
     Expression<String>? notificationId,
+    Expression<bool>? completed,
+    Expression<DateTime>? completedAt,
     Expression<bool>? isRecurring,
     Expression<String>? recurrenceRule,
     Expression<String>? parentReminderId,
@@ -2836,6 +3076,8 @@ class RemindersCompanion extends UpdateCompanion<ReminderData> {
       if (body != null) 'body': body,
       if (scheduledTime != null) 'scheduled_time': scheduledTime,
       if (notificationId != null) 'notification_id': notificationId,
+      if (completed != null) 'completed': completed,
+      if (completedAt != null) 'completed_at': completedAt,
       if (isRecurring != null) 'is_recurring': isRecurring,
       if (recurrenceRule != null) 'recurrence_rule': recurrenceRule,
       if (parentReminderId != null) 'parent_reminder_id': parentReminderId,
@@ -2853,6 +3095,8 @@ class RemindersCompanion extends UpdateCompanion<ReminderData> {
       Value<String>? body,
       Value<DateTime>? scheduledTime,
       Value<String>? notificationId,
+      Value<bool>? completed,
+      Value<DateTime?>? completedAt,
       Value<bool>? isRecurring,
       Value<String?>? recurrenceRule,
       Value<String?>? parentReminderId,
@@ -2866,6 +3110,8 @@ class RemindersCompanion extends UpdateCompanion<ReminderData> {
       body: body ?? this.body,
       scheduledTime: scheduledTime ?? this.scheduledTime,
       notificationId: notificationId ?? this.notificationId,
+      completed: completed ?? this.completed,
+      completedAt: completedAt ?? this.completedAt,
       isRecurring: isRecurring ?? this.isRecurring,
       recurrenceRule: recurrenceRule ?? this.recurrenceRule,
       parentReminderId: parentReminderId ?? this.parentReminderId,
@@ -2894,6 +3140,12 @@ class RemindersCompanion extends UpdateCompanion<ReminderData> {
     }
     if (notificationId.present) {
       map['notification_id'] = Variable<String>(notificationId.value);
+    }
+    if (completed.present) {
+      map['completed'] = Variable<bool>(completed.value);
+    }
+    if (completedAt.present) {
+      map['completed_at'] = Variable<DateTime>(completedAt.value);
     }
     if (isRecurring.present) {
       map['is_recurring'] = Variable<bool>(isRecurring.value);
@@ -2928,6 +3180,8 @@ class RemindersCompanion extends UpdateCompanion<ReminderData> {
           ..write('body: $body, ')
           ..write('scheduledTime: $scheduledTime, ')
           ..write('notificationId: $notificationId, ')
+          ..write('completed: $completed, ')
+          ..write('completedAt: $completedAt, ')
           ..write('isRecurring: $isRecurring, ')
           ..write('recurrenceRule: $recurrenceRule, ')
           ..write('parentReminderId: $parentReminderId, ')
@@ -2963,6 +3217,7 @@ typedef $$TasksTableCreateCompanionBuilder = TasksCompanion Function({
   Value<String?> description,
   required DateTime dueDate,
   Value<bool> completed,
+  Value<DateTime?> completedAt,
   Value<String?> category,
   required String priority,
   Value<String?> customCategory,
@@ -2987,6 +3242,7 @@ typedef $$TasksTableUpdateCompanionBuilder = TasksCompanion Function({
   Value<String?> description,
   Value<DateTime> dueDate,
   Value<bool> completed,
+  Value<DateTime?> completedAt,
   Value<String?> category,
   Value<String> priority,
   Value<String?> customCategory,
@@ -3049,6 +3305,9 @@ class $$TasksTableFilterComposer extends Composer<_$AppDatabase, $TasksTable> {
 
   ColumnFilters<bool> get completed => $composableBuilder(
       column: $table.completed, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get completedAt => $composableBuilder(
+      column: $table.completedAt, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<String> get category => $composableBuilder(
       column: $table.category, builder: (column) => ColumnFilters(column));
@@ -3149,6 +3408,9 @@ class $$TasksTableOrderingComposer
   ColumnOrderings<bool> get completed => $composableBuilder(
       column: $table.completed, builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<DateTime> get completedAt => $composableBuilder(
+      column: $table.completedAt, builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<String> get category => $composableBuilder(
       column: $table.category, builder: (column) => ColumnOrderings(column));
 
@@ -3228,6 +3490,9 @@ class $$TasksTableAnnotationComposer
 
   GeneratedColumn<bool> get completed =>
       $composableBuilder(column: $table.completed, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get completedAt => $composableBuilder(
+      column: $table.completedAt, builder: (column) => column);
 
   GeneratedColumn<String> get category =>
       $composableBuilder(column: $table.category, builder: (column) => column);
@@ -3325,6 +3590,7 @@ class $$TasksTableTableManager extends RootTableManager<
             Value<String?> description = const Value.absent(),
             Value<DateTime> dueDate = const Value.absent(),
             Value<bool> completed = const Value.absent(),
+            Value<DateTime?> completedAt = const Value.absent(),
             Value<String?> category = const Value.absent(),
             Value<String> priority = const Value.absent(),
             Value<String?> customCategory = const Value.absent(),
@@ -3349,6 +3615,7 @@ class $$TasksTableTableManager extends RootTableManager<
             description: description,
             dueDate: dueDate,
             completed: completed,
+            completedAt: completedAt,
             category: category,
             priority: priority,
             customCategory: customCategory,
@@ -3373,6 +3640,7 @@ class $$TasksTableTableManager extends RootTableManager<
             Value<String?> description = const Value.absent(),
             required DateTime dueDate,
             Value<bool> completed = const Value.absent(),
+            Value<DateTime?> completedAt = const Value.absent(),
             Value<String?> category = const Value.absent(),
             required String priority,
             Value<String?> customCategory = const Value.absent(),
@@ -3397,6 +3665,7 @@ class $$TasksTableTableManager extends RootTableManager<
             description: description,
             dueDate: dueDate,
             completed: completed,
+            completedAt: completedAt,
             category: category,
             priority: priority,
             customCategory: customCategory,
@@ -3460,6 +3729,7 @@ typedef $$SubtasksTableCreateCompanionBuilder = SubtasksCompanion Function({
   required String taskId,
   required String title,
   Value<bool> completed,
+  Value<DateTime?> completedAt,
   Value<int> rowid,
 });
 typedef $$SubtasksTableUpdateCompanionBuilder = SubtasksCompanion Function({
@@ -3467,6 +3737,7 @@ typedef $$SubtasksTableUpdateCompanionBuilder = SubtasksCompanion Function({
   Value<String> taskId,
   Value<String> title,
   Value<bool> completed,
+  Value<DateTime?> completedAt,
   Value<int> rowid,
 });
 
@@ -3504,6 +3775,9 @@ class $$SubtasksTableFilterComposer
 
   ColumnFilters<bool> get completed => $composableBuilder(
       column: $table.completed, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get completedAt => $composableBuilder(
+      column: $table.completedAt, builder: (column) => ColumnFilters(column));
 
   $$TasksTableFilterComposer get taskId {
     final $$TasksTableFilterComposer composer = $composerBuilder(
@@ -3544,6 +3818,9 @@ class $$SubtasksTableOrderingComposer
   ColumnOrderings<bool> get completed => $composableBuilder(
       column: $table.completed, builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<DateTime> get completedAt => $composableBuilder(
+      column: $table.completedAt, builder: (column) => ColumnOrderings(column));
+
   $$TasksTableOrderingComposer get taskId {
     final $$TasksTableOrderingComposer composer = $composerBuilder(
         composer: this,
@@ -3582,6 +3859,9 @@ class $$SubtasksTableAnnotationComposer
 
   GeneratedColumn<bool> get completed =>
       $composableBuilder(column: $table.completed, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get completedAt => $composableBuilder(
+      column: $table.completedAt, builder: (column) => column);
 
   $$TasksTableAnnotationComposer get taskId {
     final $$TasksTableAnnotationComposer composer = $composerBuilder(
@@ -3631,6 +3911,7 @@ class $$SubtasksTableTableManager extends RootTableManager<
             Value<String> taskId = const Value.absent(),
             Value<String> title = const Value.absent(),
             Value<bool> completed = const Value.absent(),
+            Value<DateTime?> completedAt = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
               SubtasksCompanion(
@@ -3638,6 +3919,7 @@ class $$SubtasksTableTableManager extends RootTableManager<
             taskId: taskId,
             title: title,
             completed: completed,
+            completedAt: completedAt,
             rowid: rowid,
           ),
           createCompanionCallback: ({
@@ -3645,6 +3927,7 @@ class $$SubtasksTableTableManager extends RootTableManager<
             required String taskId,
             required String title,
             Value<bool> completed = const Value.absent(),
+            Value<DateTime?> completedAt = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
               SubtasksCompanion.insert(
@@ -3652,6 +3935,7 @@ class $$SubtasksTableTableManager extends RootTableManager<
             taskId: taskId,
             title: title,
             completed: completed,
+            completedAt: completedAt,
             rowid: rowid,
           ),
           withReferenceMapper: (p0) => p0
@@ -3716,6 +4000,8 @@ typedef $$EventsTableCreateCompanionBuilder = EventsCompanion Function({
   required DateTime endDateTime,
   Value<String?> customCategory,
   Value<String?> color,
+  Value<bool> completed,
+  Value<DateTime?> completedAt,
   Value<bool> isRecurring,
   Value<String?> recurrenceRule,
   Value<String?> parentEventId,
@@ -3733,6 +4019,8 @@ typedef $$EventsTableUpdateCompanionBuilder = EventsCompanion Function({
   Value<DateTime> endDateTime,
   Value<String?> customCategory,
   Value<String?> color,
+  Value<bool> completed,
+  Value<DateTime?> completedAt,
   Value<bool> isRecurring,
   Value<String?> recurrenceRule,
   Value<String?> parentEventId,
@@ -3775,6 +4063,12 @@ class $$EventsTableFilterComposer
 
   ColumnFilters<String> get color => $composableBuilder(
       column: $table.color, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<bool> get completed => $composableBuilder(
+      column: $table.completed, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get completedAt => $composableBuilder(
+      column: $table.completedAt, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<bool> get isRecurring => $composableBuilder(
       column: $table.isRecurring, builder: (column) => ColumnFilters(column));
@@ -3834,6 +4128,12 @@ class $$EventsTableOrderingComposer
   ColumnOrderings<String> get color => $composableBuilder(
       column: $table.color, builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<bool> get completed => $composableBuilder(
+      column: $table.completed, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get completedAt => $composableBuilder(
+      column: $table.completedAt, builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<bool> get isRecurring => $composableBuilder(
       column: $table.isRecurring, builder: (column) => ColumnOrderings(column));
 
@@ -3891,6 +4191,12 @@ class $$EventsTableAnnotationComposer
   GeneratedColumn<String> get color =>
       $composableBuilder(column: $table.color, builder: (column) => column);
 
+  GeneratedColumn<bool> get completed =>
+      $composableBuilder(column: $table.completed, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get completedAt => $composableBuilder(
+      column: $table.completedAt, builder: (column) => column);
+
   GeneratedColumn<bool> get isRecurring => $composableBuilder(
       column: $table.isRecurring, builder: (column) => column);
 
@@ -3941,6 +4247,8 @@ class $$EventsTableTableManager extends RootTableManager<
             Value<DateTime> endDateTime = const Value.absent(),
             Value<String?> customCategory = const Value.absent(),
             Value<String?> color = const Value.absent(),
+            Value<bool> completed = const Value.absent(),
+            Value<DateTime?> completedAt = const Value.absent(),
             Value<bool> isRecurring = const Value.absent(),
             Value<String?> recurrenceRule = const Value.absent(),
             Value<String?> parentEventId = const Value.absent(),
@@ -3958,6 +4266,8 @@ class $$EventsTableTableManager extends RootTableManager<
             endDateTime: endDateTime,
             customCategory: customCategory,
             color: color,
+            completed: completed,
+            completedAt: completedAt,
             isRecurring: isRecurring,
             recurrenceRule: recurrenceRule,
             parentEventId: parentEventId,
@@ -3975,6 +4285,8 @@ class $$EventsTableTableManager extends RootTableManager<
             required DateTime endDateTime,
             Value<String?> customCategory = const Value.absent(),
             Value<String?> color = const Value.absent(),
+            Value<bool> completed = const Value.absent(),
+            Value<DateTime?> completedAt = const Value.absent(),
             Value<bool> isRecurring = const Value.absent(),
             Value<String?> recurrenceRule = const Value.absent(),
             Value<String?> parentEventId = const Value.absent(),
@@ -3992,6 +4304,8 @@ class $$EventsTableTableManager extends RootTableManager<
             endDateTime: endDateTime,
             customCategory: customCategory,
             color: color,
+            completed: completed,
+            completedAt: completedAt,
             isRecurring: isRecurring,
             recurrenceRule: recurrenceRule,
             parentEventId: parentEventId,
@@ -4190,6 +4504,8 @@ typedef $$RemindersTableCreateCompanionBuilder = RemindersCompanion Function({
   required String body,
   required DateTime scheduledTime,
   required String notificationId,
+  Value<bool> completed,
+  Value<DateTime?> completedAt,
   Value<bool> isRecurring,
   Value<String?> recurrenceRule,
   Value<String?> parentReminderId,
@@ -4204,6 +4520,8 @@ typedef $$RemindersTableUpdateCompanionBuilder = RemindersCompanion Function({
   Value<String> body,
   Value<DateTime> scheduledTime,
   Value<String> notificationId,
+  Value<bool> completed,
+  Value<DateTime?> completedAt,
   Value<bool> isRecurring,
   Value<String?> recurrenceRule,
   Value<String?> parentReminderId,
@@ -4237,6 +4555,12 @@ class $$RemindersTableFilterComposer
   ColumnFilters<String> get notificationId => $composableBuilder(
       column: $table.notificationId,
       builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<bool> get completed => $composableBuilder(
+      column: $table.completed, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get completedAt => $composableBuilder(
+      column: $table.completedAt, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<bool> get isRecurring => $composableBuilder(
       column: $table.isRecurring, builder: (column) => ColumnFilters(column));
@@ -4288,6 +4612,12 @@ class $$RemindersTableOrderingComposer
       column: $table.notificationId,
       builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<bool> get completed => $composableBuilder(
+      column: $table.completed, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get completedAt => $composableBuilder(
+      column: $table.completedAt, builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<bool> get isRecurring => $composableBuilder(
       column: $table.isRecurring, builder: (column) => ColumnOrderings(column));
 
@@ -4335,6 +4665,12 @@ class $$RemindersTableAnnotationComposer
 
   GeneratedColumn<String> get notificationId => $composableBuilder(
       column: $table.notificationId, builder: (column) => column);
+
+  GeneratedColumn<bool> get completed =>
+      $composableBuilder(column: $table.completed, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get completedAt => $composableBuilder(
+      column: $table.completedAt, builder: (column) => column);
 
   GeneratedColumn<bool> get isRecurring => $composableBuilder(
       column: $table.isRecurring, builder: (column) => column);
@@ -4386,6 +4722,8 @@ class $$RemindersTableTableManager extends RootTableManager<
             Value<String> body = const Value.absent(),
             Value<DateTime> scheduledTime = const Value.absent(),
             Value<String> notificationId = const Value.absent(),
+            Value<bool> completed = const Value.absent(),
+            Value<DateTime?> completedAt = const Value.absent(),
             Value<bool> isRecurring = const Value.absent(),
             Value<String?> recurrenceRule = const Value.absent(),
             Value<String?> parentReminderId = const Value.absent(),
@@ -4400,6 +4738,8 @@ class $$RemindersTableTableManager extends RootTableManager<
             body: body,
             scheduledTime: scheduledTime,
             notificationId: notificationId,
+            completed: completed,
+            completedAt: completedAt,
             isRecurring: isRecurring,
             recurrenceRule: recurrenceRule,
             parentReminderId: parentReminderId,
@@ -4414,6 +4754,8 @@ class $$RemindersTableTableManager extends RootTableManager<
             required String body,
             required DateTime scheduledTime,
             required String notificationId,
+            Value<bool> completed = const Value.absent(),
+            Value<DateTime?> completedAt = const Value.absent(),
             Value<bool> isRecurring = const Value.absent(),
             Value<String?> recurrenceRule = const Value.absent(),
             Value<String?> parentReminderId = const Value.absent(),
@@ -4428,6 +4770,8 @@ class $$RemindersTableTableManager extends RootTableManager<
             body: body,
             scheduledTime: scheduledTime,
             notificationId: notificationId,
+            completed: completed,
+            completedAt: completedAt,
             isRecurring: isRecurring,
             recurrenceRule: recurrenceRule,
             parentReminderId: parentReminderId,

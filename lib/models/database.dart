@@ -22,7 +22,7 @@ class DatabaseException implements Exception {
   String toString() => "DatabaseException: $message";
 }
 
-// Task Table - Updated with recurring fields
+// Task Table - Updated with recurring fields (completion already exists)
 @DataClassName('TaskData')
 class Tasks extends Table {
   TextColumn get id => text().clientDefault(() => const Uuid().v1())();
@@ -30,7 +30,8 @@ class Tasks extends Table {
   TextColumn get title => text().withLength(min: 1, max: 100)();
   TextColumn get description => text().nullable()();
   DateTimeColumn get dueDate => dateTime()();
-  BoolColumn get completed => boolean().withDefault(Constant(false))();
+  BoolColumn get completed => boolean().withDefault(Constant(false))(); // ALREADY EXISTS
+  DateTimeColumn get completedAt => dateTime().nullable()(); // ADDED: Completion timestamp
   TextColumn get category => text().nullable()();
   TextColumn get priority => text().withLength(min: 1, max: 10)();
   TextColumn get customCategory => text().nullable()();
@@ -53,19 +54,20 @@ class Tasks extends Table {
   Set<Column> get primaryKey => {id};
 }
 
-// Subtask Table
+// Subtask Table - ENHANCED with completion tracking
 @DataClassName('SubtaskData')
 class Subtasks extends Table {
   TextColumn get id => text().clientDefault(() => const Uuid().v1())();
   TextColumn get taskId => text().customConstraint('REFERENCES tasks(id) NOT NULL')(); // Foreign key to tasks, now NOT NULL
   TextColumn get title => text().withLength(min: 1, max: 100)();
-  BoolColumn get completed => boolean().withDefault(Constant(false))();
+  BoolColumn get completed => boolean().withDefault(Constant(false))(); // ALREADY EXISTS
+  DateTimeColumn get completedAt => dateTime().nullable()(); // ADDED: Completion timestamp
 
   @override
   Set<Column> get primaryKey => {id};
 }
 
-// Event Table - Updated with recurring fields
+// Event Table - ENHANCED with completion tracking and recurring fields
 @DataClassName('EventData')
 class Events extends Table {
   TextColumn get id => text().clientDefault(() => const Uuid().v1())();
@@ -76,6 +78,8 @@ class Events extends Table {
   DateTimeColumn get endDateTime => dateTime()(); // Store as DateTime
   TextColumn get customCategory => text().nullable()(); // New column for custom category
   TextColumn get color => text().nullable()(); // New column for event color
+  BoolColumn get completed => boolean().withDefault(Constant(false))(); // ADDED: Completion status
+  DateTimeColumn get completedAt => dateTime().nullable()(); // ADDED: Completion timestamp
   
   // Recurring event fields
   BoolColumn get isRecurring => boolean().withDefault(Constant(false))();
@@ -89,7 +93,7 @@ class Events extends Table {
   Set<Column> get primaryKey => {id};
 }
 
-// Class Table
+// Class Table (unchanged)
 @DataClassName('ClassData')
 class Classes extends Table {
   TextColumn get id => text().clientDefault(() => const Uuid().v1())();
@@ -102,7 +106,7 @@ class Classes extends Table {
   Set<Column> get primaryKey => {id};
 }
 
-// Reminder Table - Updated with recurring fields
+// Reminder Table - ENHANCED with completion tracking and recurring fields
 @DataClassName('ReminderData')
 class Reminders extends Table { 
   TextColumn get id => text().clientDefault(() => const Uuid().v4())(); // Use v4 for consistency
@@ -110,6 +114,8 @@ class Reminders extends Table {
   TextColumn get body => text().withLength(min: 1, max: 500)(); // Add length constraints
   DateTimeColumn get scheduledTime => dateTime()(); 
   TextColumn get notificationId => text()(); // Changed to TextColumn to match ReminderModel
+  BoolColumn get completed => boolean().withDefault(Constant(false))(); // ADDED: Completion status
+  DateTimeColumn get completedAt => dateTime().nullable()(); // ADDED: Completion timestamp
   
   // Recurring reminder fields
   BoolColumn get isRecurring => boolean().withDefault(Constant(false))();
@@ -130,9 +136,9 @@ class AppDatabase extends _$AppDatabase {
   static final AppDatabase instance = AppDatabase._();
 
   @override
-  int get schemaVersion => 6; // Increment version for recurring task fields
+  int get schemaVersion => 7; // UPDATED: Increment version for completion columns
 
-  // Define migrations
+  // ENHANCED: Define migrations with completion columns
  @override
 MigrationStrategy get migration => MigrationStrategy(
   onUpgrade: (Migrator m, int from, int to) async {
@@ -282,6 +288,48 @@ MigrationStrategy get migration => MigrationStrategy(
         if (!e.toString().contains('duplicate column')) rethrow;
       }
     }
+    // ADDED: Migration for completion tracking columns
+    if (from < 7 && to >= 7) {
+      // Add completion tracking columns to tasks table
+      try {
+        await m.addColumn(tasks, tasks.completedAt);
+      } catch (e) {
+        if (!e.toString().contains('duplicate column')) rethrow;
+      }
+      
+      // Add completion tracking columns to events table
+      try {
+        await m.addColumn(events, events.completed);
+      } catch (e) {
+        if (!e.toString().contains('duplicate column')) rethrow;
+      }
+      
+      try {
+        await m.addColumn(events, events.completedAt);
+      } catch (e) {
+        if (!e.toString().contains('duplicate column')) rethrow;
+      }
+      
+      // Add completion tracking columns to reminders table
+      try {
+        await m.addColumn(reminders, reminders.completed);
+      } catch (e) {
+        if (!e.toString().contains('duplicate column')) rethrow;
+      }
+      
+      try {
+        await m.addColumn(reminders, reminders.completedAt);
+      } catch (e) {
+        if (!e.toString().contains('duplicate column')) rethrow;
+      }
+      
+      // Add completion tracking columns to subtasks table
+      try {
+        await m.addColumn(subtasks, subtasks.completedAt);
+      } catch (e) {
+        if (!e.toString().contains('duplicate column')) rethrow;
+      }
+    }
   },
 );
 
@@ -294,7 +342,7 @@ MigrationStrategy get migration => MigrationStrategy(
     });
   }
 
-  // Task Methods - Updated with recurring support
+  // Task Methods - ENHANCED with completion tracking
   Future<List<TaskData>> getAllTasks() async {
     try {
       return await (select(tasks)).get();
@@ -338,6 +386,7 @@ MigrationStrategy get migration => MigrationStrategy(
     }
   }
 
+  // ENHANCED: Insert task with completion tracking
   Future<int> insertTask(TaskModel task) async {
     try {
       final taskCompanion = TasksCompanion(
@@ -347,6 +396,7 @@ MigrationStrategy get migration => MigrationStrategy(
         description: Value(task.description),
         dueDate: Value(task.dueDate),
         completed: Value(task.completed),
+        completedAt: task.completedAt != null ? Value(task.completedAt) : const Value.absent(), // ADDED: Completion timestamp
         category: Value(task.category),
         priority: Value(task.priority),
         customCategory: Value(task.customCategory),
@@ -391,6 +441,7 @@ MigrationStrategy get migration => MigrationStrategy(
     }
   }
 
+  // ENHANCED: Update task with completion tracking
   Future<void> updateTask(TaskModel task) async {
     try {
       final taskCompanion = TasksCompanion(
@@ -400,6 +451,7 @@ MigrationStrategy get migration => MigrationStrategy(
         description: Value(task.description),
         dueDate: Value(task.dueDate),
         completed: Value(task.completed),
+        completedAt: task.completedAt != null ? Value(task.completedAt) : const Value.absent(), // ADDED: Completion timestamp
         category: Value(task.category),
         priority: Value(task.priority),
         customCategory: Value(task.customCategory),
@@ -458,7 +510,7 @@ MigrationStrategy get migration => MigrationStrategy(
     }
   }
 
-  // Subtask Methods
+  // Subtask Methods - ENHANCED with completion tracking
   Future<List<SubtaskModel>> getAllSubtasks(String taskId) async {
     try {
       final subtaskDataList = await (select(subtasks)..where((tbl) => tbl.taskId.equals(taskId))).get();
@@ -468,6 +520,7 @@ MigrationStrategy get migration => MigrationStrategy(
           taskId: subtaskData.taskId,
           title: subtaskData.title,
           completed: subtaskData.completed,
+          completedAt: subtaskData.completedAt, // ADDED: Map completion timestamp
         );
       }).toList();
     } catch (e) {
@@ -476,6 +529,7 @@ MigrationStrategy get migration => MigrationStrategy(
     }
   }
 
+  // ENHANCED: Insert subtask with completion tracking
   Future<int> insertSubtask(SubtaskModel subtask) async {
     try {
       final subtaskCompanion = SubtasksCompanion(
@@ -483,6 +537,7 @@ MigrationStrategy get migration => MigrationStrategy(
         taskId: Value(subtask.taskId),
         title: Value(subtask.title),
         completed: Value(subtask.completed),
+        completedAt: subtask.completedAt != null ? Value(subtask.completedAt) : const Value.absent(), // ADDED: Completion timestamp
       );
       return await into(subtasks).insert(subtaskCompanion); // Return the inserted subtask ID
     } catch (e) {
@@ -500,6 +555,7 @@ MigrationStrategy get migration => MigrationStrategy(
     }
   }
 
+  // ENHANCED: Update subtask with completion tracking
   Future<void> updateSubtask(SubtaskModel subtask) async {
     try {
       final subtaskCompanion = SubtasksCompanion(
@@ -507,6 +563,7 @@ MigrationStrategy get migration => MigrationStrategy(
         taskId: Value(subtask.taskId),
         title: Value(subtask.title),
         completed: Value(subtask.completed),
+        completedAt: subtask.completedAt != null ? Value(subtask.completedAt) : const Value.absent(), // ADDED: Completion timestamp
       );
       await (update(subtasks)..where((tbl) => tbl.id.equals(subtask.id))).write(subtaskCompanion);
     } catch (e) {
@@ -515,7 +572,7 @@ MigrationStrategy get migration => MigrationStrategy(
     }
   }
 
-  // Event Methods - Updated with recurring support
+  // Event Methods - ENHANCED with completion tracking and recurring support
   Future<int> insertEvent(Event event) async {
     try {
       final eventCompanion = EventsCompanion(
@@ -527,6 +584,8 @@ MigrationStrategy get migration => MigrationStrategy(
         endDateTime: Value(event.endDateTime), // Store as DateTime
         customCategory: Value(event.customCategory), // Store custom category
         color: Value(event.color), // Store event color
+        completed: Value(event.completed), // ADDED: Completion status
+        completedAt: event.completedAt != null ? Value(event.completedAt) : const Value.absent(), // ADDED: Completion timestamp
         isRecurring: Value(event.isRecurring),
         recurrenceRule: event.recurrenceRule != null ? Value(event.recurrenceRule) : const Value.absent(),
         parentEventId: event.parentEventId != null ? Value(event.parentEventId) : const Value.absent(),
@@ -584,6 +643,7 @@ MigrationStrategy get migration => MigrationStrategy(
     }
   }
 
+  // ENHANCED: Update event with completion tracking
   Future<void> updateEvent(Event event) async {
     try {
       if (event.id.isEmpty) {
@@ -599,6 +659,8 @@ MigrationStrategy get migration => MigrationStrategy(
         endDateTime: Value(event.endDateTime), // Store as DateTime
         customCategory: Value(event.customCategory), // Update custom category
         color: Value(event.color), // Update event color
+        completed: Value(event.completed), // ADDED: Update completion status
+        completedAt: event.completedAt != null ? Value(event.completedAt) : const Value.absent(), // ADDED: Update completion timestamp
         isRecurring: Value(event.isRecurring),
         recurrenceRule: event.recurrenceRule != null ? Value(event.recurrenceRule) : const Value.absent(),
         parentEventId: event.parentEventId != null ? Value(event.parentEventId) : const Value.absent(),
@@ -616,7 +678,7 @@ MigrationStrategy get migration => MigrationStrategy(
     }
   }
 
-  // Reminder Methods - Updated with recurring support
+  // Reminder Methods - ENHANCED with completion tracking and recurring support
   Future<List<ReminderData>> getAllReminders() async {
     try {
       return await select(reminders).get();
@@ -648,6 +710,7 @@ MigrationStrategy get migration => MigrationStrategy(
     }
   }
 
+  // ENHANCED: Insert reminder with completion tracking
   Future<void> insertReminder(ReminderModel reminder) async {
     try {
       final reminderCompanion = RemindersCompanion(
@@ -656,6 +719,8 @@ MigrationStrategy get migration => MigrationStrategy(
         body: Value(reminder.body),
         scheduledTime: Value(reminder.scheduledTime),
         notificationId: Value(reminder.notificationId), // Now String type
+        completed: Value(reminder.completed), // ADDED: Completion status
+        completedAt: reminder.completedAt != null ? Value(reminder.completedAt) : const Value.absent(), // ADDED: Completion timestamp
         isRecurring: Value(reminder.isRecurring),
         recurrenceRule: reminder.recurrenceRule != null ? Value(reminder.recurrenceRule) : const Value.absent(),
         parentReminderId: reminder.parentReminderId != null ? Value(reminder.parentReminderId) : const Value.absent(),
@@ -681,6 +746,7 @@ MigrationStrategy get migration => MigrationStrategy(
     }
   }
 
+  // ENHANCED: Update reminder with completion tracking
   Future<void> updateReminder(ReminderModel reminder) async {
     try {
       final reminderCompanion = RemindersCompanion(
@@ -689,6 +755,8 @@ MigrationStrategy get migration => MigrationStrategy(
         body: Value(reminder.body),
         scheduledTime: Value(reminder.scheduledTime),
         notificationId: Value(reminder.notificationId), // Now String type
+        completed: Value(reminder.completed), // ADDED: Update completion status
+        completedAt: reminder.completedAt != null ? Value(reminder.completedAt) : const Value.absent(), // ADDED: Update completion timestamp
         isRecurring: Value(reminder.isRecurring),
         recurrenceRule: reminder.recurrenceRule != null ? Value(reminder.recurrenceRule) : const Value.absent(),
         parentReminderId: reminder.parentReminderId != null ? Value(reminder.parentReminderId) : const Value.absent(),
