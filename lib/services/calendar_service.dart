@@ -74,6 +74,70 @@ class CalendarService {
     }
   }
 
+  // ADDED: Fetch events with filtering options for better organization
+  Future<List<Event>> getEventsFiltered({
+    bool? completed,
+    String? category,
+    DateTime? date,
+    bool? isToday,
+  }) async {
+    try {
+      final allEvents = await getEvents();
+      return allEvents.where((event) {
+        if (completed != null && event.completed != completed) return false;
+        if (category != null && event.customCategory != category) return false;
+        if (date != null && !_isSameDay(event.startDateTime, date)) return false;
+        if (isToday == true && !event.isToday) return false;
+        return true;
+      }).toList();
+    } catch (e) {
+      print('Error fetching filtered events: $e');
+      return [];
+    }
+  }
+
+  // ADDED: Get today's events for dashboard overview
+  Future<List<Event>> getTodaysEvents() async {
+    try {
+      final today = DateTime.now();
+      return await getEventsFiltered(date: today);
+    } catch (e) {
+      print('Error fetching today\'s events: $e');
+      return [];
+    }
+  }
+
+  // ADDED: Get completed events for productivity tracking
+  Future<List<Event>> getCompletedEvents({DateTime? date}) async {
+    try {
+      final events = await getEvents();
+      return events.where((event) {
+        if (!event.completed) return false;
+        if (date != null && event.completedAt != null) {
+          return _isSameDay(event.completedAt!, date);
+        }
+        return event.completed;
+      }).toList();
+    } catch (e) {
+      print('Error fetching completed events: $e');
+      return [];
+    }
+  }
+
+  // ADDED: Get overdue events (past events that aren't completed)
+  Future<List<Event>> getOverdueEvents() async {
+    try {
+      final events = await getEvents();
+      final now = DateTime.now();
+      return events.where((event) {
+        return !event.completed && event.endDateTime.isBefore(now);
+      }).toList();
+    } catch (e) {
+      print('Error fetching overdue events: $e');
+      return [];
+    }
+  }
+
   // Fetch only base events (without expansion) for editing purposes
   Future<List<Event>> getBaseEvents() async {
     try {
@@ -126,6 +190,8 @@ class CalendarService {
           description: event.description,
           customCategory: event.customCategory,
           color: event.color,
+          completed: event.completed, // ADDED: Update completion status
+          completedAt: event.completedAt, // ADDED: Update completion timestamp
           isRecurring: event.isRecurring,
           recurrencePattern: event.recurrencePattern,
           recurrenceCount: event.recurrenceCount,
@@ -147,6 +213,66 @@ class CalendarService {
     } catch (e) {
       print('Error updating event: $e');
       throw Exception('Error updating event');
+    }
+  }
+
+  // ADDED: Toggle event completion status (for checkbox functionality)
+  Future<void> toggleEventCompletion(String eventId) async {
+    try {
+      final event = await getEventById(eventId);
+      if (event != null) {
+        final updatedEvent = event.toggleCompletion();
+        await updateEvent(updatedEvent);
+      }
+    } catch (e) {
+      print('Error toggling event completion: $e');
+    }
+  }
+
+  // ADDED: Mark event as completed (for checkbox functionality)
+  Future<void> markEventCompleted(String eventId) async {
+    try {
+      final event = await getEventById(eventId);
+      if (event != null && !event.completed) {
+        final updatedEvent = event.copyWith(
+          completed: true,
+          completedAt: DateTime.now(),
+        );
+        await updateEvent(updatedEvent);
+      }
+    } catch (e) {
+      print('Error marking event as completed: $e');
+    }
+  }
+
+  // ADDED: Mark event as incomplete (for checkbox functionality)
+  Future<void> markEventIncomplete(String eventId) async {
+    try {
+      final event = await getEventById(eventId);
+      if (event != null && event.completed) {
+        final updatedEvent = event.copyWith(
+          completed: false,
+          completedAt: null,
+        );
+        await updateEvent(updatedEvent);
+      }
+    } catch (e) {
+      print('Error marking event as incomplete: $e');
+    }
+  }
+
+  // ADDED: Get event by ID (helper method for completion functions)
+  Future<Event?> getEventById(String eventId) async {
+    try {
+      final eventsData = await _database.getAllEvents();
+      final eventData = eventsData.firstWhere(
+        (event) => event.id == eventId,
+        orElse: () => throw Exception('Event not found'),
+      );
+      return Event.fromEventData(eventData);
+    } catch (e) {
+      print('Error fetching event by ID: $e');
+      return null;
     }
   }
 
@@ -378,6 +504,27 @@ class CalendarService {
     }
   }
 
+  // ADDED: Get event completion statistics
+  Future<Map<String, int>> getEventStats() async {
+    try {
+      final events = await getEvents();
+      final completed = events.where((event) => event.completed).length;
+      final pending = events.where((event) => !event.completed).length;
+      final overdue = events.where((event) => 
+        !event.completed && event.endDateTime.isBefore(DateTime.now())).length;
+      
+      return {
+        'total': events.length,
+        'completed': completed,
+        'pending': pending,
+        'overdue': overdue,
+      };
+    } catch (e) {
+      print('Error getting event stats: $e');
+      return {'total': 0, 'completed': 0, 'pending': 0, 'overdue': 0};
+    }
+  }
+
   // Debug method to check database state
   Future<void> debugDatabaseState() async {
     try {
@@ -389,6 +536,7 @@ class CalendarService {
         print('  Parent: ${event.parentEventId}');
         print('  Recurring: ${event.isRecurring}');
         print('  Start: ${event.startDateTime}');
+        print('  Completed: ${event.completed}'); // ADDED: Debug completion status
         print('---');
       }
       print('Total database events: ${allEvents.length}');
