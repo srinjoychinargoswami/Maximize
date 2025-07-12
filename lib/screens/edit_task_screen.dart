@@ -17,7 +17,7 @@ class EditTaskScreen extends StatefulWidget {
 
 class _EditTaskScreenState extends State<EditTaskScreen> {
   final _formKey = GlobalKey<FormState>();
-  late String _taskName;
+  late String _taskTitle;
   late String _taskDescription;
   late DateTime _dueDate;
   late bool _completed;
@@ -46,7 +46,7 @@ class _EditTaskScreenState extends State<EditTaskScreen> {
   @override
   void initState() {
     super.initState();
-    _taskName = widget.task.name; // Initialize task name
+    _taskTitle = widget.task.title; // Initialize task title
     _taskDescription = widget.task.description ?? '';
     _dueDate = widget.task.dueDate;
     _completed = widget.task.completed;
@@ -246,19 +246,19 @@ class _EditTaskScreenState extends State<EditTaskScreen> {
                       ),
                       const SizedBox(height: 20),
                       TextFormField(
-                        initialValue: _taskName,
+                        initialValue: _taskTitle,
                         decoration: InputDecoration(
-                          labelText: 'Task Name',
+                          labelText: 'Task Title',
                           border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                           prefixIcon: const Icon(Icons.edit),
                         ),
                         validator: (value) {
                           if (value == null || value.isEmpty) {
-                            return 'Please enter task name';
+                            return 'Please enter task title';
                           }
                           return null;
                         },
-                        onSaved: (value) => _taskName = value!,
+                        onSaved: (value) => _taskTitle = value!,
                       ),
                       const SizedBox(height: 16),
                       TextFormField(
@@ -375,8 +375,7 @@ class _EditTaskScreenState extends State<EditTaskScreen> {
                       // Create an updated TaskModel instance
                       final updatedTask = TaskModel(
                         id: widget.task.id, // Use the existing task ID
-                        name: _taskName, // Pass name to updateTask
-                        title: _taskName, // Use title instead of name
+                        title: _taskTitle, // Use title
                         description: _taskDescription,
                         dueDate: _dueDate,
                         completed: _completed,
