@@ -23,7 +23,7 @@ class _PageScreenState extends State<PageScreen> {
         itemCount: widget.page.tasks.length,
         itemBuilder: (context, index) {
           return ListTile(
-            title: Text(widget.page.tasks[index].name), // Ensure TaskModel has a name property
+            title: Text(widget.page.tasks[index].title), // Ensure TaskModel has a name property
             subtitle: Text(widget.page.tasks[index].description ?? ''), // Ensure TaskModel has a description property
             trailing: Checkbox(
               value: widget.page.tasks[index].completed, // Ensure TaskModel has a completed property

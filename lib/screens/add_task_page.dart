@@ -15,7 +15,6 @@ class AddTaskPage extends StatefulWidget {
 
 class _AddTaskPageState extends State<AddTaskPage> {
   final _formKey = GlobalKey<FormState>();
-  String _taskName = '';
   String _taskTitle = '';
   String _taskDescription = '';
   DateTime _dueDate = DateTime.now();
@@ -47,7 +46,6 @@ class _AddTaskPageState extends State<AddTaskPage> {
   void initState() {
     super.initState();
     if (widget.task != null) {
-      _taskName = widget.task!.name;
       _taskTitle = widget.task!.title;
       _taskDescription = widget.task!.description ?? '';
       _dueDate = widget.task!.dueDate;
@@ -81,12 +79,6 @@ class _AddTaskPageState extends State<AddTaskPage> {
           child: SingleChildScrollView(
             child: Column(
               children: [
-                _buildTextField(
-                  label: 'Task Name',
-                  onSaved: (value) => _taskName = value!,
-                  initialValue: _taskName,
-                  validator: (value) => value == null || value.isEmpty ? 'Please enter a task name' : null,
-                ),
                 _buildTextField(
                   label: 'Task Title',
                   onSaved: (value) => _taskTitle = value!,
@@ -568,7 +560,6 @@ class _AddTaskPageState extends State<AddTaskPage> {
             try {
               final taskModel = TaskModel(
                 id: widget.task?.id ?? const Uuid().v1(),
-                name: _taskName,
                 title: _taskTitle,
                 description: _taskDescription,
                 dueDate: _dueDate,

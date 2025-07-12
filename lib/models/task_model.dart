@@ -6,7 +6,6 @@ part 'task_model.g.dart';
 @JsonSerializable()
 class TaskModel {
   final String id; // Non-optional ID for the task
-  final String name; // Name of the task
   final String title; // Title of the task
   final String? description; // Description of the task (optional)
   final DateTime dueDate; // Due date of the task
@@ -35,7 +34,6 @@ class TaskModel {
 
   TaskModel({
     required this.id,
-    required this.name,
     required this.title,
     this.description,
     required this.dueDate,
@@ -62,7 +60,6 @@ class TaskModel {
   factory TaskModel.fromData(TaskData data) {
     return TaskModel(
       id: data.id, // Changed to String
-      name: data.name,
       title: data.title,
       description: data.description,
       dueDate: data.dueDate,
@@ -94,7 +91,6 @@ class TaskModel {
   Map<String, dynamic> toMap() {
     return {
       'id': id,
-      'name': name,
       'title': title,
       'description': description,
       'dueDate': dueDate.toIso8601String(),
@@ -122,7 +118,6 @@ class TaskModel {
   factory TaskModel.fromMap(Map<String, dynamic> map) {
     return TaskModel(
       id: map['id'] ?? '',
-      name: map['name'] ?? '',
       title: map['title'] ?? '',
       description: map['description'],
       dueDate: DateTime.parse(map['dueDate']),
@@ -154,7 +149,6 @@ class TaskModel {
 
   TaskModel copyWith({
     String? id,
-    String? name,
     String? title,
     String? description,
     DateTime? dueDate,
@@ -179,7 +173,6 @@ class TaskModel {
   }) {
     return TaskModel(
       id: id ?? this.id,
-      name: name ?? this.name,
       title: title ?? this.title,
       description: description ?? this.description,
       dueDate: dueDate ?? this.dueDate,

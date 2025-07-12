@@ -5,7 +5,6 @@ import 'package:maximize/models/task_model.dart';
 TaskModel convertTaskDataToModel(TaskData taskData) {
   return TaskModel(
     id: taskData.id,
-    name: taskData.name,
     title: taskData.title,
     description: taskData.description,
     dueDate: taskData.dueDate,
@@ -21,7 +20,6 @@ TaskModel convertTaskDataToModel(TaskData taskData) {
 TaskData convertTaskModelToData(TaskModel taskModel) {
   return TaskData(
     id: taskModel.id,
-    name: taskModel.name,
     title: taskModel.title,
     description: taskModel.description,
     dueDate: taskModel.dueDate,

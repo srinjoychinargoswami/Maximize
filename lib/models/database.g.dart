@@ -15,14 +15,6 @@ class $TasksTable extends Tasks with TableInfo<$TasksTable, TaskData> {
       type: DriftSqlType.string,
       requiredDuringInsert: false,
       clientDefault: () => const Uuid().v1());
-  static const VerificationMeta _nameMeta = const VerificationMeta('name');
-  @override
-  late final GeneratedColumn<String> name = GeneratedColumn<String>(
-      'name', aliasedName, false,
-      additionalChecks:
-          GeneratedColumn.checkTextLength(minTextLength: 1, maxTextLength: 50),
-      type: DriftSqlType.string,
-      requiredDuringInsert: true);
   static const VerificationMeta _titleMeta = const VerificationMeta('title');
   @override
   late final GeneratedColumn<String> title = GeneratedColumn<String>(
@@ -161,7 +153,6 @@ class $TasksTable extends Tasks with TableInfo<$TasksTable, TaskData> {
   @override
   List<GeneratedColumn> get $columns => [
         id,
-        name,
         title,
         description,
         dueDate,
@@ -195,12 +186,6 @@ class $TasksTable extends Tasks with TableInfo<$TasksTable, TaskData> {
     final data = instance.toColumns(true);
     if (data.containsKey('id')) {
       context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
-    }
-    if (data.containsKey('name')) {
-      context.handle(
-          _nameMeta, name.isAcceptableOrUnknown(data['name']!, _nameMeta));
-    } else if (isInserting) {
-      context.missing(_nameMeta);
     }
     if (data.containsKey('title')) {
       context.handle(
@@ -325,8 +310,6 @@ class $TasksTable extends Tasks with TableInfo<$TasksTable, TaskData> {
     return TaskData(
       id: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}id'])!,
-      name: attachedDatabase.typeMapping
-          .read(DriftSqlType.string, data['${effectivePrefix}name'])!,
       title: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}title'])!,
       description: attachedDatabase.typeMapping
@@ -378,7 +361,6 @@ class $TasksTable extends Tasks with TableInfo<$TasksTable, TaskData> {
 
 class TaskData extends DataClass implements Insertable<TaskData> {
   final String id;
-  final String name;
   final String title;
   final String? description;
   final DateTime dueDate;
@@ -401,7 +383,6 @@ class TaskData extends DataClass implements Insertable<TaskData> {
   final int? weekOfMonth;
   const TaskData(
       {required this.id,
-      required this.name,
       required this.title,
       this.description,
       required this.dueDate,
@@ -426,7 +407,6 @@ class TaskData extends DataClass implements Insertable<TaskData> {
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
     map['id'] = Variable<String>(id);
-    map['name'] = Variable<String>(name);
     map['title'] = Variable<String>(title);
     if (!nullToAbsent || description != null) {
       map['description'] = Variable<String>(description);
@@ -481,7 +461,6 @@ class TaskData extends DataClass implements Insertable<TaskData> {
   TasksCompanion toCompanion(bool nullToAbsent) {
     return TasksCompanion(
       id: Value(id),
-      name: Value(name),
       title: Value(title),
       description: description == null && nullToAbsent
           ? const Value.absent()
@@ -535,7 +514,6 @@ class TaskData extends DataClass implements Insertable<TaskData> {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return TaskData(
       id: serializer.fromJson<String>(json['id']),
-      name: serializer.fromJson<String>(json['name']),
       title: serializer.fromJson<String>(json['title']),
       description: serializer.fromJson<String?>(json['description']),
       dueDate: serializer.fromJson<DateTime>(json['dueDate']),
@@ -564,7 +542,6 @@ class TaskData extends DataClass implements Insertable<TaskData> {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return <String, dynamic>{
       'id': serializer.toJson<String>(id),
-      'name': serializer.toJson<String>(name),
       'title': serializer.toJson<String>(title),
       'description': serializer.toJson<String?>(description),
       'dueDate': serializer.toJson<DateTime>(dueDate),
@@ -590,7 +567,6 @@ class TaskData extends DataClass implements Insertable<TaskData> {
 
   TaskData copyWith(
           {String? id,
-          String? name,
           String? title,
           Value<String?> description = const Value.absent(),
           DateTime? dueDate,
@@ -613,7 +589,6 @@ class TaskData extends DataClass implements Insertable<TaskData> {
           Value<int?> weekOfMonth = const Value.absent()}) =>
       TaskData(
         id: id ?? this.id,
-        name: name ?? this.name,
         title: title ?? this.title,
         description: description.present ? description.value : this.description,
         dueDate: dueDate ?? this.dueDate,
@@ -646,7 +621,6 @@ class TaskData extends DataClass implements Insertable<TaskData> {
   TaskData copyWithCompanion(TasksCompanion data) {
     return TaskData(
       id: data.id.present ? data.id.value : this.id,
-      name: data.name.present ? data.name.value : this.name,
       title: data.title.present ? data.title.value : this.title,
       description:
           data.description.present ? data.description.value : this.description,
@@ -694,7 +668,6 @@ class TaskData extends DataClass implements Insertable<TaskData> {
   String toString() {
     return (StringBuffer('TaskData(')
           ..write('id: $id, ')
-          ..write('name: $name, ')
           ..write('title: $title, ')
           ..write('description: $description, ')
           ..write('dueDate: $dueDate, ')
@@ -722,7 +695,6 @@ class TaskData extends DataClass implements Insertable<TaskData> {
   @override
   int get hashCode => Object.hashAll([
         id,
-        name,
         title,
         description,
         dueDate,
@@ -749,7 +721,6 @@ class TaskData extends DataClass implements Insertable<TaskData> {
       identical(this, other) ||
       (other is TaskData &&
           other.id == this.id &&
-          other.name == this.name &&
           other.title == this.title &&
           other.description == this.description &&
           other.dueDate == this.dueDate &&
@@ -774,7 +745,6 @@ class TaskData extends DataClass implements Insertable<TaskData> {
 
 class TasksCompanion extends UpdateCompanion<TaskData> {
   final Value<String> id;
-  final Value<String> name;
   final Value<String> title;
   final Value<String?> description;
   final Value<DateTime> dueDate;
@@ -798,7 +768,6 @@ class TasksCompanion extends UpdateCompanion<TaskData> {
   final Value<int> rowid;
   const TasksCompanion({
     this.id = const Value.absent(),
-    this.name = const Value.absent(),
     this.title = const Value.absent(),
     this.description = const Value.absent(),
     this.dueDate = const Value.absent(),
@@ -823,7 +792,6 @@ class TasksCompanion extends UpdateCompanion<TaskData> {
   });
   TasksCompanion.insert({
     this.id = const Value.absent(),
-    required String name,
     required String title,
     this.description = const Value.absent(),
     required DateTime dueDate,
@@ -845,13 +813,11 @@ class TasksCompanion extends UpdateCompanion<TaskData> {
     this.dayOfMonth = const Value.absent(),
     this.weekOfMonth = const Value.absent(),
     this.rowid = const Value.absent(),
-  })  : name = Value(name),
-        title = Value(title),
+  })  : title = Value(title),
         dueDate = Value(dueDate),
         priority = Value(priority);
   static Insertable<TaskData> custom({
     Expression<String>? id,
-    Expression<String>? name,
     Expression<String>? title,
     Expression<String>? description,
     Expression<DateTime>? dueDate,
@@ -876,7 +842,6 @@ class TasksCompanion extends UpdateCompanion<TaskData> {
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
-      if (name != null) 'name': name,
       if (title != null) 'title': title,
       if (description != null) 'description': description,
       if (dueDate != null) 'due_date': dueDate,
@@ -903,7 +868,6 @@ class TasksCompanion extends UpdateCompanion<TaskData> {
 
   TasksCompanion copyWith(
       {Value<String>? id,
-      Value<String>? name,
       Value<String>? title,
       Value<String?>? description,
       Value<DateTime>? dueDate,
@@ -927,7 +891,6 @@ class TasksCompanion extends UpdateCompanion<TaskData> {
       Value<int>? rowid}) {
     return TasksCompanion(
       id: id ?? this.id,
-      name: name ?? this.name,
       title: title ?? this.title,
       description: description ?? this.description,
       dueDate: dueDate ?? this.dueDate,
@@ -957,9 +920,6 @@ class TasksCompanion extends UpdateCompanion<TaskData> {
     final map = <String, Expression>{};
     if (id.present) {
       map['id'] = Variable<String>(id.value);
-    }
-    if (name.present) {
-      map['name'] = Variable<String>(name.value);
     }
     if (title.present) {
       map['title'] = Variable<String>(title.value);
@@ -1031,7 +991,6 @@ class TasksCompanion extends UpdateCompanion<TaskData> {
   String toString() {
     return (StringBuffer('TasksCompanion(')
           ..write('id: $id, ')
-          ..write('name: $name, ')
           ..write('title: $title, ')
           ..write('description: $description, ')
           ..write('dueDate: $dueDate, ')
@@ -3212,7 +3171,6 @@ abstract class _$AppDatabase extends GeneratedDatabase {
 
 typedef $$TasksTableCreateCompanionBuilder = TasksCompanion Function({
   Value<String> id,
-  required String name,
   required String title,
   Value<String?> description,
   required DateTime dueDate,
@@ -3237,7 +3195,6 @@ typedef $$TasksTableCreateCompanionBuilder = TasksCompanion Function({
 });
 typedef $$TasksTableUpdateCompanionBuilder = TasksCompanion Function({
   Value<String> id,
-  Value<String> name,
   Value<String> title,
   Value<String?> description,
   Value<DateTime> dueDate,
@@ -3290,9 +3247,6 @@ class $$TasksTableFilterComposer extends Composer<_$AppDatabase, $TasksTable> {
   });
   ColumnFilters<String> get id => $composableBuilder(
       column: $table.id, builder: (column) => ColumnFilters(column));
-
-  ColumnFilters<String> get name => $composableBuilder(
-      column: $table.name, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<String> get title => $composableBuilder(
       column: $table.title, builder: (column) => ColumnFilters(column));
@@ -3393,9 +3347,6 @@ class $$TasksTableOrderingComposer
   ColumnOrderings<String> get id => $composableBuilder(
       column: $table.id, builder: (column) => ColumnOrderings(column));
 
-  ColumnOrderings<String> get name => $composableBuilder(
-      column: $table.name, builder: (column) => ColumnOrderings(column));
-
   ColumnOrderings<String> get title => $composableBuilder(
       column: $table.title, builder: (column) => ColumnOrderings(column));
 
@@ -3475,9 +3426,6 @@ class $$TasksTableAnnotationComposer
   });
   GeneratedColumn<String> get id =>
       $composableBuilder(column: $table.id, builder: (column) => column);
-
-  GeneratedColumn<String> get name =>
-      $composableBuilder(column: $table.name, builder: (column) => column);
 
   GeneratedColumn<String> get title =>
       $composableBuilder(column: $table.title, builder: (column) => column);
@@ -3585,7 +3533,6 @@ class $$TasksTableTableManager extends RootTableManager<
               $$TasksTableAnnotationComposer($db: db, $table: table),
           updateCompanionCallback: ({
             Value<String> id = const Value.absent(),
-            Value<String> name = const Value.absent(),
             Value<String> title = const Value.absent(),
             Value<String?> description = const Value.absent(),
             Value<DateTime> dueDate = const Value.absent(),
@@ -3610,7 +3557,6 @@ class $$TasksTableTableManager extends RootTableManager<
           }) =>
               TasksCompanion(
             id: id,
-            name: name,
             title: title,
             description: description,
             dueDate: dueDate,
@@ -3635,7 +3581,6 @@ class $$TasksTableTableManager extends RootTableManager<
           ),
           createCompanionCallback: ({
             Value<String> id = const Value.absent(),
-            required String name,
             required String title,
             Value<String?> description = const Value.absent(),
             required DateTime dueDate,
@@ -3660,7 +3605,6 @@ class $$TasksTableTableManager extends RootTableManager<
           }) =>
               TasksCompanion.insert(
             id: id,
-            name: name,
             title: title,
             description: description,
             dueDate: dueDate,

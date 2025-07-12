@@ -50,7 +50,6 @@ class TaskService {
 
   // Add a new task to the database
   Future<int?> addTask({
-    required String name, // Add name parameter
     required String title,
     required String description,
     required DateTime dueDate,
@@ -75,7 +74,6 @@ class TaskService {
   }) async {
     final task = TaskModel(
       id: const Uuid().v1(), // Placeholder for new tasks
-      name: name, // Pass name to TaskModel
       title: title,
       description: description,
       dueDate: dueDate, // Pass DateTime directly

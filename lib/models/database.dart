@@ -26,7 +26,6 @@ class DatabaseException implements Exception {
 @DataClassName('TaskData')
 class Tasks extends Table {
   TextColumn get id => text().clientDefault(() => const Uuid().v1())();
-  TextColumn get name => text().withLength(min: 1, max: 50)();
   TextColumn get title => text().withLength(min: 1, max: 100)();
   TextColumn get description => text().nullable()();
   DateTimeColumn get dueDate => dateTime()();
@@ -142,10 +141,10 @@ class AppDatabase extends _$AppDatabase {
  @override
 MigrationStrategy get migration => MigrationStrategy(
   onUpgrade: (Migrator m, int from, int to) async {
-    if (from < 3 && to >= 3) {
+    if (from < 8 && to >= 8) {
       // Add new columns 'customCategory' and 'color' to 'events' table when upgrading to version 3 or above
-      await m.addColumn(events, events.customCategory);
-      await m.addColumn(events, events.color);
+       await m.dropColumn(tasks, 'name');
+
     }
     if (from < 4 && to >= 4) {
       // Create the reminders table when upgrading to version 4
@@ -391,7 +390,6 @@ MigrationStrategy get migration => MigrationStrategy(
     try {
       final taskCompanion = TasksCompanion(
         id: Value(task.id),
-        name: Value(task.name),
         title: Value(task.title),
         description: Value(task.description),
         dueDate: Value(task.dueDate),
@@ -446,7 +444,6 @@ MigrationStrategy get migration => MigrationStrategy(
     try {
       final taskCompanion = TasksCompanion(
         id: Value(task.id),
-        name: Value(task.name),
         title: Value(task.title),
         description: Value(task.description),
         dueDate: Value(task.dueDate),
@@ -480,7 +477,6 @@ MigrationStrategy get migration => MigrationStrategy(
   Future<void> updateRecurringTaskSeries({
     required String parentTaskId,
     String? title,
-    String? name,
     String? description,
     String? category,
     String? priority,
@@ -496,7 +492,6 @@ MigrationStrategy get migration => MigrationStrategy(
 
       final companion = TasksCompanion(
         title: title != null ? Value(title) : const Value.absent(),
-        name: name != null ? Value(name) : const Value.absent(),
         description: description != null ? Value(description) : const Value.absent(),
         category: category != null ? Value(category) : const Value.absent(),
         priority: priority != null ? Value(priority) : const Value.absent(),
