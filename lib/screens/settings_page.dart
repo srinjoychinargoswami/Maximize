@@ -153,6 +153,27 @@ class _SettingsPageState extends State<SettingsPage> {
             },
             child: Text(_tokenSaved ? 'Update Token' : 'Save Token'),
           ),
+
+          const SizedBox(height: 8),
+
+          if (_tokenSaved)
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                minimumSize: const Size.fromHeight(48),
+              ),
+              onPressed: () async {
+                await widget.api.deleteGitHubToken();
+                _tokenController.clear();
+                setState(() {
+                  _tokenSaved = false;
+                });
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Token deleted successfully.')),
+                );
+              },
+              child: const Text('Delete Token'),
+            ),
         ],
       ),
     );
