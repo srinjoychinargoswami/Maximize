@@ -554,7 +554,7 @@ class _EditTaskScreenState extends State<EditTaskScreen> {
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(color: Colors.orange[200]!),
                 ),
-                child: Column(
+                child: Wrap(
                   children: _subtasks.map((subtask) {
                     return Container(
                       margin: const EdgeInsets.symmetric(vertical: 4),
