@@ -1,58 +1,81 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'package:maximize/models/event_model.dart';
-import 'package:maximize/models/task_model.dart';
+import 'package:encrypt/encrypt.dart' as encrypt;
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:maximize/models/database.dart';
-
+import 'package:maximize/utils/encryption_helper.dart';
 
 class ApiService {
-  // Replace with your actual API base URL
-  static const String baseUrl = 'https://your-api-url.com/api';
+  static const String githubUsername = 'your-github-username';
+  static const String repoName = 'productivity-sync';
+  static const String fileName = 'sync_data.json.enc';
+  static const String tokenKey = 'github_token';
 
-  // Fetch all events for a user (or all, depending on your backend)
-  Future<List<Event>> fetchEvents() async {
-    final response = await http.get(Uri.parse('$baseUrl/events'));
-    if (response.statusCode == 200) {
-      final List<dynamic> data = jsonDecode(response.body);
-      return data.map((json) => Event.fromMap(json)).toList();
-    } else {
-      throw Exception('Failed to load events');
-    }
+  final FlutterSecureStorage _storage = const FlutterSecureStorage();
+  final AppDatabase db;
+
+  ApiService({required this.db});
+
+  Future<String?> getStoredToken() async {
+    return await _storage.read(key: tokenKey);
   }
 
-  // Create a new event
-  Future<Event> createEvent(Event event) async {
-    final response = await http.post(
-      Uri.parse('$baseUrl/events'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode(event.toMap()),
+  Future<void> syncToGitHub() async {
+    final token = await _storage.read(key: tokenKey);
+    if (token == null) throw Exception("GitHub token not set in secure storage.");
+
+    final data = await db.getAllDataAsJson();
+    final encrypted = EncryptionHelper.encrypt(jsonEncode(data));
+    final base64Content = base64Encode(utf8.encode(encrypted));
+
+    final url = Uri.parse('https://api.github.com/repos/$githubUsername/$repoName/contents/$fileName');
+    final getResp = await http.get(url, headers: {'Authorization': 'Bearer $token'});
+
+    String? sha;
+    if (getResp.statusCode == 200) {
+      final existingFile = jsonDecode(getResp.body);
+      sha = existingFile['sha'];
+    }
+
+    final body = {
+      "message": "Sync data ${DateTime.now().toIso8601String()}",
+      "content": base64Content,
+      if (sha != null) "sha": sha,
+    };
+
+    final putResp = await http.put(
+      url,
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode(body),
     );
-    if (response.statusCode == 201 || response.statusCode == 200) {
-      return Event.fromMap(jsonDecode(response.body));
-    } else {
-      throw Exception('Failed to create event');
+
+    if (putResp.statusCode != 201 && putResp.statusCode != 200) {
+      throw Exception("Failed to upload sync file to GitHub");
     }
   }
 
-  // Update an existing event
-  Future<Event> updateEvent(Event event) async {
-    final response = await http.put(
-      Uri.parse('$baseUrl/events/${event.id}'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode(event.toMap()),
-    );
-    if (response.statusCode == 200) {
-      return Event.fromMap(jsonDecode(response.body));
-    } else {
-      throw Exception('Failed to update event');
-    }
+  Future<void> syncFromGitHub() async {
+    final token = await _storage.read(key: tokenKey);
+    if (token == null) throw Exception("GitHub token not set in secure storage.");
+
+    final url = Uri.parse('https://api.github.com/repos/$githubUsername/$repoName/contents/$fileName');
+    final response = await http.get(url, headers: {'Authorization': 'Bearer $token'});
+
+    if (response.statusCode != 200) throw Exception("Failed to download sync file from GitHub");
+
+    final jsonResponse = jsonDecode(response.body);
+    final base64Content = jsonResponse['content'];
+    final encrypted = utf8.decode(base64Decode(base64Content));
+    final decrypted = EncryptionHelper.decrypt(encrypted);
+    final data = jsonDecode(decrypted);
+
+    await db.insertAllFromJson(data);
   }
 
-  // Delete an event
-  Future<void> deleteEvent(String eventId) async {
-    final response = await http.delete(Uri.parse('$baseUrl/events/$eventId'));
-    if (response.statusCode != 200 && response.statusCode != 204) {
-      throw Exception('Failed to delete event');
-    }
+  Future<void> saveGitHubToken(String token) async {
+    await _storage.write(key: tokenKey, value: token);
   }
 }
