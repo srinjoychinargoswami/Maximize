@@ -5,9 +5,13 @@ import 'package:drift/native.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
 import 'dart:io';
+import 'dart:convert';
 import 'package:uuid/uuid.dart';
+import 'package:http/http.dart' as http;
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:maximize/utils/encryption_helper.dart';
 
-// Import your models
+// Import models
 import 'package:maximize/models/task_model.dart';
 import 'package:maximize/models/event_model.dart';
 import 'package:maximize/models/reminder_model.dart';
@@ -133,6 +137,14 @@ class Reminders extends Table {
 class AppDatabase extends _$AppDatabase {
   AppDatabase._() : super(_openConnection());
   static final AppDatabase instance = AppDatabase._();
+
+  // GitHub Sync Constants
+  static const String githubUsername = 'your-github-username'; // 🔁 Replace with your GitHub username
+  static const String repoName = 'productivity-sync';
+  static const String fileName = 'sync_data.json.enc';
+  static const String tokenKey = 'github_token';
+
+  final FlutterSecureStorage _secureStorage = const FlutterSecureStorage();
 
   @override
   int get schemaVersion => 7; // UPDATED: Increment version for completion columns
@@ -340,6 +352,251 @@ MigrationStrategy get migration => MigrationStrategy(
       return NativeDatabase(file);
     });
   }
+
+  // ADDED: Export all data as JSON for sync
+  Future<Map<String, dynamic>> getAllDataAsJson() async {
+    try {
+      final tasks = await getAllTasks();
+      final reminders = await getAllReminders();
+      final events = await getAllEvents();
+
+      return {
+        'tasks': tasks.map((t) => {
+          'id': t.id,
+          'title': t.title,
+          'description': t.description,
+          'dueDate': t.dueDate.toIso8601String(),
+          'completed': t.completed,
+          'completedAt': t.completedAt?.toIso8601String(),
+          'category': t.category,
+          'priority': t.priority,
+          'customCategory': t.customCategory,
+          'pageId': t.pageId,
+          'day': t.day,
+          'isRecurring': t.isRecurring,
+          'recurrenceRule': t.recurrenceRule,
+          'recurrenceInterval': t.recurrenceInterval,
+          'daysOfWeek': t.daysOfWeek,
+          'recurrenceEndDate': t.recurrenceEndDate?.toIso8601String(),
+          'parentTaskId': t.parentTaskId,
+          'maxOccurrences': t.maxOccurrences,
+          'skipWeekends': t.skipWeekends,
+          'dayOfMonth': t.dayOfMonth,
+          'weekOfMonth': t.weekOfMonth,
+        }).toList(),
+        'reminders': reminders.map((r) => {
+          'id': r.id,
+          'title': r.title,
+          'body': r.body,
+          'scheduledTime': r.scheduledTime.toIso8601String(),
+          'notificationId': r.notificationId,
+          'completed': r.completed,
+          'completedAt': r.completedAt?.toIso8601String(),
+          'isRecurring': r.isRecurring,
+          'recurrenceRule': r.recurrenceRule,
+          'parentReminderId': r.parentReminderId,
+          'recurrenceExceptionDates': r.recurrenceExceptionDates,
+          'recurrenceEndDate': r.recurrenceEndDate?.toIso8601String(),
+          'recurrenceCount': r.recurrenceCount,
+        }).toList(),
+        'events': events.map((e) => {
+          'id': e.id,
+          'title': e.title,
+          'description': e.description,
+          'comments': e.comments,
+          'startDateTime': e.startDateTime.toIso8601String(),
+          'endDateTime': e.endDateTime.toIso8601String(),
+          'customCategory': e.customCategory,
+          'color': e.color,
+          'completed': e.completed,
+          'completedAt': e.completedAt?.toIso8601String(),
+          'isRecurring': e.isRecurring,
+          'recurrenceRule': e.recurrenceRule,
+          'parentEventId': e.parentEventId,
+          'recurrenceExceptionDates': e.recurrenceExceptionDates,
+          'recurrenceEndDate': e.recurrenceEndDate?.toIso8601String(),
+          'recurrenceCount': e.recurrenceCount,
+        }).toList(),
+      };
+    } catch (e) {
+      print('Error exporting data as JSON: $e');
+      throw DatabaseException('Error exporting data as JSON: $e');
+    }
+  }
+
+  // ADDED: Import all data from JSON for sync
+  Future<void> insertAllFromJson(Map<String, dynamic> data) async {
+    try {
+      await batch((batch) {
+        // Import tasks
+        if (data['tasks'] != null) {
+          for (final taskJson in data['tasks']) {
+            final taskCompanion = TasksCompanion(
+              id: Value(taskJson['id']),
+              title: Value(taskJson['title']),
+              description: Value(taskJson['description']),
+              dueDate: Value(DateTime.parse(taskJson['dueDate'])),
+              completed: Value(taskJson['completed'] ?? false),
+              completedAt: taskJson['completedAt'] != null ? Value(DateTime.parse(taskJson['completedAt'])) : const Value.absent(),
+              category: Value(taskJson['category']),
+              priority: Value(taskJson['priority']),
+              customCategory: Value(taskJson['customCategory']),
+              pageId: Value(taskJson['pageId']),
+              day: Value(taskJson['day']),
+              isRecurring: Value(taskJson['isRecurring'] ?? false),
+              recurrenceRule: taskJson['recurrenceRule'] != null ? Value(taskJson['recurrenceRule']) : const Value.absent(),
+              recurrenceInterval: taskJson['recurrenceInterval'] != null ? Value(taskJson['recurrenceInterval']) : const Value.absent(),
+              daysOfWeek: taskJson['daysOfWeek'] != null ? Value(taskJson['daysOfWeek']) : const Value.absent(),
+              recurrenceEndDate: taskJson['recurrenceEndDate'] != null ? Value(DateTime.parse(taskJson['recurrenceEndDate'])) : const Value.absent(),
+              parentTaskId: taskJson['parentTaskId'] != null ? Value(taskJson['parentTaskId']) : const Value.absent(),
+              maxOccurrences: taskJson['maxOccurrences'] != null ? Value(taskJson['maxOccurrences']) : const Value.absent(),
+              skipWeekends: Value(taskJson['skipWeekends'] ?? false),
+              dayOfMonth: taskJson['dayOfMonth'] != null ? Value(taskJson['dayOfMonth']) : const Value.absent(),
+              weekOfMonth: taskJson['weekOfMonth'] != null ? Value(taskJson['weekOfMonth']) : const Value.absent(),
+            );
+            batch.insert(tasks, taskCompanion, mode: InsertMode.insertOrReplace);
+          }
+        }
+
+        // Import reminders
+        if (data['reminders'] != null) {
+          for (final reminderJson in data['reminders']) {
+            final reminderCompanion = RemindersCompanion(
+              id: Value(reminderJson['id']),
+              title: Value(reminderJson['title']),
+              body: Value(reminderJson['body']),
+              scheduledTime: Value(DateTime.parse(reminderJson['scheduledTime'])),
+              notificationId: Value(reminderJson['notificationId']),
+              completed: Value(reminderJson['completed'] ?? false),
+              completedAt: reminderJson['completedAt'] != null ? Value(DateTime.parse(reminderJson['completedAt'])) : const Value.absent(),
+              isRecurring: Value(reminderJson['isRecurring'] ?? false),
+              recurrenceRule: reminderJson['recurrenceRule'] != null ? Value(reminderJson['recurrenceRule']) : const Value.absent(),
+              parentReminderId: reminderJson['parentReminderId'] != null ? Value(reminderJson['parentReminderId']) : const Value.absent(),
+              recurrenceExceptionDates: reminderJson['recurrenceExceptionDates'] != null ? Value(reminderJson['recurrenceExceptionDates']) : const Value.absent(),
+              recurrenceEndDate: reminderJson['recurrenceEndDate'] != null ? Value(DateTime.parse(reminderJson['recurrenceEndDate'])) : const Value.absent(),
+              recurrenceCount: reminderJson['recurrenceCount'] != null ? Value(reminderJson['recurrenceCount']) : const Value.absent(),
+            );
+            batch.insert(reminders, reminderCompanion, mode: InsertMode.insertOrReplace);
+          }
+        }
+
+        // Import events
+        if (data['events'] != null) {
+          for (final eventJson in data['events']) {
+            final eventCompanion = EventsCompanion(
+              id: Value(eventJson['id']),
+              title: Value(eventJson['title']),
+              description: eventJson['description'] != null ? Value(eventJson['description']) : const Value.absent(),
+              comments: eventJson['comments'] != null ? Value(eventJson['comments']) : const Value.absent(),
+              startDateTime: Value(DateTime.parse(eventJson['startDateTime'])),
+              endDateTime: Value(DateTime.parse(eventJson['endDateTime'])),
+              customCategory: Value(eventJson['customCategory']),
+              color: Value(eventJson['color']),
+              completed: Value(eventJson['completed'] ?? false),
+              completedAt: eventJson['completedAt'] != null ? Value(DateTime.parse(eventJson['completedAt'])) : const Value.absent(),
+              isRecurring: Value(eventJson['isRecurring'] ?? false),
+              recurrenceRule: eventJson['recurrenceRule'] != null ? Value(eventJson['recurrenceRule']) : const Value.absent(),
+              parentEventId: eventJson['parentEventId'] != null ? Value(eventJson['parentEventId']) : const Value.absent(),
+              recurrenceExceptionDates: eventJson['recurrenceExceptionDates'] != null ? Value(eventJson['recurrenceExceptionDates']) : const Value.absent(),
+              recurrenceEndDate: eventJson['recurrenceEndDate'] != null ? Value(DateTime.parse(eventJson['recurrenceEndDate'])) : const Value.absent(),
+              recurrenceCount: eventJson['recurrenceCount'] != null ? Value(eventJson['recurrenceCount']) : const Value.absent(),
+            );
+            batch.insert(events, eventCompanion, mode: InsertMode.insertOrReplace);
+          }
+        }
+      });
+    } catch (e) {
+      print('Error importing data from JSON: $e');
+      throw DatabaseException('Error importing data from JSON: $e');
+    }
+  }
+
+  // ADDED: Upload encrypted data to GitHub
+  Future<void> syncToGitHub() async {
+    try {
+      final token = await _secureStorage.read(key: tokenKey);
+      if (token == null) throw Exception("GitHub token not set in secure storage.");
+
+      final data = await getAllDataAsJson();
+      final encrypted = EncryptionHelper.encrypt(jsonEncode(data));
+      final base64Content = base64Encode(utf8.encode(encrypted));
+
+      final url = Uri.parse('https://api.github.com/repos/$githubUsername/$repoName/contents/$fileName');
+      final getResp = await http.get(url, headers: {'Authorization': 'Bearer $token'});
+
+      String? sha;
+      if (getResp.statusCode == 200) {
+        final existingFile = jsonDecode(getResp.body);
+        sha = existingFile['sha'];
+      }
+
+      final body = {
+        "message": "Sync data ${DateTime.now().toIso8601String()}",
+        "content": base64Content,
+        if (sha != null) "sha": sha,
+      };
+
+      final putResp = await http.put(
+        url,
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode(body),
+      );
+
+      if (putResp.statusCode != 201 && putResp.statusCode != 200) {
+        throw Exception("Failed to upload sync file to GitHub");
+      }
+    } catch (e) {
+      print('Error syncing to GitHub: $e');
+      throw DatabaseException('Error syncing to GitHub: $e');
+    }
+  }
+
+  // ADDED: Download + decrypt data from GitHub
+  Future<void> syncFromGitHub() async {
+    try {
+      final token = await _secureStorage.read(key: tokenKey);
+      if (token == null) throw Exception("GitHub token not set in secure storage.");
+
+      final url = Uri.parse('https://api.github.com/repos/$githubUsername/$repoName/contents/$fileName');
+      final response = await http.get(url, headers: {'Authorization': 'Bearer $token'});
+
+      if (response.statusCode != 200) throw Exception("Failed to download sync file from GitHub");
+
+      final jsonResponse = jsonDecode(response.body);
+      final base64Content = jsonResponse['content'].replaceAll('\n', ''); // Remove newlines
+      final encrypted = utf8.decode(base64Decode(base64Content));
+      final decrypted = EncryptionHelper.decrypt(encrypted);
+      final data = jsonDecode(decrypted);
+
+      await insertAllFromJson(data);
+    } catch (e) {
+      print('Error syncing from GitHub: $e');
+      throw DatabaseException('Error syncing from GitHub: $e');
+    }
+  }
+
+  // ADDED: Save GitHub token securely
+  Future<void> saveGitHubToken(String token) async {
+    try {
+      await _secureStorage.write(key: tokenKey, value: token);
+    } catch (e) {
+      print('Error saving GitHub token: $e');
+      throw DatabaseException('Error saving GitHub token: $e');
+    }
+  }
+
+  // ADDED: Delete GitHub token securely
+Future<void> deleteGitHubToken() async {
+  try {
+    await _secureStorage.delete(key: tokenKey);
+  } catch (e) {
+    print('Error deleting GitHub token: $e');
+    throw DatabaseException('Error deleting GitHub token: $e');
+  }
+}
 
   // Task Methods - ENHANCED with completion tracking
   Future<List<TaskData>> getAllTasks() async {
