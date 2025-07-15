@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'package:encrypt/encrypt.dart' as encrypt;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:maximize/models/database.dart';
 import 'package:maximize/utils/encryption_helper.dart';
@@ -18,6 +17,14 @@ class ApiService {
 
   Future<String?> getStoredToken() async {
     return await _storage.read(key: tokenKey);
+  }
+
+  Future<void> saveGitHubToken(String token) async {
+    await _storage.write(key: tokenKey, value: token);
+  }
+
+  Future<void> deleteGitHubToken() async {
+    await _storage.delete(key: tokenKey);
   }
 
   Future<void> syncToGitHub() async {
@@ -73,9 +80,5 @@ class ApiService {
     final data = jsonDecode(decrypted);
 
     await db.insertAllFromJson(data);
-  }
-
-  Future<void> saveGitHubToken(String token) async {
-    await _storage.write(key: tokenKey, value: token);
   }
 }
