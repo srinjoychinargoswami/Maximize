@@ -1,16 +1,26 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 import 'package:maximize/models/task_model.dart';
 import 'package:maximize/services/task_service.dart';
-import 'package:maximize/screens/add_task_page.dart'; // Import the AddTaskPage
+import 'package:maximize/screens/add_task_page.dart';
 import 'package:maximize/utils/task_utils.dart';
-import 'package:maximize/models/database.dart'; // Import your Drift database file
-// REMOVED: SharedPreferences import - no longer needed for checkboxes
+import 'package:maximize/models/database.dart';
 import 'package:intl/intl.dart';
 
-class TaskListScreen extends StatefulWidget {
-  final AppDatabase database; // Add this line to accept the database
+// ADDED: CustomScrollBehavior to fix RefreshIndicator on Windows desktop
+class CustomScrollBehavior extends ScrollBehavior {
+  @override
+  Set<PointerDeviceKind> get dragDevices => {
+    PointerDeviceKind.touch,
+    PointerDeviceKind.mouse,
+    PointerDeviceKind.trackpad,
+  };
+}
 
-  const TaskListScreen({super.key, required this.database}); // Modify the constructor
+class TaskListScreen extends StatefulWidget {
+  final AppDatabase database;
+
+  const TaskListScreen({super.key, required this.database});
 
   @override
   _TaskListScreenState createState() => _TaskListScreenState();
@@ -18,7 +28,7 @@ class TaskListScreen extends StatefulWidget {
 
 class _TaskListScreenState extends State<TaskListScreen> with TickerProviderStateMixin {
   List<TaskModel> _tasks = [];
-  late final TaskService _taskService; // Declare TaskService
+  late final TaskService _taskService;
   bool _isLoading = true;
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
@@ -27,7 +37,7 @@ class _TaskListScreenState extends State<TaskListScreen> with TickerProviderStat
   String _selectedCategory = 'All';
   String _selectedPriority = 'All';
   DateTime? _selectedDueDate;
-  String _selectedRecurrenceFilter = 'All'; // New filter for recurring tasks
+  String _selectedRecurrenceFilter = 'All';
   
   // Expansion state for recurring tasks
   Map<String, bool> _expandedRecurringTasks = {};
@@ -38,7 +48,7 @@ class _TaskListScreenState extends State<TaskListScreen> with TickerProviderStat
   @override
   void initState() {
     super.initState();
-    _taskService = TaskService(widget.database); // Initialize TaskService with the database
+    _taskService = TaskService(widget.database);
     _animationController = AnimationController(
       duration: const Duration(milliseconds: 300),
       vsync: this,
@@ -55,11 +65,11 @@ class _TaskListScreenState extends State<TaskListScreen> with TickerProviderStat
     super.dispose();
   }
 
-  // ENHANCED: Load tasks directly from database with completion status
+  // ENHANCED: Load tasks with refresh functionality
   Future<void> _loadTasks() async {
     setState(() => _isLoading = true);
     try {
-      _tasks = await _taskService.getTasks(); // SIMPLIFIED: No need for separate completion loading
+      _tasks = await _taskService.getTasks();
       _updateFilterOptions();
       setState(() => _isLoading = false);
       _animationController.forward();
@@ -72,7 +82,13 @@ class _TaskListScreenState extends State<TaskListScreen> with TickerProviderStat
     }
   }
 
-  // REMOVED: _loadTaskCompletionStatus method - no longer needed
+  // ENHANCED: Refresh method for pull-to-refresh functionality
+  Future<void> _refreshTasks() async {
+    await _loadTasks();
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Tasks refreshed!')),
+    );
+  }
 
   List<TaskModel> _filterTasks() {
     return _tasks.where((task) {
@@ -185,32 +201,40 @@ class _TaskListScreenState extends State<TaskListScreen> with TickerProviderStat
             ),
         ],
       ),
-      body: RefreshIndicator(
-        onRefresh: _loadTasks,
-        child: Column(
-          children: [
-            // Filter section with animation
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 300),
-              height: _showFilters ? null : 0,
-              child: _showFilters ? _buildFilterSection() : null,
-            ),
-            
-            // Active filters indicator
-            if (_hasActiveFilters) _buildActiveFiltersIndicator(),
-            
-            // Task list
-            Expanded(
-              child: _isLoading
-                  ? const Center(child: CircularProgressIndicator())
-                  : filteredTasks.isEmpty
-                      ? _buildEmptyState()
-                      : FadeTransition(
-                          opacity: _fadeAnimation,
-                          child: _buildTaskList(filteredTasks),
-                        ),
-            ),
-          ],
+      // ENHANCED: Wrap RefreshIndicator with ScrollConfiguration and CustomScrollBehavior
+      body: ScrollConfiguration(
+        behavior: CustomScrollBehavior(),
+        child: RefreshIndicator(
+          onRefresh: _refreshTasks,
+          color: Colors.blue,
+          backgroundColor: Colors.white,
+          strokeWidth: 2.0,
+          displacement: 40.0,
+          child: Column(
+            children: [
+              // Filter section with animation
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 300),
+                height: _showFilters ? null : 0,
+                child: _showFilters ? _buildFilterSection() : null,
+              ),
+              
+              // Active filters indicator
+              if (_hasActiveFilters) _buildActiveFiltersIndicator(),
+              
+              // Task list
+              Expanded(
+                child: _isLoading
+                    ? const Center(child: CircularProgressIndicator())
+                    : filteredTasks.isEmpty
+                        ? _buildEmptyState()
+                        : FadeTransition(
+                            opacity: _fadeAnimation,
+                            child: _buildTaskList(filteredTasks),
+                          ),
+              ),
+            ],
+          ),
         ),
       ),
       floatingActionButton: FloatingActionButton.extended(
@@ -287,54 +311,71 @@ class _TaskListScreenState extends State<TaskListScreen> with TickerProviderStat
   }
 
   Widget _buildEmptyState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.task_alt,
-            size: 80,
-            color: Colors.grey[850],
-          ),
-          const SizedBox(height: 24),
-          Text(
-            _hasActiveFilters ? 'No tasks match your filters' : 'No tasks available',
-            style: TextStyle(
-              fontSize: 20,
-              color: Colors.grey[850],
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            _hasActiveFilters 
-                ? 'Try adjusting your filters or create a new task'
-                : 'Tap the + button to create your first task',
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.grey[850],
-            ),
-            textAlign: TextAlign.center,
-          ),
-          if (_hasActiveFilters) ...[
-            const SizedBox(height: 16),
-            ElevatedButton.icon(
-              onPressed: _clearAllFilters,
-              icon: const Icon(Icons.clear_all),
-              label: const Text('Clear Filters'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blue[100],
-                foregroundColor: Colors.blue[800],
+    return SingleChildScrollView(
+      // ENHANCED: Make empty state scrollable to work with RefreshIndicator
+      physics: const AlwaysScrollableScrollPhysics(),
+      child: Container(
+        height: MediaQuery.of(context).size.height * 0.6,
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.task_alt,
+                size: 80,
+                color: Colors.grey[850],
               ),
-            ),
-          ],
-        ],
+              const SizedBox(height: 24),
+              Text(
+                _hasActiveFilters ? 'No tasks match your filters' : 'No tasks available',
+                style: TextStyle(
+                  fontSize: 20,
+                  color: Colors.grey[850],
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                _hasActiveFilters 
+                    ? 'Try adjusting your filters or create a new task'
+                    : 'Tap the + button to create your first task',
+                style: TextStyle(
+                  fontSize: 16,
+                  color: Colors.grey[850],
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Pull down to refresh',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey[600],
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+              if (_hasActiveFilters) ...[
+                const SizedBox(height: 16),
+                ElevatedButton.icon(
+                  onPressed: _clearAllFilters,
+                  icon: const Icon(Icons.clear_all),
+                  label: const Text('Clear Filters'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue[100],
+                    foregroundColor: Colors.blue[800],
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
       ),
     );
   }
 
   Widget _buildTaskList(List<TaskModel> filteredTasks) {
     return ListView.builder(
+      physics: const AlwaysScrollableScrollPhysics(), // ENHANCED: Enable scrolling for RefreshIndicator
       padding: const EdgeInsets.all(16.0),
       itemCount: filteredTasks.length,
       itemBuilder: (context, index) {
@@ -375,7 +416,7 @@ class _TaskListScreenState extends State<TaskListScreen> with TickerProviderStat
   Widget _buildMainTaskTile(TaskModel task, bool isExpanded) {
     return Container(
       decoration: BoxDecoration(
-        color: task.completed ? Colors.grey[700] : null, // Grey background when complete
+        color: task.completed ? Colors.grey[700] : null,
       ),
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 12.0),
@@ -389,7 +430,7 @@ class _TaskListScreenState extends State<TaskListScreen> with TickerProviderStat
                   fontWeight: FontWeight.w700,
                   fontSize: 16,
                   decoration: task.completed ? TextDecoration.lineThrough : null,
-                  color: task.completed ? Colors.white : Colors.white, // White text always
+                  color: task.completed ? Colors.white : Colors.white,
                 ),
               ),
             ),
@@ -486,7 +527,7 @@ class _TaskListScreenState extends State<TaskListScreen> with TickerProviderStat
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  color: Colors.white, // White text always
+                  color: Colors.white,
                   fontSize: 14,
                   height: 1.3,
                 ),
@@ -593,7 +634,7 @@ class _TaskListScreenState extends State<TaskListScreen> with TickerProviderStat
           IconButton(
             icon: Icon(
               isExpanded ? Icons.expand_less : Icons.expand_more,
-              color: task.completed ? Colors.white : Colors.grey[850], // White when task complete
+              color: task.completed ? Colors.white : Colors.grey[850],
             ),
             onPressed: () {
               setState(() {
@@ -701,7 +742,7 @@ class _TaskListScreenState extends State<TaskListScreen> with TickerProviderStat
 
   Widget _buildSubtasksSection(TaskModel task) {
     return FutureBuilder<List<SubtaskModel>>(
-      future: _taskService.getSubtasks(task.id), // ENHANCED: Use service method instead of direct database call
+      future: _taskService.getSubtasks(task.id),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Padding(
@@ -731,7 +772,7 @@ class _TaskListScreenState extends State<TaskListScreen> with TickerProviderStat
           margin: const EdgeInsets.fromLTRB(20.0, 0, 20.0, 16.0),
           padding: const EdgeInsets.all(16.0),
           decoration: BoxDecoration(
-            color: task.completed ? Colors.grey[700] : Colors.blue[50], // Grey when task complete
+            color: task.completed ? Colors.grey[700] : Colors.blue[50],
             borderRadius: BorderRadius.circular(12),
             border: Border.all(color: task.completed ? Colors.grey[500]! : Colors.blue[100]!),
           ),
@@ -746,7 +787,7 @@ class _TaskListScreenState extends State<TaskListScreen> with TickerProviderStat
                     'Subtasks (${subtasks.length})',
                     style: TextStyle(
                       fontWeight: FontWeight.w600,
-                      color: task.completed ? Colors.white : Colors.blue[700], // White when task complete
+                      color: task.completed ? Colors.white : Colors.blue[700],
                       fontSize: 14,
                     ),
                   ),
@@ -783,12 +824,11 @@ class _TaskListScreenState extends State<TaskListScreen> with TickerProviderStat
                 fontSize: 13,
                 decoration: subtask.completed ? TextDecoration.lineThrough : null,
                 color: task.completed 
-                    ? Colors.white // White text when parent task is complete
-                    : (subtask.completed ? Colors.grey[500] : Colors.grey[700]), // Original logic when parent not complete
+                    ? Colors.white
+                    : (subtask.completed ? Colors.grey[500] : Colors.grey[700]),
               ),
             ),
           ),
-          // Delete subtask button
           IconButton(
             icon: Icon(Icons.delete_outline, size: 18, color: Colors.red[400]),
             onPressed: () => _deleteSubtask(subtask),
@@ -894,21 +934,21 @@ class _TaskListScreenState extends State<TaskListScreen> with TickerProviderStat
       decoration: BoxDecoration(
         border: Border.all(color: Colors.grey[400]!),
         borderRadius: BorderRadius.circular(12),
-        color: Colors.grey[700], // Grey background
+        color: Colors.grey[700],
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<String>(
           value: value,
           onChanged: onChanged,
           isExpanded: true,
-          hint: Text(label, style: const TextStyle(color: Colors.white)), // White text for hint
-          dropdownColor: Colors.grey[700], // Grey dropdown menu background
-          style: const TextStyle(color: Colors.white), // White text for selected value
+          hint: Text(label, style: const TextStyle(color: Colors.white)),
+          dropdownColor: Colors.grey[700],
+          style: const TextStyle(color: Colors.white),
           items: items.map((item) => DropdownMenuItem(
             value: item,
             child: Text(
               item,
-              style: const TextStyle(fontSize: 14, color: Colors.white), // White text for dropdown items
+              style: const TextStyle(fontSize: 14, color: Colors.white),
             ),
           )).toList(),
         ),
@@ -921,7 +961,7 @@ class _TaskListScreenState extends State<TaskListScreen> with TickerProviderStat
       decoration: BoxDecoration(
         border: Border.all(color: Colors.grey[400]!),
         borderRadius: BorderRadius.circular(12),
-        color: Colors.grey[700], // Grey background
+        color: Colors.grey[700],
       ),
       child: Material(
         color: Colors.transparent,
@@ -945,7 +985,7 @@ class _TaskListScreenState extends State<TaskListScreen> with TickerProviderStat
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
             child: Row(
               children: [
-                const Icon(Icons.calendar_today, size: 18, color: Colors.white), // White icon
+                const Icon(Icons.calendar_today, size: 18, color: Colors.white),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
@@ -954,7 +994,7 @@ class _TaskListScreenState extends State<TaskListScreen> with TickerProviderStat
                         : DateFormat('MMM dd, yyyy').format(_selectedDueDate!),
                     style: const TextStyle(
                       fontSize: 14,
-                      color: Colors.white, // White text
+                      color: Colors.white,
                     ),
                   ),
                 ),
@@ -965,14 +1005,13 @@ class _TaskListScreenState extends State<TaskListScreen> with TickerProviderStat
                     child: Container(
                       padding: const EdgeInsets.all(4),
                       decoration: const BoxDecoration(
-                        color: Colors.white, // White background for clear button
+                        color: Colors.white,
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(Icons.close, size: 12, color: Colors.grey), // Grey icon on white background
+                      child: const Icon(Icons.close, size: 12, color: Colors.grey),
                     ),
                   ),
                 ],
-                // Reset button (always visible)
                 const SizedBox(width: 8),
                 GestureDetector(
                   onTap: () => setState(() => _selectedDueDate = null),
@@ -1123,7 +1162,6 @@ class _TaskListScreenState extends State<TaskListScreen> with TickerProviderStat
       if (isCompleted == true) {
         await _taskService.markSubtaskCompleted(subtask.id);
       } else {
-        // Create a method in TaskService for marking subtask incomplete
         final updatedSubtask = subtask.copyWith(
           completed: false,
           completedAt: null,
