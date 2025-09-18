@@ -1,11 +1,21 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 import 'package:intl/intl.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'package:maximize/models/event_model.dart';
 import 'package:maximize/services/calendar_service.dart';
 import 'package:uuid/uuid.dart';
-// REMOVED: SharedPreferences import - no longer needed for checkboxes
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
+
+// ADDED: CustomScrollBehavior to fix RefreshIndicator on Windows desktop
+class CustomScrollBehavior extends ScrollBehavior {
+  @override
+  Set<PointerDeviceKind> get dragDevices => {
+    PointerDeviceKind.touch,
+    PointerDeviceKind.mouse,
+    PointerDeviceKind.trackpad,
+  };
+}
 
 class CalendarPage extends StatefulWidget {
   final CalendarService calendarService;
@@ -22,17 +32,13 @@ class _CalendarPageState extends State<CalendarPage> {
   List<Event> _expandedEvents = []; // For displaying recurring instances
   CalendarFormat _calendarFormat = CalendarFormat.month;
   String _currentView = 'calendar';
-  // REMOVED: _eventCheckedStates and SharedPreferences - using database completion now
   Color _selectedColor = Colors.blue;
 
   @override
   void initState() {
     super.initState();
     _loadEvents();
-    // REMOVED: _initPrefs() - no longer needed
   }
-
-  // REMOVED: _initPrefs, _loadCheckedStates, _saveCheckedStates methods - no longer needed
 
   // ENHANCED: Load events with completion status from database
   Future<void> _loadEvents() async {
@@ -51,6 +57,14 @@ class _CalendarPageState extends State<CalendarPage> {
     }
   }
 
+  // ENHANCED: Refresh events method for RefreshIndicator
+  Future<void> _refreshEvents() async {
+    await _loadEvents();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Calendar refreshed!')),
+    );
+  }
+
   // Get events for a specific day (using expanded events)
   List<Event> _getEventsForDay(DateTime day) {
     return _expandedEvents.where((event) {
@@ -59,7 +73,7 @@ class _CalendarPageState extends State<CalendarPage> {
     }).toList();
   }
 
-  // ADDED: Toggle event completion using CalendarService (unified checkbox system)
+  // ENHANCED: Toggle event completion using CalendarService (unified checkbox system)
   Future<void> _toggleEventCompletion(Event event, bool? isCompleted) async {
     try {
       if (isCompleted == true) {
@@ -155,7 +169,7 @@ class _CalendarPageState extends State<CalendarPage> {
     int interval = 1;
     int? recurrenceCount;
     DateTime? recurrenceEndDate;
-
+    
     if (event.recurrencePattern != null) {
       selectedFrequency = event.recurrencePattern!.frequency;
       interval = event.recurrencePattern!.interval;
@@ -675,8 +689,8 @@ class _CalendarPageState extends State<CalendarPage> {
         date: startDate,
         customCategory: categoryController.text,
         color: '#${_selectedColor.value.toRadixString(16).substring(2)}',
-        completed: false, // ADDED: Initialize with completion status
-        completedAt: null, // ADDED: Initialize completion timestamp
+        completed: false, // Initialize with completion status
+        completedAt: null, // Initialize completion timestamp
         isRecurring: isRecurring,
         recurrencePattern: isRecurring ? RecurrencePattern(
           frequency: frequency,
@@ -733,8 +747,8 @@ class _CalendarPageState extends State<CalendarPage> {
           date: startDate,
           customCategory: categoryController.text,
           color: '#${selectedColor.value.toRadixString(16).substring(2)}',
-          completed: false, // ADDED: Initialize with completion status
-          completedAt: null, // ADDED: Initialize completion timestamp
+          completed: false, // Initialize with completion status
+          completedAt: null, // Initialize completion timestamp
           isRecurring: false,
         );
 
@@ -903,14 +917,14 @@ class _CalendarPageState extends State<CalendarPage> {
 
     return ListView.builder(
       shrinkWrap: true,
-      physics: NeverScrollableScrollPhysics(),
+      physics: AlwaysScrollableScrollPhysics(),
       itemCount: selectedDayEvents.length,
       itemBuilder: (context, index) {
         Event event = selectedDayEvents[index];
         bool isRecurringInstance = event.parentEventId != null;
         
         return Card(
-          color: event.completed ? Colors.grey[700] : Colors.grey[800], // ENHANCED: Visual feedback for completion
+          color: event.completed ? Colors.grey[700] : Colors.grey[800],
           margin: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           child: ListTile(
             leading: Container(
@@ -929,7 +943,7 @@ class _CalendarPageState extends State<CalendarPage> {
                     style: TextStyle(
                       color: Colors.white, 
                       fontWeight: FontWeight.bold,
-                      decoration: event.completed ? TextDecoration.lineThrough : null, // ENHANCED: Visual feedback
+                      decoration: event.completed ? TextDecoration.lineThrough : null,
                     ),
                   ),
                 ),
@@ -962,10 +976,9 @@ class _CalendarPageState extends State<CalendarPage> {
             trailing: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // ENHANCED: Database-backed checkbox
                 Checkbox(
-                  value: event.completed, // ENHANCED: Use database completion status
-                  onChanged: (value) => _toggleEventCompletion(event, value), // ENHANCED: Use unified system
+                  value: event.completed,
+                  onChanged: (value) => _toggleEventCompletion(event, value),
                   activeColor: Colors.green,
                 ),
                 IconButton(
@@ -998,13 +1011,14 @@ class _CalendarPageState extends State<CalendarPage> {
     }
 
     return ListView.builder(
+      physics: AlwaysScrollableScrollPhysics(),
       itemCount: _expandedEvents.length,
       itemBuilder: (context, index) {
         Event event = _expandedEvents[index];
         bool isRecurringInstance = event.parentEventId != null;
         
         return Card(
-          color: event.completed ? Colors.grey[700] : Colors.grey[800], // ENHANCED: Visual feedback for completion
+          color: event.completed ? Colors.grey[700] : Colors.grey[800],
           margin: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           child: ListTile(
             leading: Container(
@@ -1023,7 +1037,7 @@ class _CalendarPageState extends State<CalendarPage> {
                     style: TextStyle(
                       color: Colors.white, 
                       fontWeight: FontWeight.bold,
-                      decoration: event.completed ? TextDecoration.lineThrough : null, // ENHANCED: Visual feedback
+                      decoration: event.completed ? TextDecoration.lineThrough : null,
                     ),
                   ),
                 ),
@@ -1056,10 +1070,9 @@ class _CalendarPageState extends State<CalendarPage> {
             trailing: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // ENHANCED: Database-backed checkbox
                 Checkbox(
-                  value: event.completed, // ENHANCED: Use database completion status
-                  onChanged: (value) => _toggleEventCompletion(event, value), // ENHANCED: Use unified system
+                  value: event.completed,
+                  onChanged: (value) => _toggleEventCompletion(event, value),
                   activeColor: Colors.green,
                 ),
                 IconButton(
@@ -1143,6 +1156,7 @@ class _CalendarPageState extends State<CalendarPage> {
           // 24-hour timeline
           Expanded(
             child: ListView.builder(
+              physics: AlwaysScrollableScrollPhysics(),
               itemCount: 24, // 24 hours
               itemBuilder: (context, hourIndex) {
                 final hour = hourIndex;
@@ -1209,7 +1223,7 @@ class _CalendarPageState extends State<CalendarPage> {
                                         margin: EdgeInsets.symmetric(vertical: 1),
                                         padding: EdgeInsets.all(4),
                                         decoration: BoxDecoration(
-                                          color: event.completed // ENHANCED: Different color for completed events
+                                          color: event.completed 
                                               ? Colors.grey[600]!.withOpacity(0.8)
                                               : Color(int.parse(event.color.replaceFirst('#', '0xff'))).withOpacity(0.8),
                                           borderRadius: BorderRadius.circular(4),
@@ -1238,7 +1252,7 @@ class _CalendarPageState extends State<CalendarPage> {
                                                         color: Colors.white,
                                                         fontWeight: FontWeight.bold,
                                                         fontSize: 12,
-                                                        decoration: event.completed ? TextDecoration.lineThrough : null, // ENHANCED: Visual feedback
+                                                        decoration: event.completed ? TextDecoration.lineThrough : null,
                                                       ),
                                                       maxLines: 1,
                                                       overflow: TextOverflow.ellipsis,
@@ -1261,7 +1275,7 @@ class _CalendarPageState extends State<CalendarPage> {
                                                         color: Colors.white70,
                                                         fontSize: 11,
                                                         fontStyle: FontStyle.italic,
-                                                        decoration: event.completed ? TextDecoration.lineThrough : null, // ENHANCED: Visual feedback
+                                                        decoration: event.completed ? TextDecoration.lineThrough : null,
                                                       ),
                                                       maxLines: 1,
                                                       overflow: TextOverflow.ellipsis,
@@ -1274,20 +1288,19 @@ class _CalendarPageState extends State<CalendarPage> {
                                               Row(
                                                 mainAxisSize: MainAxisSize.min,
                                                 children: [
-                                                  // ENHANCED: Database-backed checkbox
                                                   GestureDetector(
-                                                    onTap: () => _toggleEventCompletion(event, !event.completed), // ENHANCED: Use unified system
+                                                    onTap: () => _toggleEventCompletion(event, !event.completed),
                                                     child: Container(
                                                       width: 16,
                                                       height: 16,
                                                       decoration: BoxDecoration(
-                                                        color: event.completed // ENHANCED: Use database completion status
+                                                        color: event.completed 
                                                             ? Colors.green 
                                                             : Colors.transparent,
                                                         border: Border.all(color: Colors.white, width: 1),
                                                         borderRadius: BorderRadius.circular(2),
                                                       ),
-                                                      child: event.completed // ENHANCED: Use database completion status
+                                                      child: event.completed 
                                                           ? Icon(Icons.check, color: Colors.white, size: 12)
                                                           : null,
                                                     ),
@@ -1374,13 +1387,14 @@ class _CalendarPageState extends State<CalendarPage> {
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: ListView.builder(
+                    physics: AlwaysScrollableScrollPhysics(),
                     itemCount: dayEvents.length,
                     itemBuilder: (context, idx) {
                       final event = dayEvents[idx];
                       bool isRecurringInstance = event.parentEventId != null;
                       
                       return Card(
-                        color: event.completed // ENHANCED: Different color for completed events
+                        color: event.completed 
                             ? Colors.grey[600]
                             : Color(int.parse(event.color.replaceFirst('#', '0xff'))),
                         margin: EdgeInsets.symmetric(vertical: 2, horizontal: 0),
@@ -1396,7 +1410,7 @@ class _CalendarPageState extends State<CalendarPage> {
                                   style: TextStyle(
                                     color: Colors.white, 
                                     fontSize: 12,
-                                    decoration: event.completed ? TextDecoration.lineThrough : null, // ENHANCED: Visual feedback
+                                    decoration: event.completed ? TextDecoration.lineThrough : null,
                                   ),
                                 ),
                               ),
@@ -1424,6 +1438,73 @@ class _CalendarPageState extends State<CalendarPage> {
         ),
       ],
     );
+  }
+
+  Widget _buildBodyContent() {
+    if (_currentView == 'calendar') {
+      return Column(
+        children: [
+          TableCalendar<Event>(
+            firstDay: DateTime.utc(2020, 1, 1),
+            lastDay: DateTime.utc(2030, 12, 31),
+            focusedDay: _focusedDay,
+            selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
+            onDaySelected: (selectedDay, focusedDay) {
+              setState(() {
+                _selectedDay = selectedDay;
+                _focusedDay = focusedDay;
+              });
+            },
+            calendarFormat: _calendarFormat,
+            onFormatChanged: (format) {
+              setState(() {
+                _calendarFormat = format;
+              });
+            },
+            eventLoader: _getEventsForDay,
+            headerStyle: HeaderStyle(
+              formatButtonVisible: false,
+              titleCentered: true,
+              leftChevronIcon: Icon(Icons.chevron_left, color: Colors.white),
+              rightChevronIcon: Icon(Icons.chevron_right, color: Colors.white),
+            ),
+            calendarStyle: CalendarStyle(
+              selectedDecoration: BoxDecoration(
+                color: Colors.blue,
+                shape: BoxShape.circle,
+              ),
+              todayDecoration: BoxDecoration(
+                color: Colors.orange,
+                shape: BoxShape.circle,
+              ),
+              markerDecoration: BoxDecoration(
+                color: Colors.red,
+                shape: BoxShape.circle,
+              ),
+            ),
+          ),
+          Container(
+            height: 400, // Fixed height to allow scrolling
+            child: _buildEventList(),
+          ),
+        ],
+      );
+    } else if (_currentView == 'week') {
+      return Container(
+        height: 600, // Fixed height for scroll
+        child: _buildWeekView(),
+      );
+    } else if (_currentView == 'day') {
+      return Container(
+        height: 600, // Fixed height for scroll
+        child: _buildDayView(),
+      );
+    } else {
+      return Container(
+        height: 600, // Fixed height for scroll
+        child: _buildAllEventsList(),
+      );
+    }
   }
 
   @override
@@ -1468,56 +1549,21 @@ class _CalendarPageState extends State<CalendarPage> {
           ),
         ],
       ),
-      body: _currentView == 'calendar'
-          ? Column(
-              children: [
-                TableCalendar<Event>(
-                  firstDay: DateTime.utc(2020, 1, 1),
-                  lastDay: DateTime.utc(2030, 12, 31),
-                  focusedDay: _focusedDay,
-                  selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
-                  onDaySelected: (selectedDay, focusedDay) {
-                    setState(() {
-                      _selectedDay = selectedDay;
-                      _focusedDay = focusedDay;
-                    });
-                  },
-                  calendarFormat: _calendarFormat,
-                  onFormatChanged: (format) {
-                    setState(() {
-                      _calendarFormat = format;
-                    });
-                  },
-                  eventLoader: _getEventsForDay,
-                  headerStyle: HeaderStyle(
-                    formatButtonVisible: false,
-                    titleCentered: true,
-                    leftChevronIcon: Icon(Icons.chevron_left, color: Colors.white),
-                    rightChevronIcon: Icon(Icons.chevron_right, color: Colors.white),
-                  ),
-                  calendarStyle: CalendarStyle(
-                    selectedDecoration: BoxDecoration(
-                      color: Colors.blue,
-                      shape: BoxShape.circle,
-                    ),
-                    todayDecoration: BoxDecoration(
-                      color: Colors.orange,
-                      shape: BoxShape.circle,
-                    ),
-                    markerDecoration: BoxDecoration(
-                      color: Colors.red,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                ),
-                Expanded(child: _buildEventList()),
-              ],
-            )
-          : _currentView == 'week'
-              ? _buildWeekView()
-              : _currentView == 'day'
-                  ? _buildDayView()
-                  : _buildAllEventsList(),
+      // ENHANCED: Wrapped RefreshIndicator with ScrollConfiguration and CustomScrollBehavior
+      body: ScrollConfiguration(
+        behavior: CustomScrollBehavior(),
+        child: RefreshIndicator(
+          onRefresh: _refreshEvents,
+          color: Colors.blue,
+          backgroundColor: Colors.white,
+          strokeWidth: 2.0,
+          displacement: 40.0,
+          child: SingleChildScrollView(
+            physics: AlwaysScrollableScrollPhysics(),
+            child: _buildBodyContent(),
+          ),
+        ),
+      ),
       floatingActionButton: FloatingActionButton(
         onPressed: _showAddEventDialog,
         child: Icon(Icons.add),

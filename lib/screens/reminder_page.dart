@@ -1,8 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:maximize/models/reminder_model.dart';
 import 'package:maximize/models/database.dart'; // Access Drift DB
 import 'package:maximize/services/reminder_service.dart';
+
+// ADDED: CustomScrollBehavior to fix RefreshIndicator on Windows desktop
+class CustomScrollBehavior extends ScrollBehavior {
+  @override
+  Set<PointerDeviceKind> get dragDevices => {
+    PointerDeviceKind.touch,
+    PointerDeviceKind.mouse,
+    PointerDeviceKind.trackpad,
+  };
+}
 
 class ReminderPage extends StatefulWidget {
   final AppDatabase database; // Inject the database
@@ -62,6 +73,14 @@ class _ReminderPageState extends State<ReminderPage> {
         SnackBar(content: Text('Error loading reminders: $e')),
       );
     }
+  }
+
+  // ENHANCED: Refresh reminders method for RefreshIndicator
+  Future<void> _refreshReminders() async {
+    await _loadRemindersFromDatabase();
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Reminders refreshed!')),
+    );
   }
 
   // ADDED: Toggle reminder completion using ReminderService (unified checkbox system)
@@ -929,7 +948,7 @@ class _ReminderPageState extends State<ReminderPage> {
     );
   }
 
-  // ENHANCED: Delete methods using ReminderService
+  // ENHANCED: Delete methods using ReminderService  
   Future<void> _deleteSingleOccurrence(ReminderModel reminder) async {
     // Add this occurrence to the parent's exception list
     ReminderModel? parentReminder = _reminders.firstWhere(
@@ -1079,101 +1098,113 @@ class _ReminderPageState extends State<ReminderPage> {
             ),
             const SizedBox(height: 16),
             Expanded(
-              child: ListView.builder(
-                itemCount: _expandedReminders.length,
-                itemBuilder: (context, index) {
-                  final reminder = _expandedReminders[index];
-                  bool isRecurringInstance = reminder.parentReminderId != null;
-                  
-                  return Card(
-                    // ENHANCED: Visual feedback for completion
-                    color: reminder.completed ? Colors.grey[700] : Colors.grey[800],
-                    child: ListTile(
-                      leading: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            isRecurringInstance ? Icons.repeat : Icons.alarm, 
-                            color: isRecurringInstance ? Colors.blue : Colors.orange,
+              // ENHANCED: Wrap RefreshIndicator with ScrollConfiguration and CustomScrollBehavior
+              child: ScrollConfiguration(
+                behavior: CustomScrollBehavior(),
+                child: RefreshIndicator(
+                  onRefresh: _refreshReminders,
+                  color: Colors.blue,
+                  backgroundColor: Colors.white,
+                  strokeWidth: 2.0,
+                  displacement: 40.0,
+                  child: ListView.builder(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    itemCount: _expandedReminders.length,
+                    itemBuilder: (context, index) {
+                      final reminder = _expandedReminders[index];
+                      bool isRecurringInstance = reminder.parentReminderId != null;
+                      
+                      return Card(
+                        // ENHANCED: Visual feedback for completion
+                        color: reminder.completed ? Colors.grey[700] : Colors.grey[800],
+                        child: ListTile(
+                          leading: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                isRecurringInstance ? Icons.repeat : Icons.alarm, 
+                                color: isRecurringInstance ? Colors.blue : Colors.orange,
+                              ),
+                              if (isRecurringInstance) const SizedBox(width: 4),
+                            ],
                           ),
-                          if (isRecurringInstance) const SizedBox(width: 4),
-                        ],
-                      ),
-                      title: Text(
-                        reminder.title,
-                        style: TextStyle(
-                          color: Colors.white,
-                          decoration: reminder.completed ? TextDecoration.lineThrough : null, // ENHANCED: Visual feedback
+                          title: Text(
+                            reminder.title,
+                            style: TextStyle(
+                              color: Colors.white,
+                              decoration: reminder.completed ? TextDecoration.lineThrough : null, // ENHANCED: Visual feedback
+                            ),
+                          ),
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Scheduled: ${reminder.scheduledTime.toLocal().toString().substring(0, 16)}',
+                                style: const TextStyle(color: Colors.grey),
+                              ),
+                              if (reminder.body.isNotEmpty)
+                                Text(
+                                  reminder.body,
+                                  style: const TextStyle(color: Colors.grey),
+                                ),
+                              if (reminder.isRecurring && !isRecurringInstance)
+                                Text(
+                                  reminder.recurrenceDescription,
+                                  style: TextStyle(
+                                    color: Colors.blue[600],
+                                    fontSize: 12,
+                                    fontStyle: FontStyle.italic,
+                                  ),
+                                ),
+                              if (isRecurringInstance)
+                                Text(
+                                  'Part of recurring series',
+                                  style: TextStyle(
+                                    color: Colors.blue[600],
+                                    fontSize: 12,
+                                    fontStyle: FontStyle.italic,
+                                  ),
+                                ),
+                              // ADDED: Show completion status
+                              if (reminder.completed && reminder.completedAt != null)
+                                Text(
+                                  'Completed: ${reminder.completedAt!.toLocal().toString().substring(0, 16)}',
+                                  style: TextStyle(
+                                    color: Colors.green[600],
+                                    fontSize: 12,
+                                    fontStyle: FontStyle.italic,
+                                  ),
+                                ),
+                            ],
+                          ),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              // ADDED: Database-backed checkbox for completion/dismissal
+                              Checkbox(
+                                value: reminder.completed, // ENHANCED: Use database completion status
+                                onChanged: (value) => _toggleReminderCompletion(reminder, value), // ENHANCED: Use unified system
+                                activeColor: Colors.green,
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.edit),
+                                onPressed: _isNotificationServiceReady 
+                                    ? () => _editReminder(reminder)
+                                    : null,
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.delete, color: Colors.red),
+                                onPressed: _isNotificationServiceReady 
+                                    ? () => _deleteReminder(reminder)
+                                    : null,
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                      subtitle: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Scheduled: ${reminder.scheduledTime.toLocal().toString().substring(0, 16)}',
-                            style: const TextStyle(color: Colors.grey),
-                          ),
-                          if (reminder.body.isNotEmpty)
-                            Text(
-                              reminder.body,
-                              style: const TextStyle(color: Colors.grey),
-                            ),
-                          if (reminder.isRecurring && !isRecurringInstance)
-                            Text(
-                              reminder.recurrenceDescription,
-                              style: TextStyle(
-                                color: Colors.blue[600],
-                                fontSize: 12,
-                                fontStyle: FontStyle.italic,
-                              ),
-                            ),
-                          if (isRecurringInstance)
-                            Text(
-                              'Part of recurring series',
-                              style: TextStyle(
-                                color: Colors.blue[600],
-                                fontSize: 12,
-                                fontStyle: FontStyle.italic,
-                              ),
-                            ),
-                          // ADDED: Show completion status
-                          if (reminder.completed && reminder.completedAt != null)
-                            Text(
-                              'Completed: ${reminder.completedAt!.toLocal().toString().substring(0, 16)}',
-                              style: TextStyle(
-                                color: Colors.green[600],
-                                fontSize: 12,
-                                fontStyle: FontStyle.italic,
-                              ),
-                            ),
-                        ],
-                      ),
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          // ADDED: Database-backed checkbox for completion/dismissal
-                          Checkbox(
-                            value: reminder.completed, // ENHANCED: Use database completion status
-                            onChanged: (value) => _toggleReminderCompletion(reminder, value), // ENHANCED: Use unified system
-                            activeColor: Colors.green,
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.edit),
-                            onPressed: _isNotificationServiceReady 
-                                ? () => _editReminder(reminder)
-                                : null,
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.delete, color: Colors.red),
-                            onPressed: _isNotificationServiceReady 
-                                ? () => _deleteReminder(reminder)
-                                : null,
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                },
+                      );
+                    },
+                  ),
+                ),
               ),
             ),
           ],

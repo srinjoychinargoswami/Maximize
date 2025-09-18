@@ -10,6 +10,8 @@ import 'package:uuid/uuid.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:maximize/utils/encryption_helper.dart';
+import 'package:crypto/crypto.dart'; // Add this for crypto functionality
+
 
 // Import models
 import 'package:maximize/models/task_model.dart';
@@ -147,202 +149,205 @@ class AppDatabase extends _$AppDatabase {
   final FlutterSecureStorage _secureStorage = const FlutterSecureStorage();
 
   @override
-  int get schemaVersion => 7; // UPDATED: Increment version for completion columns
+  int get schemaVersion => 8; // FIXED: Updated to match migration logic
 
-  // ENHANCED: Define migrations with completion columns
- @override
-MigrationStrategy get migration => MigrationStrategy(
-  onUpgrade: (Migrator m, int from, int to) async {
-    if (from < 8 && to >= 8) {
-      // Add new columns 'customCategory' and 'color' to 'events' table when upgrading to version 3 or above
-       await m.dropColumn(tasks, 'name');
-
-    }
-    if (from < 4 && to >= 4) {
-      // Create the reminders table when upgrading to version 4
-      await m.createTable(reminders);
-    }
-    if (from < 5 && to >= 5) {
-      // Add recurring fields to events table - with error handling
-      try {
-        await m.addColumn(events, events.isRecurring);
-      } catch (e) {
-        if (!e.toString().contains('duplicate column')) rethrow;
+  // FIXED: Complete migrations with proper versioning
+  @override
+  MigrationStrategy get migration => MigrationStrategy(
+    onUpgrade: (Migrator m, int from, int to) async {
+      if (from < 4 && to >= 4) {
+        // Create the reminders table when upgrading to version 4
+        await m.createTable(reminders);
       }
-      
-      try {
-        await m.addColumn(events, events.recurrenceRule);
-      } catch (e) {
-        if (!e.toString().contains('duplicate column')) rethrow;
+      if (from < 5 && to >= 5) {
+        // Add recurring fields to events table - with error handling
+        try {
+          await m.addColumn(events, events.isRecurring);
+        } catch (e) {
+          if (!e.toString().contains('duplicate column')) rethrow;
+        }
+        
+        try {
+          await m.addColumn(events, events.recurrenceRule);
+        } catch (e) {
+          if (!e.toString().contains('duplicate column')) rethrow;
+        }
+        
+        try {
+          await m.addColumn(events, events.parentEventId);
+        } catch (e) {
+          if (!e.toString().contains('duplicate column')) rethrow;
+        }
+        
+        try {
+          await m.addColumn(events, events.recurrenceExceptionDates);
+        } catch (e) {
+          if (!e.toString().contains('duplicate column')) rethrow;
+        }
+        
+        try {
+          await m.addColumn(events, events.recurrenceEndDate);
+        } catch (e) {
+          if (!e.toString().contains('duplicate column')) rethrow;
+        }
+        
+        try {
+          await m.addColumn(events, events.recurrenceCount);
+        } catch (e) {
+          if (!e.toString().contains('duplicate column')) rethrow;
+        }
+        
+        // Add recurring fields to reminders table - with error handling
+        try {
+          await m.addColumn(reminders, reminders.isRecurring);
+        } catch (e) {
+          if (!e.toString().contains('duplicate column')) rethrow;
+        }
+        
+        try {
+          await m.addColumn(reminders, reminders.recurrenceRule);
+        } catch (e) {
+          if (!e.toString().contains('duplicate column')) rethrow;
+        }
+        
+        try {
+          await m.addColumn(reminders, reminders.parentReminderId);
+        } catch (e) {
+          if (!e.toString().contains('duplicate column')) rethrow;
+        }
+        
+        try {
+          await m.addColumn(reminders, reminders.recurrenceExceptionDates);
+        } catch (e) {
+          if (!e.toString().contains('duplicate column')) rethrow;
+        }
+        
+        try {
+          await m.addColumn(reminders, reminders.recurrenceEndDate);
+        } catch (e) {
+          if (!e.toString().contains('duplicate column')) rethrow;
+        }
+        
+        try {
+          await m.addColumn(reminders, reminders.recurrenceCount);
+        } catch (e) {
+          if (!e.toString().contains('duplicate column')) rethrow;
+        }
       }
-      
-      try {
-        await m.addColumn(events, events.parentEventId);
-      } catch (e) {
-        if (!e.toString().contains('duplicate column')) rethrow;
+      if (from < 6 && to >= 6) {
+        // Add recurring fields to tasks table - with error handling
+        try {
+          await m.addColumn(tasks, tasks.isRecurring);
+        } catch (e) {
+          if (!e.toString().contains('duplicate column')) rethrow;
+        }
+        
+        try {
+          await m.addColumn(tasks, tasks.recurrenceRule);
+        } catch (e) {
+          if (!e.toString().contains('duplicate column')) rethrow;
+        }
+        
+        try {
+          await m.addColumn(tasks, tasks.recurrenceInterval);
+        } catch (e) {
+          if (!e.toString().contains('duplicate column')) rethrow;
+        }
+        
+        try {
+          await m.addColumn(tasks, tasks.daysOfWeek);
+        } catch (e) {
+          if (!e.toString().contains('duplicate column')) rethrow;
+        }
+        
+        try {
+          await m.addColumn(tasks, tasks.recurrenceEndDate);
+        } catch (e) {
+          if (!e.toString().contains('duplicate column')) rethrow;
+        }
+        
+        try {
+          await m.addColumn(tasks, tasks.parentTaskId);
+        } catch (e) {
+          if (!e.toString().contains('duplicate column')) rethrow;
+        }
+        
+        try {
+          await m.addColumn(tasks, tasks.maxOccurrences);
+        } catch (e) {
+          if (!e.toString().contains('duplicate column')) rethrow;
+        }
+        
+        try {
+          await m.addColumn(tasks, tasks.skipWeekends);
+        } catch (e) {
+          if (!e.toString().contains('duplicate column')) rethrow;
+        }
+        
+        try {
+          await m.addColumn(tasks, tasks.dayOfMonth);
+        } catch (e) {
+          if (!e.toString().contains('duplicate column')) rethrow;
+        }
+        
+        try {
+          await m.addColumn(tasks, tasks.weekOfMonth);
+        } catch (e) {
+          if (!e.toString().contains('duplicate column')) rethrow;
+        }
       }
-      
-      try {
-        await m.addColumn(events, events.recurrenceExceptionDates);
-      } catch (e) {
-        if (!e.toString().contains('duplicate column')) rethrow;
+      // ADDED: Migration for completion tracking columns
+      if (from < 7 && to >= 7) {
+        // Add completion tracking columns to tasks table
+        try {
+          await m.addColumn(tasks, tasks.completedAt);
+        } catch (e) {
+          if (!e.toString().contains('duplicate column')) rethrow;
+        }
+        
+        // Add completion tracking columns to events table
+        try {
+          await m.addColumn(events, events.completed);
+        } catch (e) {
+          if (!e.toString().contains('duplicate column')) rethrow;
+        }
+        
+        try {
+          await m.addColumn(events, events.completedAt);
+        } catch (e) {
+          if (!e.toString().contains('duplicate column')) rethrow;
+        }
+        
+        // Add completion tracking columns to reminders table
+        try {
+          await m.addColumn(reminders, reminders.completed);
+        } catch (e) {
+          if (!e.toString().contains('duplicate column')) rethrow;
+        }
+        
+        try {
+          await m.addColumn(reminders, reminders.completedAt);
+        } catch (e) {
+          if (!e.toString().contains('duplicate column')) rethrow;
+        }
+        
+        // Add completion tracking columns to subtasks table
+        try {
+          await m.addColumn(subtasks, subtasks.completedAt);
+        } catch (e) {
+          if (!e.toString().contains('duplicate column')) rethrow;
+        }
       }
-      
-      try {
-        await m.addColumn(events, events.recurrenceEndDate);
-      } catch (e) {
-        if (!e.toString().contains('duplicate column')) rethrow;
+      // FIXED: Drop the redundant 'name' column from tasks table
+      if (from < 8 && to >= 8) {
+        try {
+          await m.dropColumn(tasks, 'name');
+        } catch (e) {
+          if (!e.toString().contains('no such column')) rethrow;
+        }
       }
-      
-      try {
-        await m.addColumn(events, events.recurrenceCount);
-      } catch (e) {
-        if (!e.toString().contains('duplicate column')) rethrow;
-      }
-      
-      // Add recurring fields to reminders table - with error handling
-      try {
-        await m.addColumn(reminders, reminders.isRecurring);
-      } catch (e) {
-        if (!e.toString().contains('duplicate column')) rethrow;
-      }
-      
-      try {
-        await m.addColumn(reminders, reminders.recurrenceRule);
-      } catch (e) {
-        if (!e.toString().contains('duplicate column')) rethrow;
-      }
-      
-      try {
-        await m.addColumn(reminders, reminders.parentReminderId);
-      } catch (e) {
-        if (!e.toString().contains('duplicate column')) rethrow;
-      }
-      
-      try {
-        await m.addColumn(reminders, reminders.recurrenceExceptionDates);
-      } catch (e) {
-        if (!e.toString().contains('duplicate column')) rethrow;
-      }
-      
-      try {
-        await m.addColumn(reminders, reminders.recurrenceEndDate);
-      } catch (e) {
-        if (!e.toString().contains('duplicate column')) rethrow;
-      }
-      
-      try {
-        await m.addColumn(reminders, reminders.recurrenceCount);
-      } catch (e) {
-        if (!e.toString().contains('duplicate column')) rethrow;
-      }
-    }
-    if (from < 6 && to >= 6) {
-      // Add recurring fields to tasks table - with error handling
-      try {
-        await m.addColumn(tasks, tasks.isRecurring);
-      } catch (e) {
-        if (!e.toString().contains('duplicate column')) rethrow;
-      }
-      
-      try {
-        await m.addColumn(tasks, tasks.recurrenceRule);
-      } catch (e) {
-        if (!e.toString().contains('duplicate column')) rethrow;
-      }
-      
-      try {
-        await m.addColumn(tasks, tasks.recurrenceInterval);
-      } catch (e) {
-        if (!e.toString().contains('duplicate column')) rethrow;
-      }
-      
-      try {
-        await m.addColumn(tasks, tasks.daysOfWeek);
-      } catch (e) {
-        if (!e.toString().contains('duplicate column')) rethrow;
-      }
-      
-      try {
-        await m.addColumn(tasks, tasks.recurrenceEndDate);
-      } catch (e) {
-        if (!e.toString().contains('duplicate column')) rethrow;
-      }
-      
-      try {
-        await m.addColumn(tasks, tasks.parentTaskId);
-      } catch (e) {
-        if (!e.toString().contains('duplicate column')) rethrow;
-      }
-      
-      try {
-        await m.addColumn(tasks, tasks.maxOccurrences);
-      } catch (e) {
-        if (!e.toString().contains('duplicate column')) rethrow;
-      }
-      
-      try {
-        await m.addColumn(tasks, tasks.skipWeekends);
-      } catch (e) {
-        if (!e.toString().contains('duplicate column')) rethrow;
-      }
-      
-      try {
-        await m.addColumn(tasks, tasks.dayOfMonth);
-      } catch (e) {
-        if (!e.toString().contains('duplicate column')) rethrow;
-      }
-      
-      try {
-        await m.addColumn(tasks, tasks.weekOfMonth);
-      } catch (e) {
-        if (!e.toString().contains('duplicate column')) rethrow;
-      }
-    }
-    // ADDED: Migration for completion tracking columns
-    if (from < 7 && to >= 7) {
-      // Add completion tracking columns to tasks table
-      try {
-        await m.addColumn(tasks, tasks.completedAt);
-      } catch (e) {
-        if (!e.toString().contains('duplicate column')) rethrow;
-      }
-      
-      // Add completion tracking columns to events table
-      try {
-        await m.addColumn(events, events.completed);
-      } catch (e) {
-        if (!e.toString().contains('duplicate column')) rethrow;
-      }
-      
-      try {
-        await m.addColumn(events, events.completedAt);
-      } catch (e) {
-        if (!e.toString().contains('duplicate column')) rethrow;
-      }
-      
-      // Add completion tracking columns to reminders table
-      try {
-        await m.addColumn(reminders, reminders.completed);
-      } catch (e) {
-        if (!e.toString().contains('duplicate column')) rethrow;
-      }
-      
-      try {
-        await m.addColumn(reminders, reminders.completedAt);
-      } catch (e) {
-        if (!e.toString().contains('duplicate column')) rethrow;
-      }
-      
-      // Add completion tracking columns to subtasks table
-      try {
-        await m.addColumn(subtasks, subtasks.completedAt);
-      } catch (e) {
-        if (!e.toString().contains('duplicate column')) rethrow;
-      }
-    }
-  },
-);
+    },
+  );
 
   // Open the database connection
   static LazyDatabase _openConnection() {
@@ -353,7 +358,7 @@ MigrationStrategy get migration => MigrationStrategy(
     });
   }
 
-  // ADDED: Export all data as JSON for sync
+  // FIXED: Complete export method for sync
   Future<Map<String, dynamic>> getAllDataAsJson() async {
     try {
       final tasks = await getAllTasks();
@@ -424,7 +429,7 @@ MigrationStrategy get migration => MigrationStrategy(
     }
   }
 
-  // ADDED: Import all data from JSON for sync
+  // FIXED: Complete import method for sync
   Future<void> insertAllFromJson(Map<String, dynamic> data) async {
     try {
       await batch((batch) {
@@ -554,7 +559,7 @@ MigrationStrategy get migration => MigrationStrategy(
     }
   }
 
-  // ADDED: Download + decrypt data from GitHub
+  // ADDED: Download + decrypt data from GitHub with robust Base64 handling
   Future<void> syncFromGitHub() async {
     try {
       final token = await _secureStorage.read(key: tokenKey);
@@ -566,7 +571,21 @@ MigrationStrategy get migration => MigrationStrategy(
       if (response.statusCode != 200) throw Exception("Failed to download sync file from GitHub");
 
       final jsonResponse = jsonDecode(response.body);
-      final base64Content = jsonResponse['content'].replaceAll('\n', ''); // Remove newlines
+      
+      // FIXED: Ultra-robust Base64 cleaning to resolve extension byte errors
+      String base64Content = jsonResponse['content'];
+      
+      // Remove all possible whitespace and control characters
+      base64Content = base64Content
+          .replaceAll(RegExp(r'\s'), '')           // Remove all whitespace
+          .replaceAll(RegExp(r'[^\w+/=]'), '')     // Keep only valid Base64 characters
+          .trim();                                  // Final trim
+      
+      // Validate Base64 length (must be multiple of 4)
+      while (base64Content.length % 4 != 0) {
+        base64Content += '=';
+      }
+      
       final encrypted = utf8.decode(base64Decode(base64Content));
       final decrypted = EncryptionHelper.decrypt(encrypted);
       final data = jsonDecode(decrypted);
@@ -587,16 +606,6 @@ MigrationStrategy get migration => MigrationStrategy(
       throw DatabaseException('Error saving GitHub token: $e');
     }
   }
-
-  // ADDED: Delete GitHub token securely
-Future<void> deleteGitHubToken() async {
-  try {
-    await _secureStorage.delete(key: tokenKey);
-  } catch (e) {
-    print('Error deleting GitHub token: $e');
-    throw DatabaseException('Error deleting GitHub token: $e');
-  }
-}
 
   // Task Methods - ENHANCED with completion tracking
   Future<List<TaskData>> getAllTasks() async {
@@ -651,7 +660,7 @@ Future<void> deleteGitHubToken() async {
         description: Value(task.description),
         dueDate: Value(task.dueDate),
         completed: Value(task.completed),
-        completedAt: task.completedAt != null ? Value(task.completedAt) : const Value.absent(), // ADDED: Completion timestamp
+        completedAt: task.completedAt != null ? Value(task.completedAt) : const Value.absent(),
         category: Value(task.category),
         priority: Value(task.priority),
         customCategory: Value(task.customCategory),
@@ -669,7 +678,7 @@ Future<void> deleteGitHubToken() async {
         dayOfMonth: task.dayOfMonth != null ? Value(task.dayOfMonth) : const Value.absent(),
         weekOfMonth: task.weekOfMonth != null ? Value(task.weekOfMonth) : const Value.absent(),
       );
-      return await into(tasks).insert(taskCompanion); // Return the inserted task ID
+      return await into(tasks).insert(taskCompanion);
     } catch (e) {
       print('Error inserting task: $e');
       throw DatabaseException('Error inserting task: $e');
@@ -705,7 +714,7 @@ Future<void> deleteGitHubToken() async {
         description: Value(task.description),
         dueDate: Value(task.dueDate),
         completed: Value(task.completed),
-        completedAt: task.completedAt != null ? Value(task.completedAt) : const Value.absent(), // ADDED: Completion timestamp
+        completedAt: task.completedAt != null ? Value(task.completedAt) : const Value.absent(),
         category: Value(task.category),
         priority: Value(task.priority),
         customCategory: Value(task.customCategory),
@@ -772,7 +781,7 @@ Future<void> deleteGitHubToken() async {
           taskId: subtaskData.taskId,
           title: subtaskData.title,
           completed: subtaskData.completed,
-          completedAt: subtaskData.completedAt, // ADDED: Map completion timestamp
+          completedAt: subtaskData.completedAt,
         );
       }).toList();
     } catch (e) {
@@ -789,9 +798,9 @@ Future<void> deleteGitHubToken() async {
         taskId: Value(subtask.taskId),
         title: Value(subtask.title),
         completed: Value(subtask.completed),
-        completedAt: subtask.completedAt != null ? Value(subtask.completedAt) : const Value.absent(), // ADDED: Completion timestamp
+        completedAt: subtask.completedAt != null ? Value(subtask.completedAt) : const Value.absent(),
       );
-      return await into(subtasks).insert(subtaskCompanion); // Return the inserted subtask ID
+      return await into(subtasks).insert(subtaskCompanion);
     } catch (e) {
       print('Error inserting subtask: $e');
       throw DatabaseException('Error inserting subtask: $e');
@@ -815,7 +824,7 @@ Future<void> deleteGitHubToken() async {
         taskId: Value(subtask.taskId),
         title: Value(subtask.title),
         completed: Value(subtask.completed),
-        completedAt: subtask.completedAt != null ? Value(subtask.completedAt) : const Value.absent(), // ADDED: Completion timestamp
+        completedAt: subtask.completedAt != null ? Value(subtask.completedAt) : const Value.absent(),
       );
       await (update(subtasks)..where((tbl) => tbl.id.equals(subtask.id))).write(subtaskCompanion);
     } catch (e) {
@@ -832,12 +841,12 @@ Future<void> deleteGitHubToken() async {
         title: Value(event.title),
         description: event.description != null ? Value(event.description) : const Value.absent(),
         comments: event.comments != null ? Value(event.comments) : const Value.absent(),
-        startDateTime: Value(event.startDateTime), // Store as DateTime
-        endDateTime: Value(event.endDateTime), // Store as DateTime
-        customCategory: Value(event.customCategory), // Store custom category
-        color: Value(event.color), // Store event color
-        completed: Value(event.completed), // ADDED: Completion status
-        completedAt: event.completedAt != null ? Value(event.completedAt) : const Value.absent(), // ADDED: Completion timestamp
+        startDateTime: Value(event.startDateTime),
+        endDateTime: Value(event.endDateTime),
+        customCategory: Value(event.customCategory),
+        color: Value(event.color),
+        completed: Value(event.completed),
+        completedAt: event.completedAt != null ? Value(event.completedAt) : const Value.absent(),
         isRecurring: Value(event.isRecurring),
         recurrenceRule: event.recurrenceRule != null ? Value(event.recurrenceRule) : const Value.absent(),
         parentEventId: event.parentEventId != null ? Value(event.parentEventId) : const Value.absent(),
@@ -847,7 +856,7 @@ Future<void> deleteGitHubToken() async {
         recurrenceEndDate: event.recurrenceEndDate != null ? Value(event.recurrenceEndDate) : const Value.absent(),
         recurrenceCount: event.recurrenceCount != null ? Value(event.recurrenceCount) : const Value.absent(),
       );
-      return await into(events).insert(eventCompanion); // Return the inserted event ID
+      return await into(events).insert(eventCompanion);
     } catch (e) {
       print('Error inserting event: $e');
       throw DatabaseException('Error inserting event: $e');
@@ -907,12 +916,12 @@ Future<void> deleteGitHubToken() async {
         title: Value(event.title),
         description: event.description != null ? Value(event.description) : const Value.absent(),
         comments: event.comments != null ? Value(event.comments) : const Value.absent(),
-        startDateTime: Value(event.startDateTime), // Store as DateTime
-        endDateTime: Value(event.endDateTime), // Store as DateTime
-        customCategory: Value(event.customCategory), // Update custom category
-        color: Value(event.color), // Update event color
-        completed: Value(event.completed), // ADDED: Update completion status
-        completedAt: event.completedAt != null ? Value(event.completedAt) : const Value.absent(), // ADDED: Update completion timestamp
+        startDateTime: Value(event.startDateTime),
+        endDateTime: Value(event.endDateTime),
+        customCategory: Value(event.customCategory),
+        color: Value(event.color),
+        completed: Value(event.completed),
+        completedAt: event.completedAt != null ? Value(event.completedAt) : const Value.absent(),
         isRecurring: Value(event.isRecurring),
         recurrenceRule: event.recurrenceRule != null ? Value(event.recurrenceRule) : const Value.absent(),
         parentEventId: event.parentEventId != null ? Value(event.parentEventId) : const Value.absent(),
@@ -970,9 +979,9 @@ Future<void> deleteGitHubToken() async {
         title: Value(reminder.title),
         body: Value(reminder.body),
         scheduledTime: Value(reminder.scheduledTime),
-        notificationId: Value(reminder.notificationId), // Now String type
-        completed: Value(reminder.completed), // ADDED: Completion status
-        completedAt: reminder.completedAt != null ? Value(reminder.completedAt) : const Value.absent(), // ADDED: Completion timestamp
+        notificationId: Value(reminder.notificationId),
+        completed: Value(reminder.completed),
+        completedAt: reminder.completedAt != null ? Value(reminder.completedAt) : const Value.absent(),
         isRecurring: Value(reminder.isRecurring),
         recurrenceRule: reminder.recurrenceRule != null ? Value(reminder.recurrenceRule) : const Value.absent(),
         parentReminderId: reminder.parentReminderId != null ? Value(reminder.parentReminderId) : const Value.absent(),
@@ -1006,9 +1015,9 @@ Future<void> deleteGitHubToken() async {
         title: Value(reminder.title),
         body: Value(reminder.body),
         scheduledTime: Value(reminder.scheduledTime),
-        notificationId: Value(reminder.notificationId), // Now String type
-        completed: Value(reminder.completed), // ADDED: Update completion status
-        completedAt: reminder.completedAt != null ? Value(reminder.completedAt) : const Value.absent(), // ADDED: Update completion timestamp
+        notificationId: Value(reminder.notificationId),
+        completed: Value(reminder.completed),
+        completedAt: reminder.completedAt != null ? Value(reminder.completedAt) : const Value.absent(),
         isRecurring: Value(reminder.isRecurring),
         recurrenceRule: reminder.recurrenceRule != null ? Value(reminder.recurrenceRule) : const Value.absent(),
         parentReminderId: reminder.parentReminderId != null ? Value(reminder.parentReminderId) : const Value.absent(),
