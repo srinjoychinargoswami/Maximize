@@ -14,7 +14,6 @@ import 'package:maximize/models/task_model.dart';
 import 'package:maximize/models/event_model.dart';
 import 'package:maximize/models/reminder_model.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest.dart' as tz_data;  // ADD THIS LINE
 
 
@@ -129,7 +128,7 @@ class _MyHomePageState extends State<MyHomePage> {
 
       
 
-      /* ────────────── DRAWER ────────────── */
+      /*  DRAWER  */
       drawer: Drawer(
         child: ListView(
           children: [

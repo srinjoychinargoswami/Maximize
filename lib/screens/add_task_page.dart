@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:maximize/models/database.dart'; // Import your Drift database file
+import 'package:maximize/models/database.dart';
 import 'package:maximize/utils/task_utils.dart';
 import 'package:uuid/uuid.dart';
 import 'package:maximize/models/task_model.dart';
 
 class AddTaskPage extends StatefulWidget {
-  final TaskData? task; // Use the Drift Task class
+  final TaskData? task;
   const AddTaskPage({super.key, this.task});
 
   @override
@@ -39,12 +39,13 @@ class _AddTaskPageState extends State<AddTaskPage> {
   final List<String> _weekDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
   // Subtask management
-  final List<SubtaskModel> _subtasks = []; // List to hold subtasks
+  List<SubtaskModel> _subtasks = [];
   final TextEditingController _subtaskController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
+    
     if (widget.task != null) {
       _taskTitle = widget.task!.title;
       _taskDescription = widget.task!.description ?? '';
@@ -63,6 +64,38 @@ class _AddTaskPageState extends State<AddTaskPage> {
       _skipWeekends = widget.task!.skipWeekends ?? false;
       _dayOfMonth = widget.task!.dayOfMonth;
       _weekOfMonth = widget.task!.weekOfMonth;
+      
+      // Load existing subtasks for edit mode
+      _loadExistingSubtasks();
+    }
+  }
+
+  Future<void> _loadExistingSubtasks() async {
+    try {
+      final database = AppDatabase.instance;
+      final existingSubtasks = await database.getAllSubtasks(widget.task!.id);
+      
+      final subtaskModels = existingSubtasks.map((subtaskData) {
+        return SubtaskModel(
+          id: subtaskData.id,
+          taskId: subtaskData.taskId,
+          title: subtaskData.title,
+          completed: subtaskData.completed,
+          completedAt: subtaskData.completedAt,
+        );
+      }).toList();
+      
+      if (mounted) {
+        setState(() {
+          _subtasks = subtaskModels;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error loading subtasks: $e')),
+        );
+      }
     }
   }
 
@@ -97,7 +130,7 @@ class _AddTaskPageState extends State<AddTaskPage> {
                 const SizedBox(height: 16),
                 _buildRecurringSection(),
                 const SizedBox(height: 16),
-                _buildSubtaskField(), // New method to add subtasks
+                _buildSubtaskField(),
                 const SizedBox(height: 24),
                 _buildSubmitButton(),
               ],
@@ -160,7 +193,7 @@ class _AddTaskPageState extends State<AddTaskPage> {
               const SizedBox(width: 8),
               ElevatedButton(
                 onPressed: () {
-                  if (_newCategory.isNotEmpty) {
+                  if (_newCategory.isNotEmpty && !_categories.contains(_newCategory)) {
                     setState(() {
                       _categories.add(_newCategory);
                       _newCategory = '';
@@ -277,7 +310,7 @@ class _AddTaskPageState extends State<AddTaskPage> {
             onChanged: (String? newValue) {
               setState(() {
                 _recurrenceRule = newValue ?? 'daily';
-                _selectedDaysOfWeek.clear(); // Clear previous selections
+                _selectedDaysOfWeek.clear();
               });
             },
             items: _recurrenceOptions.map((String rule) {
@@ -341,7 +374,7 @@ class _AddTaskPageState extends State<AddTaskPage> {
         Wrap(
           spacing: 8.0,
           children: List.generate(7, (index) {
-            final dayIndex = index + 1; // 1 = Monday, 7 = Sunday
+            final dayIndex = index + 1;
             final isSelected = _selectedDaysOfWeek.contains(dayIndex);
             return FilterChip(
               label: Text(_weekDays[index]),
@@ -487,56 +520,76 @@ class _AddTaskPageState extends State<AddTaskPage> {
     );
   }
 
-  // New method to build the subtask input field
   Widget _buildSubtaskField() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text('Subtasks:', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
         const SizedBox(height: 8),
-        Wrap(
-          spacing: 8.0,
-          children: _subtasks.map((subtask) {
-            return Chip(
-              label: Text(subtask.title),
-              onDeleted: () {
-                setState(() {
-                  _subtasks.remove(subtask);
-                });
-              },
-            );
-          }).toList(),
-        ),
-        const SizedBox(height: 8),
+        
+        // Display existing subtasks
+        if (_subtasks.isNotEmpty) ...[
+          Wrap(
+            spacing: 8.0,
+            runSpacing: 8.0,
+            children: _subtasks.map((subtask) {
+              return Chip(
+                avatar: subtask.completed 
+                    ? Icon(Icons.check_circle, size: 18, color: Colors.green[600])
+                    : Icon(Icons.radio_button_unchecked, size: 18, color: Colors.grey[600]),
+                label: Text(
+                  subtask.title,
+                  style: TextStyle(
+                    decoration: subtask.completed ? TextDecoration.lineThrough : null,
+                    color: subtask.completed ? Colors.grey[600] : null,
+                  ),
+                ),
+                onDeleted: () {
+                  setState(() {
+                    _subtasks.remove(subtask);
+                  });
+                },
+                backgroundColor: subtask.completed ? Colors.green[50] : null,
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: 12),
+        ],
+        
+        // Add new subtask
         Row(
           children: [
             Expanded(
               child: TextField(
                 controller: _subtaskController,
                 decoration: const InputDecoration(hintText: 'Enter new subtask'),
+                onSubmitted: (_) => _addNewSubtask(),
               ),
             ),
             const SizedBox(width: 8),
             ElevatedButton(
-              onPressed: () {
-                if (_subtaskController.text.isNotEmpty) {
-                  setState(() {
-                    _subtasks.add(SubtaskModel(
-                      id: const Uuid().v1(),
-                      taskId: '', // This will be set when the task is saved
-                      title: _subtaskController.text,
-                      completed: false,
-                    ));
-                    _subtaskController.clear(); // Clear the input field
-                  });
-                }
-              },
+              onPressed: _addNewSubtask,
               child: const Text('Add Subtask'),
             ),
           ],
         ),
       ],
     );
+  }
+
+  void _addNewSubtask() {
+    final title = _subtaskController.text.trim();
+    if (title.isNotEmpty) {
+      setState(() {
+        _subtasks.add(SubtaskModel(
+          id: const Uuid().v1(),
+          taskId: widget.task?.id ?? '',
+          title: title,
+          completed: false,
+        ));
+        _subtaskController.clear();
+      });
+    }
   }
 
   Widget _buildSubmitButton() {
@@ -569,13 +622,12 @@ class _AddTaskPageState extends State<AddTaskPage> {
                 customCategory: null,
                 pageId: null,
                 day: null,
-                // Recurring fields
                 isRecurring: _isRecurring,
                 recurrenceRule: _isRecurring ? _recurrenceRule : null,
                 recurrenceInterval: _isRecurring ? _recurrenceInterval : null,
                 daysOfWeek: _isRecurring && _selectedDaysOfWeek.isNotEmpty ? _selectedDaysOfWeek : null,
                 recurrenceEndDate: _isRecurring ? _recurrenceEndDate : null,
-                parentTaskId: null, // This will be set for recurring instances
+                parentTaskId: null,
                 maxOccurrences: _isRecurring ? _maxOccurrences : null,
                 skipWeekends: _isRecurring ? _skipWeekends : false,
                 dayOfMonth: _isRecurring && _recurrenceRule == 'monthly' ? _dayOfMonth : null,
@@ -585,20 +637,25 @@ class _AddTaskPageState extends State<AddTaskPage> {
               if (widget.task != null) {
                 // Update existing task
                 await AppDatabase.instance.updateTask(taskModel);
+                
+                // Delete existing subtasks before inserting new ones
+                final existingSubtasks = await AppDatabase.instance.getAllSubtasks(taskModel.id);
+                for (var existingSubtask in existingSubtasks) {
+                  await AppDatabase.instance.deleteSubtask(existingSubtask.id);
+                }
               } else {
                 // Create new task
                 await AppDatabase.instance.insertTask(taskModel);
               }
 
-              // FIXED: Save subtasks using copyWith() method
-for (var subtask in _subtasks) {
-  final updatedSubtask = subtask.copyWith(taskId: taskModel.id);
-  await AppDatabase.instance.insertSubtask(updatedSubtask);
-}
+              // Save all subtasks
+              for (var subtask in _subtasks) {
+                final updatedSubtask = subtask.copyWith(taskId: taskModel.id);
+                await AppDatabase.instance.insertSubtask(updatedSubtask);
+              }
 
               Navigator.pop(context, taskModel);
             } catch (e) {
-              print('Error saving task: $e');
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(content: Text('Error saving task: $e')),
               );

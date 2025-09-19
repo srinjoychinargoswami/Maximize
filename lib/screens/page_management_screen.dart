@@ -33,6 +33,7 @@ class _PageManagementScreenState extends State<PageManagementScreen> {
         },
       ),
       floatingActionButton: FloatingActionButton(
+        heroTag: "page_mangement_fab",
         onPressed: () {
           setState(() {
             _pages.add(page_model.PageModel( // Change Page to PageModel

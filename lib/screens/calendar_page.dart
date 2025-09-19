@@ -1565,6 +1565,7 @@ class _CalendarPageState extends State<CalendarPage> {
         ),
       ),
       floatingActionButton: FloatingActionButton(
+        heroTag: "calendar_fab",
         onPressed: _showAddEventDialog,
         child: Icon(Icons.add),
         backgroundColor: Colors.blue,

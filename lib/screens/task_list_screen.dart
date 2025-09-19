@@ -238,6 +238,7 @@ class _TaskListScreenState extends State<TaskListScreen> with TickerProviderStat
         ),
       ),
       floatingActionButton: FloatingActionButton.extended(
+        heroTag: "task_list_fab",
         onPressed: _addTask,
         tooltip: 'Add Task',
         icon: const Icon(Icons.add),

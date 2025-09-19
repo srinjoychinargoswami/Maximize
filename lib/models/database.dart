@@ -10,7 +10,6 @@ import 'package:uuid/uuid.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:maximize/utils/encryption_helper.dart';
-import 'package:crypto/crypto.dart'; // Add this for crypto functionality
 
 
 // Import models
@@ -772,23 +771,23 @@ class AppDatabase extends _$AppDatabase {
   }
 
   // Subtask Methods - ENHANCED with completion tracking
-  Future<List<SubtaskModel>> getAllSubtasks(String taskId) async {
-    try {
-      final subtaskDataList = await (select(subtasks)..where((tbl) => tbl.taskId.equals(taskId))).get();
-      return subtaskDataList.map((subtaskData) {
-        return SubtaskModel(
-          id: subtaskData.id,
-          taskId: subtaskData.taskId,
-          title: subtaskData.title,
-          completed: subtaskData.completed,
-          completedAt: subtaskData.completedAt,
-        );
-      }).toList();
-    } catch (e) {
-      print('Error fetching subtasks: $e');
-      throw DatabaseException('Error fetching subtasks: $e');
+  Future<List<SubtaskData>> getAllSubtasks(String taskId) async {
+  try {
+    final subtaskDataList = await (select(subtasks)..where((tbl) => tbl.taskId.equals(taskId))).get();
+    print('Database found ${subtaskDataList.length} subtasks for taskId: $taskId');
+    
+    // Debug each found subtask
+    for (final subtaskData in subtaskDataList) {
+      print('Database subtask: id=${subtaskData.id}, title="${subtaskData.title}", completed=${subtaskData.completed}');
     }
+    
+    return subtaskDataList; // Return SubtaskData directly, not SubtaskModel
+  } catch (e) {
+    print('Error fetching subtasks: $e');
+    throw DatabaseException('Error fetching subtasks: $e');
   }
+}
+
 
   // ENHANCED: Insert subtask with completion tracking
   Future<int> insertSubtask(SubtaskModel subtask) async {
