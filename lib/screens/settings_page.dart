@@ -61,7 +61,7 @@ class _SettingsPageState extends State<SettingsPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Settings', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text('Syncing', style: TextStyle(fontWeight: FontWeight.bold)),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         elevation: 2,
       ),
@@ -228,10 +228,10 @@ class _SettingsPageState extends State<SettingsPage> {
               });
 
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Settings saved successfully!')),
+                const SnackBar(content: Text('Sync Information Saved Successfully!')),
               );
             },
-            child: Text(_tokenSaved && _usernameSaved && _repoSaved ? 'Update Settings' : 'Save Settings'),
+            child: Text(_tokenSaved && _usernameSaved && _repoSaved ? 'Update Sync Information' : 'Save Sync Information'),
           ),
 
           const SizedBox(height: 8),
@@ -258,10 +258,10 @@ class _SettingsPageState extends State<SettingsPage> {
                 });
 
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('All GitHub settings deleted successfully.')),
+                  const SnackBar(content: Text('All GitHub Sync Information Deleted Successfully.')),
                 );
               },
-              child: const Text('Delete All Settings'),
+              child: const Text('Delete All Sync Information'),
             ),
         ],
       ),

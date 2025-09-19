@@ -141,7 +141,7 @@ class _MyHomePageState extends State<MyHomePage> {
             _drawerTile(title: 'Calendar', icon: Icons.calendar_today, index: 2),
             _drawerTile(title: 'Notes', icon: Icons.note, index: 3),
             _drawerTile(title: 'Reminders', icon: Icons.notifications, index: 4),
-            _drawerTile(title: 'Settings', icon: Icons.settings, index: 5),
+            _drawerTile(title: 'Syncing', icon: Icons.settings, index: 5),
             _drawerTile(title: 'About', icon: Icons.info, index: 6),
           ],
         ),
@@ -164,7 +164,7 @@ class _MyHomePageState extends State<MyHomePage> {
           BottomNavigationBarItem(icon: Icon(Icons.calendar_today), label: 'Calendar'),
           BottomNavigationBarItem(icon: Icon(Icons.note), label: 'Notes'),
           BottomNavigationBarItem(icon: Icon(Icons.notifications), label: 'Reminders'),
-          BottomNavigationBarItem(icon: Icon(Icons.settings), label: 'Settings'),
+          BottomNavigationBarItem(icon: Icon(Icons.settings), label: 'Syncing'),
         ],
       ),
     );
@@ -692,7 +692,7 @@ class _SettingsPageState extends State<SettingsPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Settings', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text('Syncing', style: TextStyle(fontWeight: FontWeight.bold)),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         elevation: 2,
       ),
@@ -859,10 +859,10 @@ class _SettingsPageState extends State<SettingsPage> {
               });
 
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Settings saved successfully!')),
+                const SnackBar(content: Text('Sync Information saved successfully!')),
               );
             },
-            child: Text(_tokenSaved && _usernameSaved && _repoSaved ? 'Update Settings' : 'Save Settings'),
+            child: Text(_tokenSaved && _usernameSaved && _repoSaved ? 'Update Sync Information' : 'Save Sync Information'),
           ),
 
           const SizedBox(height: 8),
@@ -889,10 +889,10 @@ class _SettingsPageState extends State<SettingsPage> {
                 });
 
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('All GitHub settings deleted successfully.')),
+                  const SnackBar(content: Text('All GitHub Sync Information Deleted Successfully.')),
                 );
               },
-              child: const Text('Delete All Settings'),
+              child: const Text('Delete All Sync Information'),
             ),
         ],
       ),
