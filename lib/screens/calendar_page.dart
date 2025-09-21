@@ -73,6 +73,13 @@ class _CalendarPageState extends State<CalendarPage> {
     }).toList();
   }
 
+  // ENHANCED: Get sorted events for day (chronological order)
+  List<Event> _getSortedEventsForDay(DateTime day) {
+    List<Event> dayEvents = _getEventsForDay(day);
+    dayEvents.sort((a, b) => a.startDateTime.compareTo(b.startDateTime));
+    return dayEvents;
+  }
+
   // ENHANCED: Toggle event completion using CalendarService (unified checkbox system)
   Future<void> _toggleEventCompletion(Event event, bool? isCompleted) async {
     try {
@@ -900,9 +907,240 @@ class _CalendarPageState extends State<CalendarPage> {
     }
   }
 
+  // ENHANCED: Improved month view event markers (positioned below date, 3 max + counter)
+  Widget _buildMonthEventMarkers(DateTime day) {
+    List<Event> dayEvents = _getSortedEventsForDay(day);
+    
+    if (dayEvents.isEmpty) {
+      return SizedBox.shrink();
+    }
+
+    // Show maximum 3 events as bars, then show "+X more"
+    const int maxVisible = 3;
+    List<Event> visibleEvents = dayEvents.take(maxVisible).toList();
+    int remainingCount = dayEvents.length - maxVisible;
+
+    return Positioned(
+      bottom: 2, // ENHANCED: Position at bottom of cell to avoid covering date
+      left: 2,
+      right: 2,
+      child: Container(
+        constraints: BoxConstraints(
+          maxHeight: 50, // ENHANCED: Reduced height to fit better
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ...visibleEvents.map((event) => GestureDetector(
+              onTap: () => _showEventActionsDialog(event),
+              child: Container(
+                height: 12, // ENHANCED: Smaller height for better fit
+                margin: EdgeInsets.symmetric(vertical: 0.5, horizontal: 1),
+                padding: EdgeInsets.symmetric(horizontal: 3, vertical: 1),
+                decoration: BoxDecoration(
+                  color: Color(int.parse(event.color.replaceFirst('#', '0xff'))).withOpacity(0.8),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (event.parentEventId != null) ...[
+                      Icon(Icons.repeat, size: 6, color: Colors.white),
+                      SizedBox(width: 1),
+                    ],
+                    Flexible(
+                      child: Text(
+                        event.title,
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 8, // ENHANCED: Smaller font
+                          fontWeight: FontWeight.w500,
+                          decoration: event.completed ? TextDecoration.lineThrough : null,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    if (event.completed) ...[
+                      SizedBox(width: 1),
+                      Icon(Icons.check_circle, size: 6, color: Colors.white),
+                    ],
+                  ],
+                ),
+              ),
+            )).toList(),
+            
+            if (remainingCount > 0)
+              GestureDetector(
+                onTap: () => _showAllDayEventsDialog(day),
+                child: Container(
+                  height: 10, // ENHANCED: Smaller height for counter
+                  margin: EdgeInsets.symmetric(vertical: 0.5, horizontal: 1),
+                  child: Text(
+                    '+$remainingCount more',
+                    style: TextStyle(
+                      color: Colors.grey[600],
+                      fontSize: 7, // ENHANCED: Very small font for counter
+                      fontWeight: FontWeight.w600,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // NEW: Show event actions dialog for month view
+  void _showEventActionsDialog(Event event) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            if (event.parentEventId != null) ...[
+              Icon(Icons.repeat, size: 16, color: Colors.grey[600]),
+              SizedBox(width: 8),
+            ],
+            Expanded(child: Text(event.title)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('${DateFormat.jm().format(event.startDateTime)} - ${DateFormat.jm().format(event.endDateTime)}'),
+            if (event.description != null && event.description!.isNotEmpty)
+              Padding(
+                padding: EdgeInsets.only(top: 8),
+                child: Text(event.description!),
+              ),
+            SizedBox(height: 16),
+            Row(
+              children: [
+                Icon(event.completed ? Icons.check_box : Icons.check_box_outline_blank),
+                SizedBox(width: 8),
+                Text(event.completed ? 'Completed' : 'Mark as complete'),
+              ],
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.of(context).pop();
+              await _toggleEventCompletion(event, !event.completed);
+            },
+            child: Text(event.completed ? 'Mark Incomplete' : 'Mark Complete'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              _editEvent(event);
+            },
+            child: Text('Edit'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              _showDeleteConfirmationDialog(event);
+            },
+            child: Text('Delete'),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // NEW: Show all events dialog for "+X more"
+  void _showAllDayEventsDialog(DateTime day) {
+    List<Event> dayEvents = _getSortedEventsForDay(day);
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Events for ${DateFormat.yMMMd().format(day)}'),
+        content: Container(
+          width: double.maxFinite,
+          child: ListView.builder(
+            shrinkWrap: true,
+            itemCount: dayEvents.length,
+            itemBuilder: (context, index) {
+              Event event = dayEvents[index];
+              return ListTile(
+                leading: Container(
+                  width: 4,
+                  height: 40,
+                  color: Color(int.parse(event.color.replaceFirst('#', '0xff'))),
+                ),
+                title: Row(
+                  children: [
+                    if (event.parentEventId != null) ...[
+                      Icon(Icons.repeat, size: 14, color: Colors.grey[600]),
+                      SizedBox(width: 4),
+                    ],
+                    Expanded(
+                      child: Text(
+                        event.title,
+                        style: TextStyle(
+                          decoration: event.completed ? TextDecoration.lineThrough : null,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                subtitle: Text('${DateFormat.jm().format(event.startDateTime)} - ${DateFormat.jm().format(event.endDateTime)}'),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      icon: Icon(event.completed ? Icons.check_box : Icons.check_box_outline_blank),
+                      onPressed: () async {
+                        await _toggleEventCompletion(event, !event.completed);
+                        Navigator.of(context).pop();
+                      },
+                    ),
+                    IconButton(
+                      icon: Icon(Icons.edit),
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                        _editEvent(event);
+                      },
+                    ),
+                    IconButton(
+                      icon: Icon(Icons.delete, color: Colors.red),
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                        _showDeleteConfirmationDialog(event);
+                      },
+                    ),
+                  ],
+                ),
+                onTap: () => _showEventActionsDialog(event),
+              );
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
   // ENHANCED: Event list with database-backed checkboxes
   Widget _buildEventList() {
-    List<Event> selectedDayEvents = _getEventsForDay(_selectedDay);
+    List<Event> selectedDayEvents = _getSortedEventsForDay(_selectedDay);
     
     if (selectedDayEvents.isEmpty) {
       return Container(
@@ -1093,7 +1331,7 @@ class _CalendarPageState extends State<CalendarPage> {
 
   // ENHANCED: Day view with database-backed checkboxes
   Widget _buildDayView() {
-    List<Event> dayEvents = _getEventsForDay(_selectedDay);
+    List<Event> dayEvents = _getSortedEventsForDay(_selectedDay);
     
     return Container(
       margin: EdgeInsets.symmetric(horizontal: 8.0),
@@ -1337,6 +1575,7 @@ class _CalendarPageState extends State<CalendarPage> {
     );
   }
 
+  // ENHANCED: Week view with chronological sorting and full editing capabilities
   Widget _buildWeekView() {
     // Find the first day of the current week (Monday)
     DateTime weekStart = _focusedDay.subtract(Duration(days: _focusedDay.weekday - 1));
@@ -1377,7 +1616,8 @@ class _CalendarPageState extends State<CalendarPage> {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: weekDays.map((date) {
-              List<Event> dayEvents = _getEventsForDay(date);
+              // ENHANCED: Use chronologically sorted events
+              List<Event> dayEvents = _getSortedEventsForDay(date);
               return Expanded(
                 child: Container(
                   margin: EdgeInsets.all(2),
@@ -1423,9 +1663,54 @@ class _CalendarPageState extends State<CalendarPage> {
                           dense: true,
                           contentPadding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                           onTap: () => _editEvent(event),
-                          trailing: IconButton(
-                            icon: Icon(Icons.delete, color: Colors.red[200], size: 16),
-                            onPressed: () => _showDeleteConfirmationDialog(event),
+                          // ENHANCED: Add PopupMenuButton with check off, edit, and delete
+                          trailing: PopupMenuButton<String>(
+                            icon: Icon(Icons.more_vert, color: Colors.white70, size: 16),
+                            onSelected: (value) {
+                              if (value == 'edit') {
+                                _editEvent(event);
+                              } else if (value == 'delete') {
+                                _showDeleteConfirmationDialog(event);
+                              } else if (value == 'toggle') {
+                                _toggleEventCompletion(event, !event.completed);
+                              }
+                            },
+                            itemBuilder: (context) => [
+                              PopupMenuItem(
+                                value: 'toggle',
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      event.completed ? Icons.check_box_outline_blank : Icons.check_box,
+                                      size: 16,
+                                      color: Colors.green,
+                                    ),
+                                    SizedBox(width: 8),
+                                    Text(event.completed ? 'Mark Incomplete' : 'Mark Complete'),
+                                  ],
+                                ),
+                              ),
+                              PopupMenuItem(
+                                value: 'edit',
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.edit, size: 16, color: Colors.blue),
+                                    SizedBox(width: 8),
+                                    Text('Edit'),
+                                  ],
+                                ),
+                              ),
+                              PopupMenuItem(
+                                value: 'delete',
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.delete, size: 16, color: Colors.red),
+                                    SizedBox(width: 8),
+                                    Text('Delete'),
+                                  ],
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       );
@@ -1462,6 +1747,11 @@ class _CalendarPageState extends State<CalendarPage> {
               });
             },
             eventLoader: _getEventsForDay,
+            
+            // ENHANCED: Bigger calendar with proper spacing
+            rowHeight: 90, // ENHANCED: Increased from default ~52 to 90 for more space
+            daysOfWeekHeight: 40, // ENHANCED: More space for day headers
+            
             headerStyle: HeaderStyle(
               formatButtonVisible: false,
               titleCentered: true,
@@ -1477,14 +1767,22 @@ class _CalendarPageState extends State<CalendarPage> {
                 color: Colors.orange,
                 shape: BoxShape.circle,
               ),
+              // Remove default markers since we'll use custom ones
               markerDecoration: BoxDecoration(
-                color: Colors.red,
-                shape: BoxShape.circle,
+                color: Colors.transparent,
               ),
+              // ENHANCED: Better cell padding for date visibility
+              cellPadding: EdgeInsets.all(4), // More padding around dates
+            ),
+            // ENHANCED: Custom calendar builder with Google Calendar-style markers
+            calendarBuilders: CalendarBuilders<Event>(
+              markerBuilder: (context, day, events) {
+                return _buildMonthEventMarkers(day); // No Positioned wrapper needed
+              },
             ),
           ),
           Container(
-            height: 400, // Fixed height to allow scrolling
+            height: 350, // ENHANCED: Reduced to give more space to calendar
             child: _buildEventList(),
           ),
         ],
