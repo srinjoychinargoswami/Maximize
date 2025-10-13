@@ -141,16 +141,16 @@ class _MyHomePageState extends State<MyHomePage> {
             _drawerTile(title: 'Calendar', icon: Icons.calendar_today, index: 2),
             _drawerTile(title: 'Notes', icon: Icons.note, index: 3),
             _drawerTile(title: 'Reminders', icon: Icons.notifications, index: 4),
-            _drawerTile(title: 'Syncing', icon: Icons.settings, index: 5),
+            _drawerTile(title: 'Syncing', icon: Icons.sync, index: 5),
             _drawerTile(title: 'About', icon: Icons.info, index: 6),
           ],
         ),
       ),
 
-      /* ─────────── MAIN CONTENT ─────────── */
+      /*  MAIN CONTENT  */
       body: IndexedStack(index: _currentIndex, children: _screens),
 
-      /* ───────── BOTTOM NAVIGATION ──────── */
+      /*  BOTTOM NAVIGATION */
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
         onTap: _jumpTo,
@@ -164,7 +164,7 @@ class _MyHomePageState extends State<MyHomePage> {
           BottomNavigationBarItem(icon: Icon(Icons.calendar_today), label: 'Calendar'),
           BottomNavigationBarItem(icon: Icon(Icons.note), label: 'Notes'),
           BottomNavigationBarItem(icon: Icon(Icons.notifications), label: 'Reminders'),
-          BottomNavigationBarItem(icon: Icon(Icons.settings), label: 'Syncing'),
+          BottomNavigationBarItem(icon: Icon(Icons.sync), label: 'Syncing'),
         ],
       ),
     );
@@ -186,9 +186,9 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 }
 
-/* ────────────────────────────────────────────────────────────────────────── */
+/*  */
 /* OVERVIEW PAGE – UPDATED with pull-to-refresh functionality                */
-/* ────────────────────────────────────────────────────────────────────────── */
+/*  */
 
 class OverviewPage extends StatefulWidget {
   final AppDatabase database;
@@ -251,7 +251,7 @@ class _OverviewPageState extends State<OverviewPage> {
     );
   }
 
-  /* ---------- UI helpers ---------- */
+  /*  UI helpers  */
 
   Padding _sectionHeader(String text) => Padding(
     padding: const EdgeInsets.all(16),
@@ -262,7 +262,7 @@ class _OverviewPageState extends State<OverviewPage> {
     )),
   );
 
-  /* ---------- TASKS SECTION - UPDATED with unified completion system ---------- */
+  /*  TASKS SECTION - UPDATED with unified completion system  */
   SizedBox _taskSection(DateTime today) {
     return SizedBox(
       height: 250,
@@ -372,7 +372,7 @@ class _OverviewPageState extends State<OverviewPage> {
     );
   }
 
-  /* ---------- EVENTS SECTION - UPDATED with unified completion system ---------- */
+  /*  EVENTS SECTION - UPDATED with unified completion system  */
   SizedBox _eventSection(DateTime today) {
     return SizedBox(
       height: 200,
