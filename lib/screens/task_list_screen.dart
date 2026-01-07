@@ -387,8 +387,7 @@ class _TaskListScreenState extends State<TaskListScreen> with TickerProviderStat
                   fontStyle: FontStyle.italic,
                 ),
               ),
-              if (_hasActiveFilters) ...[
-                const SizedBox(height: 16),
+              if (_hasActiveFilters) ...[ const SizedBox(height: 16),
                 ElevatedButton.icon(
                   onPressed: _clearAllFilters,
                   icon: const Icon(Icons.clear_all),
@@ -1073,10 +1072,13 @@ class _TaskListScreenState extends State<TaskListScreen> with TickerProviderStat
     );
   }
 
+  // ✅ UPDATED: Pass taskService parameter
   void _addTask() {
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (context) => const AddTaskPage()),
+      MaterialPageRoute(
+        builder: (context) => AddTaskPage(taskService: _taskService), // ✅ ADD taskService
+      ),
     ).then((value) {
       if (value != null) {
         _loadTasks();
@@ -1160,11 +1162,15 @@ class _TaskListScreenState extends State<TaskListScreen> with TickerProviderStat
     );
   }
 
+  // ✅ UPDATED: Pass taskService parameter
   void _editTask(TaskModel task) {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => AddTaskPage(task: convertTaskModelToData(task)),
+        builder: (context) => AddTaskPage(
+          task: convertTaskModelToData(task),
+          taskService: _taskService, // ✅ ADD taskService
+        ),
       ),
     ).then((value) {
       if (value != null) {
