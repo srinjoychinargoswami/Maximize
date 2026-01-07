@@ -33,6 +33,7 @@ class _CalendarPageState extends State<CalendarPage> {
   CalendarFormat _calendarFormat = CalendarFormat.month;
   String _currentView = 'calendar';
   Color _selectedColor = Colors.blue;
+  bool _isRefreshing = false;
 
   @override
   void initState() {
@@ -63,6 +64,24 @@ class _CalendarPageState extends State<CalendarPage> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('Calendar refreshed!')),
     );
+  }
+
+  // Public refresh method with loading indicator (called from refresh button)
+  Future<void> _refreshEventsWithIndicator() async {
+    if (_isRefreshing) return; // Prevents multiple simultaneous refreshes
+
+    setState(() => _isRefreshing = true);
+    await _loadEvents();
+    setState(() => _isRefreshing = false);
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Calendar refreshed!'),
+          duration: Duration(seconds: 1),
+       ),
+      );
+    }
   }
 
   // Get events for a specific day (using expanded events)
@@ -1806,43 +1825,58 @@ class _CalendarPageState extends State<CalendarPage> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.grey[850],
-      appBar: AppBar(
-        backgroundColor: Colors.grey[900],
-        title: Text('Calendar', style: TextStyle(color: Colors.white)),
-        actions: [
-          IconButton(
-            icon: Icon(Icons.list, color: Colors.white),
-            onPressed: () {
-              setState(() {
-                _currentView = 'list';
-              });
-            },
-          ),
-          IconButton(
-            icon: Icon(Icons.calendar_today, color: Colors.white),
-            onPressed: () {
-              setState(() {
-                _currentView = 'calendar';
-              });
-            },
-          ),
-          IconButton(
-            icon: Icon(Icons.view_week, color: Colors.white),
-            onPressed: () {
-              setState(() {
-                _currentView = 'week';
-              });
-            },
-          ),
-          IconButton(
-            icon: Icon(Icons.access_time, color: Colors.white),
-            onPressed: () {
-              setState(() {
-                _currentView = 'day';
-              });
+Widget build(BuildContext context) {
+  return Scaffold(
+    backgroundColor: Colors.grey[850],
+    appBar: AppBar(
+      backgroundColor: Colors.grey[900],
+      title: Text('Calendar', style: TextStyle(color: Colors.white)),
+      actions: [
+        IconButton(
+          icon: _isRefreshing 
+            ? const SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                ),
+              )
+            : const Icon(Icons.refresh),
+          onPressed: _isRefreshing ? null : _refreshEventsWithIndicator,
+          tooltip: 'Refresh',
+        ),
+        // Rest of your existing icons
+        IconButton(
+          icon: Icon(Icons.list, color: Colors.white),
+          onPressed: () {
+            setState(() {
+              _currentView = 'list';
+            });
+          },
+        ),
+        IconButton(
+          icon: Icon(Icons.calendar_today, color: Colors.white),
+          onPressed: () {
+            setState(() {
+              _currentView = 'calendar';
+            });
+          },
+        ),
+        IconButton(
+          icon: Icon(Icons.view_week, color: Colors.white),
+          onPressed: () {
+            setState(() {
+              _currentView = 'week';
+            });
+          },
+        ),
+        IconButton(
+          icon: Icon(Icons.access_time, color: Colors.white),
+          onPressed: () {
+            setState(() {
+              _currentView = 'day';
+            });
             },
           ),
         ],
