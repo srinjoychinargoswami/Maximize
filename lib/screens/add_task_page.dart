@@ -4,10 +4,12 @@ import 'package:maximize/models/database.dart';
 import 'package:maximize/utils/task_utils.dart';
 import 'package:uuid/uuid.dart';
 import 'package:maximize/models/task_model.dart';
+import 'package:maximize/services/task_service.dart';
 
 class AddTaskPage extends StatefulWidget {
   final TaskData? task;
-  const AddTaskPage({super.key, this.task});
+  final TaskService? taskService;
+  const AddTaskPage({super.key, this.task, this.taskService});
 
   @override
   _AddTaskPageState createState() => _AddTaskPageState();
@@ -38,6 +40,19 @@ class _AddTaskPageState extends State<AddTaskPage> {
   final List<String> _recurrenceOptions = ['daily', 'weekly', 'monthly', 'yearly'];
   final List<String> _weekDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
+  // ✅ NEW: Reminder fields
+  bool _reminderEnabled = false;
+  DateTime? _reminderTime;
+  String _reminderPreset = 'at_time';
+  final List<Map<String, String>> _reminderPresets = [
+    {'value': 'at_time', 'label': 'At time of task'},
+    {'value': '15min', 'label': '15 minutes before'},
+    {'value': '30min', 'label': '30 minutes before'},
+    {'value': '1hour', 'label': '1 hour before'},
+    {'value': '1day', 'label': '1 day before'},
+    {'value': 'custom', 'label': 'Custom time'},
+  ];
+
   // Subtask management
   List<SubtaskModel> _subtasks = [];
   final TextEditingController _subtaskController = TextEditingController();
@@ -64,6 +79,11 @@ class _AddTaskPageState extends State<AddTaskPage> {
       _skipWeekends = widget.task!.skipWeekends ?? false;
       _dayOfMonth = widget.task!.dayOfMonth;
       _weekOfMonth = widget.task!.weekOfMonth;
+      
+      // ✅ NEW: Initialize reminder fields
+      _reminderEnabled = widget.task!.reminderEnabled ?? false;
+      _reminderTime = widget.task!.reminderTime;
+      _reminderPreset = widget.task!.reminderPreset ?? 'at_time';
       
       // Load existing subtasks for edit mode
       _loadExistingSubtasks();
@@ -129,6 +149,8 @@ class _AddTaskPageState extends State<AddTaskPage> {
                 _buildDueDateField(),
                 const SizedBox(height: 16),
                 _buildRecurringSection(),
+                const SizedBox(height: 16),
+                _buildReminderSection(), // ✅ NEW: Reminder section
                 const SizedBox(height: 16),
                 _buildSubtaskField(),
                 const SizedBox(height: 24),
@@ -256,6 +278,10 @@ class _AddTaskPageState extends State<AddTaskPage> {
           if (pickedDate != null) {
             setState(() {
               _dueDate = pickedDate;
+              // ✅ ADDED: Update reminder time when due date changes
+              if (_reminderEnabled && _reminderPreset != 'custom') {
+                _updateReminderTime();
+              }
             });
           }
         },
@@ -297,6 +323,145 @@ class _AddTaskPageState extends State<AddTaskPage> {
         ),
       ),
     );
+  }
+
+  // ✅ NEW: Reminder Section
+  Widget _buildReminderSection() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SwitchListTile(
+              title: const Text('Reminder', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              subtitle: const Text('Get notified about this task'),
+              value: _reminderEnabled,
+              onChanged: (value) {
+                setState(() {
+                  _reminderEnabled = value;
+                  if (value && _reminderTime == null) {
+                    // Set default reminder time to task due date
+                    _reminderTime = _dueDate;
+                  }
+                });
+              },
+            ),
+            if (_reminderEnabled) ...[
+              const Divider(),
+              const SizedBox(height: 8),
+              const Text('Remind me:', style: TextStyle(fontWeight: FontWeight.w500)),
+              const SizedBox(height: 8),
+              ..._reminderPresets.map((preset) {
+                return RadioListTile<String>(
+                  title: Text(preset['label']!),
+                  value: preset['value']!,
+                  groupValue: _reminderPreset,
+                  onChanged: (value) {
+                    setState(() {
+                      _reminderPreset = value!;
+                      _updateReminderTime();
+                    });
+                  },
+                );
+              }).toList(),
+              if (_reminderPreset == 'custom') ...[
+                const SizedBox(height: 16),
+                TextFormField(
+                  decoration: const InputDecoration(
+                    labelText: 'Custom Reminder Time',
+                    suffixIcon: Icon(Icons.access_time),
+                    border: OutlineInputBorder(),
+                  ),
+                  readOnly: true,
+                  onTap: _pickCustomReminderTime,
+                  controller: TextEditingController(
+                    text: _reminderTime != null 
+                        ? DateFormat('MMM dd, yyyy - hh:mm a').format(_reminderTime!)
+                        : 'Tap to set time',
+                  ),
+                ),
+              ],
+              const SizedBox(height: 8),
+              if (_reminderTime != null)
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.notifications_active, color: Colors.blue, size: 20),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Reminder set for ${DateFormat('MMM dd, yyyy - hh:mm a').format(_reminderTime!)}',
+                          style: const TextStyle(fontSize: 13, color: Colors.blue),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ✅ NEW: Update reminder time based on preset
+  void _updateReminderTime() {
+    switch (_reminderPreset) {
+      case 'at_time':
+        _reminderTime = _dueDate;
+        break;
+      case '15min':
+        _reminderTime = _dueDate.subtract(const Duration(minutes: 15));
+        break;
+      case '30min':
+        _reminderTime = _dueDate.subtract(const Duration(minutes: 30));
+        break;
+      case '1hour':
+        _reminderTime = _dueDate.subtract(const Duration(hours: 1));
+        break;
+      case '1day':
+        _reminderTime = _dueDate.subtract(const Duration(days: 1));
+        break;
+      case 'custom':
+        // Keep existing custom time or set to due date
+        _reminderTime ??= _dueDate;
+        break;
+    }
+  }
+
+  // ✅ NEW: Pick custom reminder time
+  Future<void> _pickCustomReminderTime() async {
+    final pickedDate = await showDatePicker(
+      context: context,
+      initialDate: _reminderTime ?? _dueDate,
+      firstDate: DateTime.now(),
+      lastDate: _dueDate,
+    );
+    
+    if (pickedDate != null && mounted) {
+      final pickedTime = await showTimePicker(
+        context: context,
+        initialTime: TimeOfDay.fromDateTime(_reminderTime ?? _dueDate),
+      );
+      
+      if (pickedTime != null && mounted) {
+        setState(() {
+          _reminderTime = DateTime(
+            pickedDate.year,
+            pickedDate.month,
+            pickedDate.day,
+            pickedTime.hour,
+            pickedTime.minute,
+          );
+        });
+      }
+    }
   }
 
   Widget _buildRecurrenceRuleDropdown() {
@@ -610,6 +775,14 @@ class _AddTaskPageState extends State<AddTaskPage> {
               }
             }
             
+            // ✅ NEW: Validate reminder settings
+            if (_reminderEnabled && _reminderTime == null) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Please set a reminder time')),
+              );
+              return;
+            }
+            
             try {
               final taskModel = TaskModel(
                 id: widget.task?.id ?? const Uuid().v1(),
@@ -632,11 +805,21 @@ class _AddTaskPageState extends State<AddTaskPage> {
                 skipWeekends: _isRecurring ? _skipWeekends : false,
                 dayOfMonth: _isRecurring && _recurrenceRule == 'monthly' ? _dayOfMonth : null,
                 weekOfMonth: _weekOfMonth,
+                // ✅ NEW: Reminder fields
+                reminderEnabled: _reminderEnabled,
+                reminderTime: _reminderEnabled ? _reminderTime : null,
+                reminderPreset: _reminderEnabled ? _reminderPreset : null,
               );
 
               if (widget.task != null) {
-                // Update existing task
-                await AppDatabase.instance.updateTask(taskModel);
+                // ✅ FIXED: Update existing task with proper notification handling
+                if (widget.taskService != null) {
+                  // Use TaskService (handles notifications automatically)
+                  await widget.taskService!.updateTask(taskModel);
+                } else {
+                  // Fallback to direct database call
+                  await AppDatabase.instance.updateTask(taskModel);
+                }
                 
                 // Delete existing subtasks before inserting new ones
                 final existingSubtasks = await AppDatabase.instance.getAllSubtasks(taskModel.id);
@@ -644,8 +827,38 @@ class _AddTaskPageState extends State<AddTaskPage> {
                   await AppDatabase.instance.deleteSubtask(existingSubtask.id);
                 }
               } else {
-                // Create new task
-                await AppDatabase.instance.insertTask(taskModel);
+                // ✅ FIXED: Create new task with proper notification handling
+                if (widget.taskService != null) {
+                  // Use TaskService (handles notifications automatically)
+                  await widget.taskService!.addTask(
+                    title: taskModel.title,
+                    description: taskModel.description ?? '',
+                    dueDate: taskModel.dueDate,
+                    completed: taskModel.completed,
+                    category: taskModel.category ?? '',
+                    priority: taskModel.priority,
+                    pageId: taskModel.pageId != null ? int.tryParse(taskModel.pageId!) : null,
+                    completedAt: taskModel.completedAt,
+                    subtasks: taskModel.subtasks,
+                    isRecurring: taskModel.isRecurring ?? false,
+                    recurrenceRule: taskModel.recurrenceRule,
+                    recurrenceInterval: taskModel.recurrenceInterval,
+                    daysOfWeek: taskModel.daysOfWeek,
+                    recurrenceEndDate: taskModel.recurrenceEndDate,
+                    parentTaskId: taskModel.parentTaskId,
+                    maxOccurrences: taskModel.maxOccurrences,
+                    skipWeekends: taskModel.skipWeekends ?? false,
+                    dayOfMonth: taskModel.dayOfMonth,
+                    weekOfMonth: taskModel.weekOfMonth,
+                    // ✅ Pass reminder fields
+                    reminderEnabled: taskModel.reminderEnabled ?? false,
+                    reminderTime: taskModel.reminderTime,
+                    reminderPreset: taskModel.reminderPreset,
+                  );
+                } else {
+                  // Fallback to direct database call
+                  await AppDatabase.instance.insertTask(taskModel);
+                }
               }
 
               // Save all subtasks
@@ -654,11 +867,15 @@ class _AddTaskPageState extends State<AddTaskPage> {
                 await AppDatabase.instance.insertSubtask(updatedSubtask);
               }
 
-              Navigator.pop(context, taskModel);
+              if (mounted) {
+                Navigator.pop(context, taskModel);
+              }
             } catch (e) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Error saving task: $e')),
-              );
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Error saving task: $e')),
+                );
+              }
             }
           }
         },
