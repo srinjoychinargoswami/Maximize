@@ -18,7 +18,7 @@ class ApiService {
 
   ApiService({required this.db});
 
-  // Token methods (unchanged)
+  // Token methods
   Future<String?> getStoredToken() async {
     return await _storage.read(key: tokenKey);
   }
@@ -31,7 +31,7 @@ class ApiService {
     await _storage.delete(key: tokenKey);
   }
 
-  // Username methods (unchanged)
+  // Username methods
   Future<String> getGitHubUsername() async {
     final username = await _storage.read(key: usernameKey);
     return username ?? defaultGitHubUsername;
@@ -45,7 +45,7 @@ class ApiService {
     await _storage.delete(key: usernameKey);
   }
 
-  // Repo name methods (unchanged)
+  // Repo name methods
   Future<String> getGitHubRepo() async {
     final repo = await _storage.read(key: repoKey);
     return repo ?? defaultRepoName;
@@ -59,21 +59,21 @@ class ApiService {
     await _storage.delete(key: repoKey);
   }
 
-  // Build repo URL dynamically (unchanged)
+  // Build repo URL dynamically
   Future<Uri> _getRepoFileUri() async {
     final username = await getGitHubUsername();
     final repo = await getGitHubRepo();
     return Uri.parse('https://api.github.com/repos/$username/$repo/contents/$fileName');
   }
 
-  // FIXED: Upload method with proper Base64 encoding
+  // Upload method (unchanged)
   Future<void> syncToGitHub() async {
     final token = await getStoredToken();
     if (token == null) throw Exception("GitHub token not set in secure storage.");
 
     final data = await db.getAllDataAsJson();
     final encrypted = EncryptionHelper.encrypt(jsonEncode(data));
-    final base64Content = base64Encode(utf8.encode(encrypted)); // ✅ FIXED: Proper Base64 encoding
+    final base64Content = base64Encode(utf8.encode(encrypted));
 
     final url = await _getRepoFileUri();
     final getResp = await http.get(url, headers: {'Authorization': 'Bearer $token'});
@@ -104,7 +104,7 @@ class ApiService {
     }
   }
 
-  // FIXED: Download method with proper Base64 decoding
+  // FIXED: Download method with deletion detection
   Future<void> syncFromGitHub() async {
     try {
       final token = await getStoredToken();
@@ -118,21 +118,98 @@ class ApiService {
       final jsonResponse = jsonDecode(response.body);
       final githubBase64Content = jsonResponse['content'];
       
-      // FIXED: Enhanced Base64 cleaning
+      // Clean Base64 content
       final cleanBase64Content = githubBase64Content
-          .replaceAll(RegExp(r'\s'), '')           // Remove all whitespace
-          .replaceAll(RegExp(r'[^\w+/=]'), '')     // Keep only valid Base64 characters
+          .replaceAll(RegExp(r'\s'), '')
+          .replaceAll(RegExp(r'[^\w+/=]'), '')
           .trim();
       
-      // FIXED: Proper decoding sequence
+      // Decode
       final encryptedString = utf8.decode(base64Decode(cleanBase64Content));
       final decrypted = EncryptionHelper.decrypt(encryptedString);
 
       final data = jsonDecode(decrypted);
-      await db.insertAllFromJson(data);
+      
+      // Detect and delete items that exist locally but not in GitHub
+      await _syncWithDeletionDetection(data);
+      
     } catch (e) {
       print('Error syncing from GitHub: $e');
       throw Exception('Error syncing from GitHub: $e');
     }
+  }
+
+  // Sync with deletion detection
+  Future<void> _syncWithDeletionDetection(Map<String, dynamic> githubData) async {
+    print('[ApiService] Starting sync with deletion detection...');
+    
+    // Step 1: Get IDs from GitHub data
+    final githubTaskIds = _extractIds(githubData['tasks']);
+    final githubSubtaskIds = _extractIds(githubData['subtasks']);
+    final githubEventIds = _extractIds(githubData['events']);
+    final githubReminderIds = _extractIds(githubData['reminders']);
+    
+    print('[ApiService] GitHub has: ${githubTaskIds.length} tasks, ${githubSubtaskIds.length} subtasks, ${githubEventIds.length} events, ${githubReminderIds.length} reminders');
+    
+    // Step 2: Get IDs from local database
+    final localTasks = await db.getAllTasks();
+    final localSubtasks = await db.getAllSubtasks(''); // Empty string gets all subtasks
+    final localEvents = await db.getAllEvents();
+    final localReminders = await db.getAllReminders();
+    
+    final localTaskIds = localTasks.map((t) => t.id).toSet();
+    final localSubtaskIds = localSubtasks.map((s) => s.id).toSet();
+    final localEventIds = localEvents.map((e) => e.id).toSet();
+    final localReminderIds = localReminders.map((r) => r.id).toSet();
+    
+    print('[ApiService] Local has: ${localTaskIds.length} tasks, ${localSubtaskIds.length} subtasks, ${localEventIds.length} events, ${localReminderIds.length} reminders');
+    
+    // Step 3: Find items to delete (exist locally but not in GitHub)
+    final tasksToDelete = localTaskIds.difference(githubTaskIds);
+    final subtasksToDelete = localSubtaskIds.difference(githubSubtaskIds);
+    final eventsToDelete = localEventIds.difference(githubEventIds);
+    final remindersToDelete = localReminderIds.difference(githubReminderIds);
+    
+    print('[ApiService] Items to delete: ${tasksToDelete.length} tasks, ${subtasksToDelete.length} subtasks, ${eventsToDelete.length} events, ${remindersToDelete.length} reminders');
+    
+    // Step 4: Delete orphaned items from local database
+    for (final taskId in tasksToDelete) {
+      print('[ApiService] Deleting orphaned task: $taskId');
+      await db.deleteTask(taskId);
+    }
+    
+    for (final subtaskId in subtasksToDelete) {
+      print('[ApiService] Deleting orphaned subtask: $subtaskId');
+      await db.deleteSubtask(subtaskId);
+    }
+    
+    for (final eventId in eventsToDelete) {
+      print('[ApiService] Deleting orphaned event: $eventId');
+      await db.deleteEvent(eventId);
+    }
+    
+    for (final reminderId in remindersToDelete) {
+      print('[ApiService] Deleting orphaned reminder: $reminderId');
+      await db.deleteReminder(reminderId);
+    }
+    
+    // Step 5: Insert/update items from GitHub (existing functionality)
+    print('[ApiService] Inserting/updating items from GitHub...');
+    await db.insertAllFromJson(githubData);
+    
+    print('[ApiService] Sync with deletion detection complete!');
+  }
+
+  // Helper method to extract IDs from JSON list
+  Set<String> _extractIds(dynamic jsonList) {
+    if (jsonList == null) return {};
+    if (jsonList is! List) return {};
+    
+    return jsonList
+        .where((item) => item != null && item is Map<String, dynamic>)
+        .map((item) => item['id'] as String?)
+        .where((id) => id != null)
+        .cast<String>()
+        .toSet();
   }
 }
