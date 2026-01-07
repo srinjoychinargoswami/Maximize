@@ -34,6 +34,19 @@ class _CalendarPageState extends State<CalendarPage> {
   String _currentView = 'calendar';
   Color _selectedColor = Colors.blue;
   bool _isRefreshing = false;
+  // New Reminder fields
+  bool _reminderEnabled = false;
+  DateTime? _reminderTime;
+  String _reminderPreset = 'at_time'; 
+  final List<Map<String, String>> _reminderPresets = [
+  {'value': 'at_time', 'label': 'At time of event'},
+  {'value': '15min', 'label': '15 minutes before'},
+  {'value': '30min', 'label': '30 minutes before'},
+  {'value': '1hour', 'label': '1 hour before'},
+  {'value': '1day', 'label': '1 day before'},
+  {'value': 'custom', 'label': 'Custom time'},
+];
+
 
   @override
   void initState() {
@@ -202,6 +215,9 @@ class _CalendarPageState extends State<CalendarPage> {
     }
     if (event.recurrenceCount != null) recurrenceCount = event.recurrenceCount;
     if (event.recurrenceEndDate != null) recurrenceEndDate = event.recurrenceEndDate;
+    bool reminderEnabled = event.reminderEnabled ?? false;
+    DateTime? reminderTime = event.reminderTime;
+    String reminderPreset = event.reminderPreset ?? 'at_time';
 
     showDialog(
       context: context,
@@ -255,6 +271,14 @@ class _CalendarPageState extends State<CalendarPage> {
                         (endDate) => recurrenceEndDate = endDate,
                       ),
                     ],
+                    SizedBox(height: 16),
+                    _buildReminderSection(
+                     reminderEnabled, reminderTime, reminderPreset, setDialogState,
+                     (enabled) => reminderEnabled = enabled,
+                     (time) => reminderTime = time,
+                     (preset) => reminderPreset = preset,
+                     startDate,
+                     ),
                   ],
                 ),
               ),
@@ -271,6 +295,7 @@ class _CalendarPageState extends State<CalendarPage> {
                         startDate, endDate, startTime!, endTime!, selectedColor,
                         isRecurring, selectedFrequency, interval, 
                         recurrenceCount, recurrenceEndDate, isSingleOccurrence,
+                        reminderEnabled, reminderTime, reminderPreset
                       );
                       Navigator.of(context).pop();
                     }
@@ -300,6 +325,10 @@ class _CalendarPageState extends State<CalendarPage> {
     int interval = 1;
     int? recurrenceCount;
     DateTime? recurrenceEndDate;
+
+    bool reminderEnabled = false; 
+    DateTime? reminderTime; 
+    String reminderPreset = 'at_time';
 
     showDialog(
       context: context,
@@ -351,6 +380,14 @@ class _CalendarPageState extends State<CalendarPage> {
                       (count) => recurrenceCount = count,
                       (endDate) => recurrenceEndDate = endDate,
                     ),
+                    SizedBox(height: 16), 
+                    _buildReminderSection(
+                      reminderEnabled, reminderTime, reminderPreset, setDialogState, 
+                      (enabled) =>reminderEnabled = enabled, 
+                      (time) => reminderTime = time, 
+                      (preset) => reminderPreset = preset,
+                      startDate,
+                      ),
                   ],
                 ),
               ),
@@ -367,6 +404,7 @@ class _CalendarPageState extends State<CalendarPage> {
                         startDate, endDate, startTime!, endTime!,
                         isRecurring, selectedFrequency, interval, 
                         recurrenceCount, recurrenceEndDate,
+                        reminderEnabled, reminderTime, reminderPreset, // 3 new parameters
                       );
                       Navigator.of(context).pop();
                     }
@@ -555,6 +593,155 @@ class _CalendarPageState extends State<CalendarPage> {
     );
   }
 
+
+// ✅ NEW: Reminder section builder
+Widget _buildReminderSection(
+  bool reminderEnabled, DateTime? reminderTime, String reminderPreset, 
+  StateSetter setDialogState,
+  Function(bool) onReminderEnabledChanged,
+  Function(DateTime?) onReminderTimeChanged,
+  Function(String) onReminderPresetChanged,
+  DateTime eventStartDate,
+) {
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Row(
+        children: [
+          Checkbox(
+            value: reminderEnabled,
+            onChanged: (value) {
+              setDialogState(() {
+                onReminderEnabledChanged(value ?? false);
+                if (value == true && reminderTime == null) {
+                  onReminderTimeChanged(eventStartDate);
+                }
+              });
+            },
+          ),
+          Text('Reminder'),
+        ],
+      ),
+      if (reminderEnabled) ...[
+        SizedBox(height: 8),
+        Text('Remind me:'),
+        ..._reminderPresets.map((preset) {
+          return RadioListTile<String>(
+            title: Text(preset['label']!, style: TextStyle(fontSize: 13)),
+            value: preset['value']!,
+            groupValue: reminderPreset,
+            dense: true,
+            contentPadding: EdgeInsets.zero,
+            onChanged: (value) {
+              setDialogState(() {
+                onReminderPresetChanged(value!);
+                _updateEventReminderTime(eventStartDate, value, onReminderTimeChanged);
+              });
+            },
+          );
+        }).toList(),
+        if (reminderPreset == 'custom') ...[
+          SizedBox(height: 8),
+          TextButton(
+            onPressed: () async {
+              await _pickCustomEventReminderTime(
+                context, eventStartDate, reminderTime, setDialogState, onReminderTimeChanged
+              );
+            },
+            child: Text(
+              reminderTime != null 
+                  ? 'Reminder: ${DateFormat('MMM dd, yyyy - hh:mm a').format(reminderTime!)}'
+                  : 'Tap to set custom time',
+            ),
+          ),
+        ],
+        if (reminderTime != null)
+          Container(
+            padding: EdgeInsets.all(8),
+            margin: EdgeInsets.only(top: 8),
+            decoration: BoxDecoration(
+              color: Colors.blue.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.notifications_active, color: Colors.blue, size: 16),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Reminder set for ${DateFormat('MMM dd, hh:mm a').format(reminderTime!)}',
+                    style: TextStyle(fontSize: 11, color: Colors.blue),
+                  ),
+                ),
+              ],
+            ),
+          ),
+      ],
+    ],
+  );
+}
+
+//Update event reminder time based on preset
+void _updateEventReminderTime(
+  DateTime eventStart, String preset, Function(DateTime?) onReminderTimeChanged
+) {
+  DateTime? newTime;
+  switch (preset) {
+    case 'at_time':
+      newTime = eventStart;
+      break;
+    case '15min':
+      newTime = eventStart.subtract(Duration(minutes: 15));
+      break;
+    case '30min':
+      newTime = eventStart.subtract(Duration(minutes: 30));
+      break;
+    case '1hour':
+      newTime = eventStart.subtract(Duration(hours: 1));
+      break;
+    case '1day':
+      newTime = eventStart.subtract(Duration(days: 1));
+      break;
+    case 'custom':
+      newTime = eventStart; // Keep existing or set to event start
+      break;
+  }
+  onReminderTimeChanged(newTime);
+}
+
+//Pick custom reminder time for events
+Future<void> _pickCustomEventReminderTime(
+  BuildContext context, DateTime eventStart, DateTime? currentTime,
+  StateSetter setDialogState, Function(DateTime?) onReminderTimeChanged
+) async {
+  final pickedDate = await showDatePicker(
+    context: context,
+    initialDate: currentTime ?? eventStart,
+    firstDate: DateTime.now(),
+    lastDate: eventStart,
+  );
+  
+  if (pickedDate != null) {
+    final pickedTime = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(currentTime ?? eventStart),
+    );
+    
+    if (pickedTime != null) {
+      setDialogState(() {
+        onReminderTimeChanged(DateTime(
+          pickedDate.year,
+          pickedDate.month,
+          pickedDate.day,
+          pickedTime.hour,
+          pickedTime.minute,
+        ));
+      });
+    }
+  }
+}
+
+
   Widget _buildDateTimeSelectors(
     DateTime startDate, DateTime endDate, TimeOfDay? startTime, TimeOfDay? endTime,
     StateSetter setDialogState,
@@ -690,6 +877,7 @@ class _CalendarPageState extends State<CalendarPage> {
     );
   }
 
+
   Future<void> _saveNewEvent(
     TextEditingController titleController,
     TextEditingController descriptionController,
@@ -698,6 +886,7 @@ class _CalendarPageState extends State<CalendarPage> {
     TimeOfDay startTime, TimeOfDay endTime,
     bool isRecurring, RecurrenceFrequency frequency, int interval,
     int? recurrenceCount, DateTime? recurrenceEndDate,
+    bool reminderEnabled, DateTime? reminderTime, String reminderPreset,
   ) async {
     try {
       final newEvent = Event(
@@ -724,6 +913,9 @@ class _CalendarPageState extends State<CalendarPage> {
         ) : null,
         recurrenceCount: recurrenceCount,
         recurrenceEndDate: recurrenceEndDate,
+        reminderEnabled: reminderEnabled,
+        reminderTime: reminderEnabled ? reminderTime : null, 
+        reminderPreset: reminderEnabled ? reminderPreset : null,
       );
 
       if (isRecurring) {
@@ -755,6 +947,7 @@ class _CalendarPageState extends State<CalendarPage> {
     bool isRecurring, RecurrenceFrequency frequency, int interval,
     int? recurrenceCount, DateTime? recurrenceEndDate,
     bool isSingleOccurrence,
+    bool reminderEnabled, DateTime? reminderTime, String reminderPreset,
   ) async {
     try {
       if (isSingleOccurrence) {
@@ -776,6 +969,9 @@ class _CalendarPageState extends State<CalendarPage> {
           completed: false, // Initialize with completion status
           completedAt: null, // Initialize completion timestamp
           isRecurring: false,
+          reminderEnabled: reminderEnabled,
+          reminderTime: reminderEnabled ? reminderTime : null, 
+          reminderPreset: reminderEnabled ? reminderPreset : null, 
         );
 
         await widget.calendarService.createModifiedOccurrence(originalEvent, newSingleEvent);
@@ -801,6 +997,9 @@ class _CalendarPageState extends State<CalendarPage> {
           ) : null,
           recurrenceCount: recurrenceCount,
           recurrenceEndDate: recurrenceEndDate,
+          reminderEnabled: reminderEnabled,
+          reminderTime: reminderEnabled ? reminderTime : null, 
+          reminderPreset: reminderEnabled ? reminderPreset : null,
         );
 
         if (isRecurring) {
