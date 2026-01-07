@@ -1,6 +1,8 @@
 import 'package:maximize/models/task_model.dart';
 import 'package:maximize/models/database.dart';
 import 'package:uuid/uuid.dart';
+import 'package:maximize/services/reminder_service.dart'; // ✅ ADDED: For notifications
+import 'package:maximize/models/reminder_model.dart'; // ✅ ADDED: For creating reminder objects
 
 class TaskService {
   final AppDatabase _dbHelper; // Declare a variable to hold the database
@@ -48,7 +50,7 @@ class TaskService {
            date1.day == date2.day;
   }
 
-  // Add a new task to the database
+  // ✅ UPDATED: Add a new task to the database with notification support
   Future<int?> addTask({
     required String title,
     required String description,
@@ -71,6 +73,10 @@ class TaskService {
     bool skipWeekends = false,
     int? dayOfMonth,
     int? weekOfMonth,
+    // ✅ NEW: Reminder parameters
+    bool reminderEnabled = false,
+    DateTime? reminderTime,
+    String? reminderPreset,
   }) async {
     final task = TaskModel(
       id: const Uuid().v1(), // Placeholder for new tasks
@@ -93,17 +99,26 @@ class TaskService {
       skipWeekends: skipWeekends,
       dayOfMonth: dayOfMonth,
       weekOfMonth: weekOfMonth,
+      // ✅ NEW: Reminder fields
+      reminderEnabled: reminderEnabled,
+      reminderTime: reminderTime,
+      reminderPreset: reminderPreset,
     );
 
     try {
-      return await _dbHelper.insertTask(task);
+      final result = await _dbHelper.insertTask(task);
+      
+      // ✅ NEW: Schedule notification if reminder is enabled
+      await _scheduleTaskNotification(task);
+      
+      return result;
     } catch (e) {
       print('Error adding task: $e');
       return null; // Indicate failure
     }
   }
 
-  // Update an existing task in the database
+  // ✅ UPDATED: Update an existing task with notification support
   Future<void> updateTask(TaskModel task) async {
     if (task.id.isEmpty) {
       print('Error: Task ID cannot be empty for update.');
@@ -111,7 +126,13 @@ class TaskService {
     }
 
     try {
+      // ✅ NEW: Cancel old notification before updating
+      await _cancelTaskNotification(task.id);
+      
       await _dbHelper.updateTask(task); // Assuming this method accepts TaskModel
+      
+      // ✅ NEW: Schedule new notification if reminder is enabled
+      await _scheduleTaskNotification(task);
     } catch (e) {
       print('Error updating task: $e');
     }
@@ -130,7 +151,7 @@ class TaskService {
     }
   }
 
-  // ADDED: Mark task as completed (for checkbox functionality)
+  // ✅ UPDATED: Mark task as completed + cancel notification
   Future<void> markTaskCompleted(String taskId) async {
     try {
       final task = await getTaskById(taskId);
@@ -139,14 +160,17 @@ class TaskService {
           completed: true,
           completedAt: DateTime.now(),
         );
-        await updateTask(updatedTask);
+        await _dbHelper.updateTask(updatedTask);
+        
+        // ✅ NEW: Cancel notification when completed
+        await _cancelTaskNotification(taskId);
       }
     } catch (e) {
       print('Error marking task as completed: $e');
     }
   }
 
-  // ADDED: Mark task as incomplete (for checkbox functionality)
+  // ✅ UPDATED: Mark task as incomplete + reschedule notification
   Future<void> markTaskIncomplete(String taskId) async {
     try {
       final task = await getTaskById(taskId);
@@ -155,7 +179,10 @@ class TaskService {
           completed: false,
           completedAt: null,
         );
-        await updateTask(updatedTask);
+        await _dbHelper.updateTask(updatedTask);
+        
+        // ✅ NEW: Reschedule notification if still in future
+        await _scheduleTaskNotification(updatedTask);
       }
     } catch (e) {
       print('Error marking task as incomplete: $e');
@@ -204,9 +231,12 @@ class TaskService {
     }
   }
 
-  // Delete a task from the database
+  // ✅ UPDATED: Delete a task with notification cleanup
   Future<void> deleteTask(String taskId) async {
     try {
+      // ✅ NEW: Cancel notification before deleting
+      await _cancelTaskNotification(taskId);
+      
       // ENHANCED: Also delete associated subtasks
       final subtasks = await getSubtasks(taskId);
       for (final subtask in subtasks) {
@@ -268,6 +298,43 @@ class TaskService {
     } catch (e) {
       print('Error fetching subtask by ID: $e');
       return null;
+    }
+  }
+
+  // ✅ NEW: Schedule notification for task reminder
+  Future<void> _scheduleTaskNotification(TaskModel task) async {
+    try {
+      // Only schedule if reminder is enabled and time is set
+      if (task.reminderEnabled == true && 
+          task.reminderTime != null && 
+          !task.completed &&
+          task.reminderTime!.isAfter(DateTime.now())) {
+        
+        // Create a reminder model for the notification system
+        final reminder = ReminderModel(
+          id: 'task_${task.id}',
+          title: task.title,
+          body: task.description ?? 'Task reminder',
+          scheduledTime: task.reminderTime!,
+          notificationId: task.id.hashCode.toString(),
+          completed: false,
+        );
+        
+        await NotificationService.instance.scheduleNotification(reminder);
+        print('[TaskService] Scheduled notification for task: ${task.title} at ${task.reminderTime}');
+      }
+    } catch (e) {
+      print('[TaskService] Error scheduling task notification: $e');
+    }
+  }
+
+  // ✅ NEW: Cancel notification for task
+  Future<void> _cancelTaskNotification(String taskId) async {
+    try {
+      await NotificationService.instance.cancelNotification('task_$taskId');
+      print('[TaskService] Cancelled notification for task: $taskId');
+    } catch (e) {
+      print('[TaskService] Error cancelling task notification: $e');
     }
   }
 
