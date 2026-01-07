@@ -9,11 +9,27 @@ TaskModel convertTaskDataToModel(TaskData taskData) {
     description: taskData.description,
     dueDate: taskData.dueDate,
     completed: taskData.completed,
+    completedAt: taskData.completedAt, // ADDED: Completion timestamp
     category: taskData.category,
     priority: taskData.priority,
     customCategory: taskData.customCategory,
     pageId: taskData.pageId,
     day: taskData.day,
+    // Recurring task fields
+    isRecurring: taskData.isRecurring,
+    recurrenceRule: taskData.recurrenceRule,
+    recurrenceInterval: taskData.recurrenceInterval,
+    daysOfWeek: taskData.daysOfWeek?.split(',').map((e) => int.tryParse(e.trim())).where((e) => e != null).cast<int>().toList(),
+    recurrenceEndDate: taskData.recurrenceEndDate,
+    parentTaskId: taskData.parentTaskId,
+    maxOccurrences: taskData.maxOccurrences,
+    skipWeekends: taskData.skipWeekends,
+    dayOfMonth: taskData.dayOfMonth,
+    weekOfMonth: taskData.weekOfMonth,
+    // Reminder fields
+    reminderEnabled: taskData.reminderEnabled,
+    reminderTime: taskData.reminderTime,
+    reminderPreset: taskData.reminderPreset,
   );
 }
 
@@ -24,6 +40,7 @@ TaskData convertTaskModelToData(TaskModel taskModel) {
     description: taskModel.description,
     dueDate: taskModel.dueDate,
     completed: taskModel.completed,
+    completedAt: taskModel.completedAt, // ADDED: Completion timestamp
     category: taskModel.category,
     priority: taskModel.priority,
     customCategory: taskModel.customCategory,
@@ -40,5 +57,9 @@ TaskData convertTaskModelToData(TaskModel taskModel) {
     skipWeekends: taskModel.skipWeekends,
     dayOfMonth: taskModel.dayOfMonth,
     weekOfMonth: taskModel.weekOfMonth,
+    // NEW: Reminder fields
+    reminderEnabled: taskModel.reminderEnabled ?? false,
+    reminderTime: taskModel.reminderTime,
+    reminderPreset: taskModel.reminderPreset,
   );
 }
