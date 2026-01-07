@@ -7,7 +7,7 @@ import 'package:maximize/utils/task_utils.dart';
 import 'package:maximize/models/database.dart';
 import 'package:intl/intl.dart';
 
-// ADDED: CustomScrollBehavior to fix RefreshIndicator on Windows desktop
+// CustomScrollBehavior to fix RefreshIndicator on Windows desktop
 class CustomScrollBehavior extends ScrollBehavior {
   @override
   Set<PointerDeviceKind> get dragDevices => {
@@ -30,6 +30,7 @@ class _TaskListScreenState extends State<TaskListScreen> with TickerProviderStat
   List<TaskModel> _tasks = [];
   late final TaskService _taskService;
   bool _isLoading = true;
+  bool _isRefreshing = false; // ADDED: Track refresh state
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
 
@@ -65,7 +66,7 @@ class _TaskListScreenState extends State<TaskListScreen> with TickerProviderStat
     super.dispose();
   }
 
-  // ENHANCED: Load tasks with refresh functionality
+  // Load tasks with refresh functionality
   Future<void> _loadTasks() async {
     setState(() => _isLoading = true);
     try {
@@ -82,7 +83,25 @@ class _TaskListScreenState extends State<TaskListScreen> with TickerProviderStat
     }
   }
 
-  // ENHANCED: Refresh method for pull-to-refresh functionality
+  // ENHANCED: Public refresh method that can be called from parent with loading indicator
+  Future<void> refreshTasks() async {
+    if (_isRefreshing) return; // Prevent multiple simultaneous refreshes
+    
+    setState(() => _isRefreshing = true);
+    await _loadTasks();
+    setState(() => _isRefreshing = false);
+    
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Tasks refreshed!'),
+          duration: Duration(seconds: 1),
+        ),
+      );
+    }
+  }
+
+  // Refresh method for pull-to-refresh functionality
   Future<void> _refreshTasks() async {
     await _loadTasks();
     ScaffoldMessenger.of(context).showSnackBar(
@@ -184,6 +203,21 @@ class _TaskListScreenState extends State<TaskListScreen> with TickerProviderStat
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         elevation: 0,
         actions: [
+          // ADDED: Refresh button with loading indicator
+          IconButton(
+            icon: _isRefreshing 
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                  ),
+                )
+              : const Icon(Icons.refresh),
+            onPressed: _isRefreshing ? null : refreshTasks,
+            tooltip: 'Refresh',
+          ),
           IconButton(
             icon: Icon(_showFilters ? Icons.filter_list_off : Icons.filter_list),
             onPressed: () {
@@ -201,7 +235,6 @@ class _TaskListScreenState extends State<TaskListScreen> with TickerProviderStat
             ),
         ],
       ),
-      // ENHANCED: Wrap RefreshIndicator with ScrollConfiguration and CustomScrollBehavior
       body: ScrollConfiguration(
         behavior: CustomScrollBehavior(),
         child: RefreshIndicator(
@@ -313,7 +346,6 @@ class _TaskListScreenState extends State<TaskListScreen> with TickerProviderStat
 
   Widget _buildEmptyState() {
     return SingleChildScrollView(
-      // ENHANCED: Make empty state scrollable to work with RefreshIndicator
       physics: const AlwaysScrollableScrollPhysics(),
       child: Container(
         height: MediaQuery.of(context).size.height * 0.6,
@@ -376,7 +408,7 @@ class _TaskListScreenState extends State<TaskListScreen> with TickerProviderStat
 
   Widget _buildTaskList(List<TaskModel> filteredTasks) {
     return ListView.builder(
-      physics: const AlwaysScrollableScrollPhysics(), // ENHANCED: Enable scrolling for RefreshIndicator
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.all(16.0),
       itemCount: filteredTasks.length,
       itemBuilder: (context, index) {
@@ -1141,7 +1173,6 @@ class _TaskListScreenState extends State<TaskListScreen> with TickerProviderStat
     });
   }
 
-  // ENHANCED: Use TaskService completion methods instead of SharedPreferences
   void _toggleTaskCompletion(TaskModel task, bool? isCompleted) async {
     try {
       if (isCompleted == true) {
@@ -1149,7 +1180,7 @@ class _TaskListScreenState extends State<TaskListScreen> with TickerProviderStat
       } else {
         await _taskService.markTaskIncomplete(task.id);
       }
-      _loadTasks(); // Reload to get updated data from database
+      _loadTasks();
     } catch (error) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Failed to update task: $error')),
@@ -1157,7 +1188,6 @@ class _TaskListScreenState extends State<TaskListScreen> with TickerProviderStat
     }
   }
 
-  // ENHANCED: Use TaskService completion methods instead of direct database calls
   void _toggleSubtaskCompletion(SubtaskModel subtask, bool? isCompleted) async {
     try {
       if (isCompleted == true) {
@@ -1169,7 +1199,7 @@ class _TaskListScreenState extends State<TaskListScreen> with TickerProviderStat
         );
         await _taskService.updateSubtask(updatedSubtask);
       }
-      _loadTasks(); // Reload to get updated data from database
+      _loadTasks();
     } catch (error) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Failed to update subtask: $error')),
