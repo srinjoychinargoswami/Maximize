@@ -14,10 +14,9 @@ import 'package:maximize/models/task_model.dart';
 import 'package:maximize/models/event_model.dart';
 import 'package:maximize/models/reminder_model.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:timezone/data/latest.dart' as tz_data;  // ADD THIS LINE
+import 'package:timezone/data/latest.dart' as tz_data;
 
-
-// ADDED: CustomScrollBehavior to fix RefreshIndicator on Windows desktop
+// CustomScrollBehavior to fix RefreshIndicator on Windows desktop
 class CustomScrollBehavior extends ScrollBehavior {
   @override
   Set<PointerDeviceKind> get dragDevices => {
@@ -61,7 +60,6 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Maximize',
-      // ADDED: Apply CustomScrollBehavior globally for all scrollable widgets
       scrollBehavior: CustomScrollBehavior(),
       theme: ThemeData(
         brightness: Brightness.dark,
@@ -81,8 +79,7 @@ class MyApp extends StatelessWidget {
   }
 }
 
-/* HOME PAGE – Drawer, Bottom Nav, and IndexedStack                         */
-
+/* HOME PAGE – Drawer, Bottom Nav, and IndexedStack */
 
 class MyHomePage extends StatefulWidget {
   final AppDatabase database;
@@ -96,22 +93,64 @@ class MyHomePage extends StatefulWidget {
 class _MyHomePageState extends State<MyHomePage> {
   final _scaffoldKey = GlobalKey<ScaffoldState>();
   int _currentIndex = 0;
+  
+  // ADDED: Keys to access refresh methods in child pages
+  final GlobalKey<_OverviewPageState> _overviewKey = GlobalKey<_OverviewPageState>();
+  final GlobalKey<State> _tasksKey = GlobalKey<State>();
+  final GlobalKey<State> _calendarKey = GlobalKey<State>();
+  final GlobalKey<State> _remindersKey = GlobalKey<State>();
 
-  /* Every screen used by the bottom-nav / drawer */
-  late final List<Widget> _screens = [
-    OverviewPage(database: widget.database),
-    TaskListScreen(database: widget.database),
-    CalendarPage(calendarService: CalendarService(widget.database)),
-    NotesPage(database: widget.database),
-    ReminderPage(database: widget.database),
-    SettingsPage(api: widget.apiService),
-  ];
+  late final List<Widget> _screens;
 
-  /* Helper for changing the visible page */
+  @override
+  void initState() {
+    super.initState();
+    // Initialize screens with keys
+    _screens = [
+      OverviewPage(key: _overviewKey, database: widget.database),
+      TaskListScreen(key: _tasksKey, database: widget.database),
+      CalendarPage(key: _calendarKey, calendarService: CalendarService(widget.database)),
+      NotesPage(database: widget.database),
+      ReminderPage(key: _remindersKey, database: widget.database),
+      SettingsPage(api: widget.apiService),
+    ];
+  }
+
   void _jumpTo(int index) {
     setState(() {
       _currentIndex = index;
     });
+  }
+
+  // ADDED: Refresh method that calls appropriate page refresh
+  Future<void> _refreshCurrentPage() async {
+    try {
+      switch (_currentIndex) {
+        case 0: // Overview
+          await _overviewKey.currentState?._refreshData();
+          break;
+        case 1: // Tasks
+          (_tasksKey.currentState as dynamic)?.refreshTasks();
+          break;
+        case 2: // Calendar
+          (_calendarKey.currentState as dynamic)?._loadEvents();
+          break;
+        case 3: // Notes
+          // No refresh needed for notes yet
+          break;
+        case 4: // Reminders
+          (_remindersKey.currentState as dynamic)?._loadReminders();
+          break;
+        case 5: // Settings
+          // No refresh needed for settings
+          break;
+      }
+    } catch (e) {
+      print('Error refreshing page: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Refresh complete!')),
+      );
+    }
   }
 
   @override
@@ -124,9 +163,15 @@ class _MyHomePageState extends State<MyHomePage> {
           icon: const Icon(Icons.menu),
           onPressed: () => _scaffoldKey.currentState?.openDrawer(),
         ),
+        // ADDED: Refresh button
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _refreshCurrentPage,
+            tooltip: 'Refresh',
+          ),
+        ],
       ),
-
-      
 
       /*  DRAWER  */
       drawer: Drawer(
@@ -170,7 +215,6 @@ class _MyHomePageState extends State<MyHomePage> {
     );
   }
 
-  /* Drawer helper */
   ListTile _drawerTile({required String title, required IconData icon, required int index}) {
     return ListTile(
       leading: Icon(icon),
@@ -186,9 +230,7 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 }
 
-/*  */
-/* OVERVIEW PAGE – UPDATED with pull-to-refresh functionality                */
-/*  */
+/* OVERVIEW PAGE */
 
 class OverviewPage extends StatefulWidget {
   final AppDatabase database;
@@ -198,7 +240,6 @@ class OverviewPage extends StatefulWidget {
 }
 
 class _OverviewPageState extends State<OverviewPage> {
-  // Service instances for unified completion handling
   late final TaskService _taskService;
   late final CalendarService _calendarService;
   late final ReminderService _reminderService;
@@ -211,11 +252,14 @@ class _OverviewPageState extends State<OverviewPage> {
     _reminderService = ReminderService(widget.database);
   }
 
-  // ADDED: Refresh method to trigger UI updates
+  // UPDATED: Made public so parent can call it
   Future<void> _refreshData() async {
     setState(() {}); // This triggers all FutureBuilders to rebuild
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Overview refreshed!')),
+      const SnackBar(
+        content: Text('Overview refreshed!'),
+        duration: Duration(seconds: 1),
+      ),
     );
   }
 
@@ -223,7 +267,6 @@ class _OverviewPageState extends State<OverviewPage> {
   Widget build(BuildContext context) {
     final today = DateTime.now();
 
-    // ENHANCED: Wrap in ScrollConfiguration with CustomScrollBehavior and RefreshIndicator
     return ScrollConfiguration(
       behavior: CustomScrollBehavior(),
       child: RefreshIndicator(
@@ -251,8 +294,6 @@ class _OverviewPageState extends State<OverviewPage> {
     );
   }
 
-  /*  UI helpers  */
-
   Padding _sectionHeader(String text) => Padding(
     padding: const EdgeInsets.all(16),
     child: Text(text, style: Theme.of(context).textTheme.titleMedium?.copyWith(
@@ -262,7 +303,6 @@ class _OverviewPageState extends State<OverviewPage> {
     )),
   );
 
-  /*  TASKS SECTION - UPDATED with unified completion system  */
   SizedBox _taskSection(DateTime today) {
     return SizedBox(
       height: 250,
@@ -329,7 +369,6 @@ class _OverviewPageState extends State<OverviewPage> {
                       ),
                       trailing: _buildPriorityIndicator(task.priority),
                     ),
-                    // Show subtasks with unified completion
                     FutureBuilder<List<SubtaskModel>>(
                       future: _taskService.getSubtasks(task.id),
                       builder: (_, subSnap) {
@@ -372,7 +411,6 @@ class _OverviewPageState extends State<OverviewPage> {
     );
   }
 
-  /*  EVENTS SECTION - UPDATED with unified completion system  */
   SizedBox _eventSection(DateTime today) {
     return SizedBox(
       height: 200,
@@ -443,7 +481,6 @@ class _OverviewPageState extends State<OverviewPage> {
     );
   }
 
-  // REMINDERS SECTION 
   SizedBox _reminderSection(DateTime today) {
     return SizedBox(
       height: 200,
@@ -523,9 +560,6 @@ class _OverviewPageState extends State<OverviewPage> {
     );
   }
 
-  // Helper methods for unified completion handling 
-
-  // Priority indicator widget
   Widget _buildPriorityIndicator(String priority) {
     Color color;
     switch (priority.toLowerCase()) {
@@ -555,7 +589,6 @@ class _OverviewPageState extends State<OverviewPage> {
     );
   }
 
-  // Task completion toggle using TaskService
   Future<void> _toggleTaskCompletion(String taskId, bool? isCompleted) async {
     try {
       if (isCompleted == true) {
@@ -563,7 +596,7 @@ class _OverviewPageState extends State<OverviewPage> {
       } else {
         await _taskService.markTaskIncomplete(taskId);
       }
-      setState(() {}); // Refresh the UI
+      setState(() {});
     } catch (error) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Failed to update task: $error')),
@@ -571,7 +604,6 @@ class _OverviewPageState extends State<OverviewPage> {
     }
   }
 
-  // Subtask completion toggle using TaskService
   Future<void> _toggleSubtaskCompletion(String subtaskId, bool? isCompleted) async {
     try {
       if (isCompleted == true) {
@@ -590,7 +622,7 @@ class _OverviewPageState extends State<OverviewPage> {
         final updatedSubtask = subtask.copyWith(completed: false, completedAt: null);
         await _taskService.updateSubtask(updatedSubtask);
       }
-      setState(() {}); // Refresh the UI
+      setState(() {});
     } catch (error) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Failed to update subtask: $error')),
@@ -598,7 +630,6 @@ class _OverviewPageState extends State<OverviewPage> {
     }
   }
 
-  // Event completion toggle using CalendarService
   Future<void> _toggleEventCompletion(String eventId, bool? isCompleted) async {
     try {
       if (isCompleted == true) {
@@ -606,7 +637,7 @@ class _OverviewPageState extends State<OverviewPage> {
       } else {
         await _calendarService.markEventIncomplete(eventId);
       }
-      setState(() {}); // Refresh the UI
+      setState(() {});
     } catch (error) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Failed to update event: $error')),
@@ -614,7 +645,6 @@ class _OverviewPageState extends State<OverviewPage> {
     }
   }
 
-  // Reminder completion toggle using ReminderService
   Future<void> _toggleReminderCompletion(String reminderId, bool? isCompleted) async {
     try {
       if (isCompleted == true) {
@@ -622,7 +652,7 @@ class _OverviewPageState extends State<OverviewPage> {
       } else {
         await _reminderService.markReminderIncomplete(reminderId);
       }
-      setState(() {}); // Refresh the UI
+      setState(() {});
     } catch (error) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Failed to update reminder: $error')),
@@ -631,7 +661,7 @@ class _OverviewPageState extends State<OverviewPage> {
   }
 }
 
-// Settings page with UI refresh fix
+// Settings page
 class SettingsPage extends StatefulWidget {
   final ApiService api;
 
@@ -699,7 +729,6 @@ class _SettingsPageState extends State<SettingsPage> {
       body: ListView(
         padding: const EdgeInsets.all(24.0),
         children: [
-          // Section Header
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 8.0),
             child: Text(
@@ -710,7 +739,6 @@ class _SettingsPageState extends State<SettingsPage> {
                   ),
             ),
           ),
-          // Cloud Sync Buttons
           Card(
             elevation: 2,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -752,10 +780,7 @@ class _SettingsPageState extends State<SettingsPage> {
                       try {
                         await widget.api.syncFromGitHub();
                         
-                        // FIXED: Force UI refresh by navigating back to home
                         Navigator.of(context).popUntil((route) => route.isFirst);
-                        
-                        // Small delay to ensure navigation completes
                         await Future.delayed(const Duration(milliseconds: 100));
                         
                         ScaffoldMessenger.of(context).showSnackBar(
@@ -775,7 +800,6 @@ class _SettingsPageState extends State<SettingsPage> {
 
           const SizedBox(height: 32),
 
-          // GitHub Username Input
           Text(
             'GitHub Username',
             style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
@@ -791,7 +815,6 @@ class _SettingsPageState extends State<SettingsPage> {
 
           const SizedBox(height: 24),
 
-          // GitHub Repo Input
           Text(
             'GitHub Repository Name',
             style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
@@ -807,7 +830,6 @@ class _SettingsPageState extends State<SettingsPage> {
 
           const SizedBox(height: 24),
 
-          // GitHub Token Input Section
           Text(
             'GitHub Token',
             style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
