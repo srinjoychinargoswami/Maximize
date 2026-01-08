@@ -1,7 +1,7 @@
 import 'package:maximize/models/database.dart';
 import 'package:maximize/models/event_model.dart';
-import 'package:maximize/services/reminder_service.dart'; // ✅ ADDED: For notifications
-import 'package:maximize/models/reminder_model.dart'; // ✅ ADDED: For creating reminder objects
+import 'package:maximize/services/reminder_service.dart'; 
+import 'package:maximize/models/reminder_model.dart'; 
 
 class CalendarService {
   final AppDatabase _database;
@@ -151,7 +151,7 @@ class CalendarService {
     }
   }
 
-  // ✅ UPDATED: Add a new event to the database with recurrence support + notifications
+  // Add a new event to the database with recurrence support + notifications
   Future<int> addEvent(Event event) async {
     if (event.id.isEmpty) {
       throw Exception('Event ID is required');
@@ -165,7 +165,7 @@ class CalendarService {
       
       final result = await _database.insertEvent(event);
       
-      // ✅ NEW: Schedule notification if reminder is enabled
+      // Schedule notification if reminder is enabled
       await _scheduleEventNotification(event);
       
       return result;
@@ -175,14 +175,14 @@ class CalendarService {
     }
   }
 
-  // ✅ UPDATED: Update an existing event with notifications
+  // Update an existing event with notifications
   Future<void> updateEvent(Event event, {bool updateSeries = false}) async {
     if (event.id.isEmpty) {
       throw Exception('Event ID is required');
     }
 
     try {
-      // ✅ NEW: Cancel old notification before updating
+      // Cancel old notification before updating
       await _cancelEventNotification(event.id);
       
       if (updateSeries && event.parentEventId != null) {
@@ -206,9 +206,9 @@ class CalendarService {
           recurrencePattern: event.recurrencePattern,
           recurrenceCount: event.recurrenceCount,
           recurrenceEndDate: event.recurrenceEndDate,
-          reminderEnabled: event.reminderEnabled, // ✅ NEW
-          reminderTime: event.reminderTime, // ✅ NEW
-          reminderPreset: event.reminderPreset, // ✅ NEW
+          reminderEnabled: event.reminderEnabled, 
+          reminderTime: event.reminderTime, 
+          reminderPreset: event.reminderPreset, 
         );
         
         if (updatedParent.isRecurring && updatedParent.recurrencePattern != null) {
@@ -217,7 +217,7 @@ class CalendarService {
         
         await _database.updateEvent(updatedParent);
         
-        // ✅ NEW: Schedule notification for updated parent
+        // Schedule notification for updated parent
         await _scheduleEventNotification(updatedParent);
       } else {
         // Update single event or non-recurring event
@@ -226,7 +226,7 @@ class CalendarService {
         }
         await _database.updateEvent(event);
         
-        // ✅ NEW: Schedule notification for updated event
+        // Schedule notification for updated event
         await _scheduleEventNotification(event);
       }
     } catch (e) {
@@ -248,7 +248,7 @@ class CalendarService {
     }
   }
 
-  // ✅ UPDATED: Mark event as completed + cancel notification
+  // Mark event as completed + cancel notification
   Future<void> markEventCompleted(String eventId) async {
     try {
       final event = await getEventById(eventId);
@@ -259,7 +259,7 @@ class CalendarService {
         );
         await _database.updateEvent(updatedEvent);
         
-        // ✅ NEW: Cancel notification when completed
+        //  Cancel notification when completed
         await _cancelEventNotification(eventId);
       }
     } catch (e) {
@@ -267,7 +267,7 @@ class CalendarService {
     }
   }
 
-  // ✅ UPDATED: Mark event as incomplete + reschedule notification
+  // Mark event as incomplete + reschedule notification
   Future<void> markEventIncomplete(String eventId) async {
     try {
       final event = await getEventById(eventId);
@@ -278,7 +278,7 @@ class CalendarService {
         );
         await _database.updateEvent(updatedEvent);
         
-        // ✅ NEW: Reschedule notification if still in future
+        // Reschedule notification if still in future
         await _scheduleEventNotification(updatedEvent);
       }
     } catch (e) {
@@ -301,12 +301,12 @@ class CalendarService {
     }
   }
 
-  // ✅ UPDATED: Delete an event with notification cleanup
+  // Delete an event with notification cleanup
   Future<void> deleteEvent(String id, {bool deleteSeries = false}) async {
     try {
       print('Deleting event - ID: $id, deleteSeries: $deleteSeries');
       
-      // ✅ NEW: Cancel notification before deleting
+      // Cancel notification before deleting
       await _cancelEventNotification(id);
       
       if (deleteSeries) {
@@ -330,7 +330,7 @@ class CalendarService {
         for (Event event in events) {
           if (event.parentEventId == parentId && event.id != parentId) {
             print('Deleting instance: ${event.id}');
-            await _cancelEventNotification(event.id); // ✅ NEW
+            await _cancelEventNotification(event.id); 
             await _database.deleteEvent(event.id);
           }
         }
@@ -406,7 +406,7 @@ class CalendarService {
     }
   }
 
-  // ✅ NEW: Schedule notification for event reminder
+  // Schedule notification for event reminder
   Future<void> _scheduleEventNotification(Event event) async {
     try {
       // Only schedule if reminder is enabled and time is set
@@ -433,7 +433,7 @@ class CalendarService {
     }
   }
 
-  // ✅ NEW: Cancel notification for event
+  // Cancel notification for event
   Future<void> _cancelEventNotification(String eventId) async {
     try {
       await NotificationService.instance.cancelNotification('event_$eventId');
@@ -603,7 +603,7 @@ class CalendarService {
         print('  Recurring: ${event.isRecurring}');
         print('  Start: ${event.startDateTime}');
         print('  Completed: ${event.completed}');
-        print('  Reminder: ${event.reminderEnabled}'); // ✅ NEW
+        print('  Reminder: ${event.reminderEnabled}'); 
         print('---');
       }
       print('Total database events: ${allEvents.length}');

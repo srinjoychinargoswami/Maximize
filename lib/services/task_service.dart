@@ -1,9 +1,8 @@
 import 'package:maximize/models/task_model.dart';
 import 'package:maximize/models/database.dart';
 import 'package:uuid/uuid.dart';
-import 'package:maximize/services/reminder_service.dart'; // ✅ ADDED: For notifications
-import 'package:maximize/models/reminder_model.dart'; // ✅ ADDED: For creating reminder objects
-
+import 'package:maximize/services/reminder_service.dart';
+import 'package:maximize/models/reminder_model.dart'; 
 class TaskService {
   final AppDatabase _dbHelper; // Declare a variable to hold the database
 
@@ -50,7 +49,7 @@ class TaskService {
            date1.day == date2.day;
   }
 
-  // ✅ UPDATED: Add a new task to the database with notification support
+  // Add a new task to the database with notification support
   Future<int?> addTask({
     required String title,
     required String description,
@@ -73,7 +72,6 @@ class TaskService {
     bool skipWeekends = false,
     int? dayOfMonth,
     int? weekOfMonth,
-    // ✅ NEW: Reminder parameters
     bool reminderEnabled = false,
     DateTime? reminderTime,
     String? reminderPreset,
@@ -99,7 +97,6 @@ class TaskService {
       skipWeekends: skipWeekends,
       dayOfMonth: dayOfMonth,
       weekOfMonth: weekOfMonth,
-      // ✅ NEW: Reminder fields
       reminderEnabled: reminderEnabled,
       reminderTime: reminderTime,
       reminderPreset: reminderPreset,
@@ -108,7 +105,7 @@ class TaskService {
     try {
       final result = await _dbHelper.insertTask(task);
       
-      // ✅ NEW: Schedule notification if reminder is enabled
+      // Schedule notification if reminder is enabled
       await _scheduleTaskNotification(task);
       
       return result;
@@ -118,7 +115,7 @@ class TaskService {
     }
   }
 
-  // ✅ UPDATED: Update an existing task with notification support
+  //Update an existing task with notification support
   Future<void> updateTask(TaskModel task) async {
     if (task.id.isEmpty) {
       print('Error: Task ID cannot be empty for update.');
@@ -126,12 +123,12 @@ class TaskService {
     }
 
     try {
-      // ✅ NEW: Cancel old notification before updating
+      // Cancel old notification before updating
       await _cancelTaskNotification(task.id);
       
       await _dbHelper.updateTask(task); // Assuming this method accepts TaskModel
       
-      // ✅ NEW: Schedule new notification if reminder is enabled
+      // Schedule new notification if reminder is enabled
       await _scheduleTaskNotification(task);
     } catch (e) {
       print('Error updating task: $e');
@@ -151,7 +148,7 @@ class TaskService {
     }
   }
 
-  // ✅ UPDATED: Mark task as completed + cancel notification
+  // Mark task as completed + cancel notification
   Future<void> markTaskCompleted(String taskId) async {
     try {
       final task = await getTaskById(taskId);
@@ -162,7 +159,7 @@ class TaskService {
         );
         await _dbHelper.updateTask(updatedTask);
         
-        // ✅ NEW: Cancel notification when completed
+        // Cancel notification when completed
         await _cancelTaskNotification(taskId);
       }
     } catch (e) {
@@ -170,7 +167,7 @@ class TaskService {
     }
   }
 
-  // ✅ UPDATED: Mark task as incomplete + reschedule notification
+  // Mark task as incomplete + reschedule notification
   Future<void> markTaskIncomplete(String taskId) async {
     try {
       final task = await getTaskById(taskId);
@@ -181,7 +178,7 @@ class TaskService {
         );
         await _dbHelper.updateTask(updatedTask);
         
-        // ✅ NEW: Reschedule notification if still in future
+        // Reschedule notification if still in future
         await _scheduleTaskNotification(updatedTask);
       }
     } catch (e) {
@@ -231,10 +228,10 @@ class TaskService {
     }
   }
 
-  // ✅ UPDATED: Delete a task with notification cleanup
+  // Delete a task with notification cleanup
   Future<void> deleteTask(String taskId) async {
     try {
-      // ✅ NEW: Cancel notification before deleting
+      // Cancel notification before deleting
       await _cancelTaskNotification(taskId);
       
       // ENHANCED: Also delete associated subtasks
@@ -301,7 +298,7 @@ class TaskService {
     }
   }
 
-  // ✅ NEW: Schedule notification for task reminder
+  // Schedule notification for task reminder
   Future<void> _scheduleTaskNotification(TaskModel task) async {
     try {
       // Only schedule if reminder is enabled and time is set
@@ -328,7 +325,7 @@ class TaskService {
     }
   }
 
-  // ✅ NEW: Cancel notification for task
+  // Cancel notification for task
   Future<void> _cancelTaskNotification(String taskId) async {
     try {
       await NotificationService.instance.cancelNotification('task_$taskId');
