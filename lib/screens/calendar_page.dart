@@ -594,7 +594,7 @@ class _CalendarPageState extends State<CalendarPage> {
   }
 
 
-// ✅ NEW: Reminder section builder
+// NEW: Reminder section builder
 Widget _buildReminderSection(
   bool reminderEnabled, DateTime? reminderTime, String reminderPreset, 
   StateSetter setDialogState,

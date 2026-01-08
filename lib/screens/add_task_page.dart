@@ -40,7 +40,7 @@ class _AddTaskPageState extends State<AddTaskPage> {
   final List<String> _recurrenceOptions = ['daily', 'weekly', 'monthly', 'yearly'];
   final List<String> _weekDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
-  // ✅ NEW: Reminder fields
+  // Reminder fields
   bool _reminderEnabled = false;
   DateTime? _reminderTime;
   String _reminderPreset = 'at_time';
@@ -80,7 +80,7 @@ class _AddTaskPageState extends State<AddTaskPage> {
       _dayOfMonth = widget.task!.dayOfMonth;
       _weekOfMonth = widget.task!.weekOfMonth;
       
-      // ✅ NEW: Initialize reminder fields
+      //  Initialize reminder fields
       _reminderEnabled = widget.task!.reminderEnabled ?? false;
       _reminderTime = widget.task!.reminderTime;
       _reminderPreset = widget.task!.reminderPreset ?? 'at_time';
@@ -150,7 +150,7 @@ class _AddTaskPageState extends State<AddTaskPage> {
                 const SizedBox(height: 16),
                 _buildRecurringSection(),
                 const SizedBox(height: 16),
-                _buildReminderSection(), // ✅ NEW: Reminder section
+                _buildReminderSection(), //NEW: Reminder section
                 const SizedBox(height: 16),
                 _buildSubtaskField(),
                 const SizedBox(height: 24),
@@ -278,7 +278,7 @@ class _AddTaskPageState extends State<AddTaskPage> {
           if (pickedDate != null) {
             setState(() {
               _dueDate = pickedDate;
-              // ✅ ADDED: Update reminder time when due date changes
+              // ADDED: Update reminder time when due date changes
               if (_reminderEnabled && _reminderPreset != 'custom') {
                 _updateReminderTime();
               }
@@ -325,7 +325,7 @@ class _AddTaskPageState extends State<AddTaskPage> {
     );
   }
 
-  // ✅ NEW: Reminder Section
+  // Reminder Section
   Widget _buildReminderSection() {
     return Card(
       child: Padding(
@@ -410,7 +410,7 @@ class _AddTaskPageState extends State<AddTaskPage> {
     );
   }
 
-  // ✅ NEW: Update reminder time based on preset
+  //  Update reminder time based on preset
   void _updateReminderTime() {
     switch (_reminderPreset) {
       case 'at_time':
@@ -435,7 +435,7 @@ class _AddTaskPageState extends State<AddTaskPage> {
     }
   }
 
-  // ✅ NEW: Pick custom reminder time
+  // Pick custom reminder time
   Future<void> _pickCustomReminderTime() async {
     final pickedDate = await showDatePicker(
       context: context,
@@ -775,7 +775,7 @@ class _AddTaskPageState extends State<AddTaskPage> {
               }
             }
             
-            // ✅ NEW: Validate reminder settings
+            // Validate reminder settings
             if (_reminderEnabled && _reminderTime == null) {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text('Please set a reminder time')),
@@ -805,14 +805,13 @@ class _AddTaskPageState extends State<AddTaskPage> {
                 skipWeekends: _isRecurring ? _skipWeekends : false,
                 dayOfMonth: _isRecurring && _recurrenceRule == 'monthly' ? _dayOfMonth : null,
                 weekOfMonth: _weekOfMonth,
-                // ✅ NEW: Reminder fields
                 reminderEnabled: _reminderEnabled,
                 reminderTime: _reminderEnabled ? _reminderTime : null,
                 reminderPreset: _reminderEnabled ? _reminderPreset : null,
               );
 
               if (widget.task != null) {
-                // ✅ FIXED: Update existing task with proper notification handling
+                // Update existing task with proper notification handling
                 if (widget.taskService != null) {
                   // Use TaskService (handles notifications automatically)
                   await widget.taskService!.updateTask(taskModel);
@@ -827,7 +826,7 @@ class _AddTaskPageState extends State<AddTaskPage> {
                   await AppDatabase.instance.deleteSubtask(existingSubtask.id);
                 }
               } else {
-                // ✅ FIXED: Create new task with proper notification handling
+                // Create new task with proper notification handling
                 if (widget.taskService != null) {
                   // Use TaskService (handles notifications automatically)
                   await widget.taskService!.addTask(
@@ -850,7 +849,6 @@ class _AddTaskPageState extends State<AddTaskPage> {
                     skipWeekends: taskModel.skipWeekends ?? false,
                     dayOfMonth: taskModel.dayOfMonth,
                     weekOfMonth: taskModel.weekOfMonth,
-                    // ✅ Pass reminder fields
                     reminderEnabled: taskModel.reminderEnabled ?? false,
                     reminderTime: taskModel.reminderTime,
                     reminderPreset: taskModel.reminderPreset,
