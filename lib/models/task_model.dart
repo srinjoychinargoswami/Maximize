@@ -32,6 +32,11 @@ class TaskModel {
   final DateTime? completedAt; // When the task was completed (NEW)
   final List<SubtaskModel>? subtasks; // List of subtasks (ADDED for better integration)
 
+  // NEW: Reminder fields
+  final bool? reminderEnabled; // Whether reminder notification is enabled
+  final DateTime? reminderTime; // When to show the reminder notification
+  final String? reminderPreset; // Preset type: 'at_time', '15min', '30min', '1hour', '1day', 'custom'
+
   TaskModel({
     required this.id,
     required this.title,
@@ -55,6 +60,9 @@ class TaskModel {
     this.weekOfMonth,
     this.completedAt, // ADDED: Track completion timestamp
     this.subtasks, // ADDED: Include subtasks in model
+    this.reminderEnabled, 
+    this.reminderTime, 
+    this.reminderPreset, 
   });
 
   factory TaskModel.fromData(TaskData data) {
@@ -80,6 +88,9 @@ class TaskModel {
       dayOfMonth: data.dayOfMonth,
       weekOfMonth: data.weekOfMonth,
       completedAt: data.completedAt, // ADDED: Map completion timestamp
+      reminderEnabled: data.reminderEnabled, // : Map reminder enabled
+      reminderTime: data.reminderTime, //  Map reminder time
+      reminderPreset: data.reminderPreset, //  Map reminder preset
       // Note: subtasks will be loaded separately via service layer
     );
   }
@@ -111,6 +122,9 @@ class TaskModel {
       'dayOfMonth': dayOfMonth,
       'weekOfMonth': weekOfMonth,
       'completedAt': completedAt?.toIso8601String(), // ADDED: Include completion timestamp
+      'reminderEnabled': reminderEnabled, // Include reminder enabled
+      'reminderTime': reminderTime?.toIso8601String(), //Include reminder time
+      'reminderPreset': reminderPreset, // Include reminder preset
     };
   }
 
@@ -144,6 +158,11 @@ class TaskModel {
       completedAt: map['completedAt'] != null // ADDED: Parse completion timestamp
           ? DateTime.parse(map['completedAt'])
           : null,
+      reminderEnabled: map['reminderEnabled'], // Parse reminder enabled
+      reminderTime: map['reminderTime'] != null // Parse reminder time
+          ? DateTime.parse(map['reminderTime'])
+          : null,
+      reminderPreset: map['reminderPreset'], // Parse reminder preset
     );
   }
 
@@ -170,6 +189,9 @@ class TaskModel {
     int? weekOfMonth,
     DateTime? completedAt, // ADDED: Allow updating completion timestamp
     List<SubtaskModel>? subtasks, // ADDED: Allow updating subtasks
+    bool? reminderEnabled, // Allow updating reminder enabled
+    DateTime? reminderTime, //  Allow updating reminder time
+    String? reminderPreset, //Allow updating reminder preset
   }) {
     return TaskModel(
       id: id ?? this.id,
@@ -194,6 +216,9 @@ class TaskModel {
       weekOfMonth: weekOfMonth ?? this.weekOfMonth,
       completedAt: completedAt ?? this.completedAt, // ADDED: Update completion timestamp
       subtasks: subtasks ?? this.subtasks, // ADDED: Update subtasks
+      reminderEnabled: reminderEnabled ?? this.reminderEnabled, // Update reminder enabled
+      reminderTime: reminderTime ?? this.reminderTime, // Update reminder time
+      reminderPreset: reminderPreset ?? this.reminderPreset, // Update reminder preset
     );
   }
 
@@ -217,6 +242,9 @@ class TaskModel {
       completedAt: !completed ? DateTime.now() : null, // Set timestamp when completing
     );
   }
+  
+  // Helper method to check if reminder is set
+  bool get hasReminder => reminderEnabled == true && reminderTime != null;
   
   // Check if this task should recur on a specific date
   bool shouldRecurOnDate(DateTime date) {

@@ -150,6 +150,28 @@ class $TasksTable extends Tasks with TableInfo<$TasksTable, TaskData> {
   late final GeneratedColumn<int> weekOfMonth = GeneratedColumn<int>(
       'week_of_month', aliasedName, true,
       type: DriftSqlType.int, requiredDuringInsert: false);
+  static const VerificationMeta _reminderEnabledMeta =
+      const VerificationMeta('reminderEnabled');
+  @override
+  late final GeneratedColumn<bool> reminderEnabled = GeneratedColumn<bool>(
+      'reminder_enabled', aliasedName, false,
+      type: DriftSqlType.bool,
+      requiredDuringInsert: false,
+      defaultConstraints: GeneratedColumn.constraintIsAlways(
+          'CHECK ("reminder_enabled" IN (0, 1))'),
+      defaultValue: Constant(false));
+  static const VerificationMeta _reminderTimeMeta =
+      const VerificationMeta('reminderTime');
+  @override
+  late final GeneratedColumn<DateTime> reminderTime = GeneratedColumn<DateTime>(
+      'reminder_time', aliasedName, true,
+      type: DriftSqlType.dateTime, requiredDuringInsert: false);
+  static const VerificationMeta _reminderPresetMeta =
+      const VerificationMeta('reminderPreset');
+  @override
+  late final GeneratedColumn<String> reminderPreset = GeneratedColumn<String>(
+      'reminder_preset', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
   @override
   List<GeneratedColumn> get $columns => [
         id,
@@ -172,7 +194,10 @@ class $TasksTable extends Tasks with TableInfo<$TasksTable, TaskData> {
         maxOccurrences,
         skipWeekends,
         dayOfMonth,
-        weekOfMonth
+        weekOfMonth,
+        reminderEnabled,
+        reminderTime,
+        reminderPreset
       ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -299,6 +324,24 @@ class $TasksTable extends Tasks with TableInfo<$TasksTable, TaskData> {
           weekOfMonth.isAcceptableOrUnknown(
               data['week_of_month']!, _weekOfMonthMeta));
     }
+    if (data.containsKey('reminder_enabled')) {
+      context.handle(
+          _reminderEnabledMeta,
+          reminderEnabled.isAcceptableOrUnknown(
+              data['reminder_enabled']!, _reminderEnabledMeta));
+    }
+    if (data.containsKey('reminder_time')) {
+      context.handle(
+          _reminderTimeMeta,
+          reminderTime.isAcceptableOrUnknown(
+              data['reminder_time']!, _reminderTimeMeta));
+    }
+    if (data.containsKey('reminder_preset')) {
+      context.handle(
+          _reminderPresetMeta,
+          reminderPreset.isAcceptableOrUnknown(
+              data['reminder_preset']!, _reminderPresetMeta));
+    }
     return context;
   }
 
@@ -350,6 +393,12 @@ class $TasksTable extends Tasks with TableInfo<$TasksTable, TaskData> {
           .read(DriftSqlType.int, data['${effectivePrefix}day_of_month']),
       weekOfMonth: attachedDatabase.typeMapping
           .read(DriftSqlType.int, data['${effectivePrefix}week_of_month']),
+      reminderEnabled: attachedDatabase.typeMapping
+          .read(DriftSqlType.bool, data['${effectivePrefix}reminder_enabled'])!,
+      reminderTime: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}reminder_time']),
+      reminderPreset: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}reminder_preset']),
     );
   }
 
@@ -381,6 +430,9 @@ class TaskData extends DataClass implements Insertable<TaskData> {
   final bool skipWeekends;
   final int? dayOfMonth;
   final int? weekOfMonth;
+  final bool reminderEnabled;
+  final DateTime? reminderTime;
+  final String? reminderPreset;
   const TaskData(
       {required this.id,
       required this.title,
@@ -402,7 +454,10 @@ class TaskData extends DataClass implements Insertable<TaskData> {
       this.maxOccurrences,
       required this.skipWeekends,
       this.dayOfMonth,
-      this.weekOfMonth});
+      this.weekOfMonth,
+      required this.reminderEnabled,
+      this.reminderTime,
+      this.reminderPreset});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -455,6 +510,13 @@ class TaskData extends DataClass implements Insertable<TaskData> {
     if (!nullToAbsent || weekOfMonth != null) {
       map['week_of_month'] = Variable<int>(weekOfMonth);
     }
+    map['reminder_enabled'] = Variable<bool>(reminderEnabled);
+    if (!nullToAbsent || reminderTime != null) {
+      map['reminder_time'] = Variable<DateTime>(reminderTime);
+    }
+    if (!nullToAbsent || reminderPreset != null) {
+      map['reminder_preset'] = Variable<String>(reminderPreset);
+    }
     return map;
   }
 
@@ -506,6 +568,13 @@ class TaskData extends DataClass implements Insertable<TaskData> {
       weekOfMonth: weekOfMonth == null && nullToAbsent
           ? const Value.absent()
           : Value(weekOfMonth),
+      reminderEnabled: Value(reminderEnabled),
+      reminderTime: reminderTime == null && nullToAbsent
+          ? const Value.absent()
+          : Value(reminderTime),
+      reminderPreset: reminderPreset == null && nullToAbsent
+          ? const Value.absent()
+          : Value(reminderPreset),
     );
   }
 
@@ -535,6 +604,9 @@ class TaskData extends DataClass implements Insertable<TaskData> {
       skipWeekends: serializer.fromJson<bool>(json['skipWeekends']),
       dayOfMonth: serializer.fromJson<int?>(json['dayOfMonth']),
       weekOfMonth: serializer.fromJson<int?>(json['weekOfMonth']),
+      reminderEnabled: serializer.fromJson<bool>(json['reminderEnabled']),
+      reminderTime: serializer.fromJson<DateTime?>(json['reminderTime']),
+      reminderPreset: serializer.fromJson<String?>(json['reminderPreset']),
     );
   }
   @override
@@ -562,6 +634,9 @@ class TaskData extends DataClass implements Insertable<TaskData> {
       'skipWeekends': serializer.toJson<bool>(skipWeekends),
       'dayOfMonth': serializer.toJson<int?>(dayOfMonth),
       'weekOfMonth': serializer.toJson<int?>(weekOfMonth),
+      'reminderEnabled': serializer.toJson<bool>(reminderEnabled),
+      'reminderTime': serializer.toJson<DateTime?>(reminderTime),
+      'reminderPreset': serializer.toJson<String?>(reminderPreset),
     };
   }
 
@@ -586,7 +661,10 @@ class TaskData extends DataClass implements Insertable<TaskData> {
           Value<int?> maxOccurrences = const Value.absent(),
           bool? skipWeekends,
           Value<int?> dayOfMonth = const Value.absent(),
-          Value<int?> weekOfMonth = const Value.absent()}) =>
+          Value<int?> weekOfMonth = const Value.absent(),
+          bool? reminderEnabled,
+          Value<DateTime?> reminderTime = const Value.absent(),
+          Value<String?> reminderPreset = const Value.absent()}) =>
       TaskData(
         id: id ?? this.id,
         title: title ?? this.title,
@@ -617,6 +695,11 @@ class TaskData extends DataClass implements Insertable<TaskData> {
         skipWeekends: skipWeekends ?? this.skipWeekends,
         dayOfMonth: dayOfMonth.present ? dayOfMonth.value : this.dayOfMonth,
         weekOfMonth: weekOfMonth.present ? weekOfMonth.value : this.weekOfMonth,
+        reminderEnabled: reminderEnabled ?? this.reminderEnabled,
+        reminderTime:
+            reminderTime.present ? reminderTime.value : this.reminderTime,
+        reminderPreset:
+            reminderPreset.present ? reminderPreset.value : this.reminderPreset,
       );
   TaskData copyWithCompanion(TasksCompanion data) {
     return TaskData(
@@ -661,6 +744,15 @@ class TaskData extends DataClass implements Insertable<TaskData> {
           data.dayOfMonth.present ? data.dayOfMonth.value : this.dayOfMonth,
       weekOfMonth:
           data.weekOfMonth.present ? data.weekOfMonth.value : this.weekOfMonth,
+      reminderEnabled: data.reminderEnabled.present
+          ? data.reminderEnabled.value
+          : this.reminderEnabled,
+      reminderTime: data.reminderTime.present
+          ? data.reminderTime.value
+          : this.reminderTime,
+      reminderPreset: data.reminderPreset.present
+          ? data.reminderPreset.value
+          : this.reminderPreset,
     );
   }
 
@@ -687,7 +779,10 @@ class TaskData extends DataClass implements Insertable<TaskData> {
           ..write('maxOccurrences: $maxOccurrences, ')
           ..write('skipWeekends: $skipWeekends, ')
           ..write('dayOfMonth: $dayOfMonth, ')
-          ..write('weekOfMonth: $weekOfMonth')
+          ..write('weekOfMonth: $weekOfMonth, ')
+          ..write('reminderEnabled: $reminderEnabled, ')
+          ..write('reminderTime: $reminderTime, ')
+          ..write('reminderPreset: $reminderPreset')
           ..write(')'))
         .toString();
   }
@@ -714,7 +809,10 @@ class TaskData extends DataClass implements Insertable<TaskData> {
         maxOccurrences,
         skipWeekends,
         dayOfMonth,
-        weekOfMonth
+        weekOfMonth,
+        reminderEnabled,
+        reminderTime,
+        reminderPreset
       ]);
   @override
   bool operator ==(Object other) =>
@@ -740,7 +838,10 @@ class TaskData extends DataClass implements Insertable<TaskData> {
           other.maxOccurrences == this.maxOccurrences &&
           other.skipWeekends == this.skipWeekends &&
           other.dayOfMonth == this.dayOfMonth &&
-          other.weekOfMonth == this.weekOfMonth);
+          other.weekOfMonth == this.weekOfMonth &&
+          other.reminderEnabled == this.reminderEnabled &&
+          other.reminderTime == this.reminderTime &&
+          other.reminderPreset == this.reminderPreset);
 }
 
 class TasksCompanion extends UpdateCompanion<TaskData> {
@@ -765,6 +866,9 @@ class TasksCompanion extends UpdateCompanion<TaskData> {
   final Value<bool> skipWeekends;
   final Value<int?> dayOfMonth;
   final Value<int?> weekOfMonth;
+  final Value<bool> reminderEnabled;
+  final Value<DateTime?> reminderTime;
+  final Value<String?> reminderPreset;
   final Value<int> rowid;
   const TasksCompanion({
     this.id = const Value.absent(),
@@ -788,6 +892,9 @@ class TasksCompanion extends UpdateCompanion<TaskData> {
     this.skipWeekends = const Value.absent(),
     this.dayOfMonth = const Value.absent(),
     this.weekOfMonth = const Value.absent(),
+    this.reminderEnabled = const Value.absent(),
+    this.reminderTime = const Value.absent(),
+    this.reminderPreset = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   TasksCompanion.insert({
@@ -812,6 +919,9 @@ class TasksCompanion extends UpdateCompanion<TaskData> {
     this.skipWeekends = const Value.absent(),
     this.dayOfMonth = const Value.absent(),
     this.weekOfMonth = const Value.absent(),
+    this.reminderEnabled = const Value.absent(),
+    this.reminderTime = const Value.absent(),
+    this.reminderPreset = const Value.absent(),
     this.rowid = const Value.absent(),
   })  : title = Value(title),
         dueDate = Value(dueDate),
@@ -838,6 +948,9 @@ class TasksCompanion extends UpdateCompanion<TaskData> {
     Expression<bool>? skipWeekends,
     Expression<int>? dayOfMonth,
     Expression<int>? weekOfMonth,
+    Expression<bool>? reminderEnabled,
+    Expression<DateTime>? reminderTime,
+    Expression<String>? reminderPreset,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -862,6 +975,9 @@ class TasksCompanion extends UpdateCompanion<TaskData> {
       if (skipWeekends != null) 'skip_weekends': skipWeekends,
       if (dayOfMonth != null) 'day_of_month': dayOfMonth,
       if (weekOfMonth != null) 'week_of_month': weekOfMonth,
+      if (reminderEnabled != null) 'reminder_enabled': reminderEnabled,
+      if (reminderTime != null) 'reminder_time': reminderTime,
+      if (reminderPreset != null) 'reminder_preset': reminderPreset,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -888,6 +1004,9 @@ class TasksCompanion extends UpdateCompanion<TaskData> {
       Value<bool>? skipWeekends,
       Value<int?>? dayOfMonth,
       Value<int?>? weekOfMonth,
+      Value<bool>? reminderEnabled,
+      Value<DateTime?>? reminderTime,
+      Value<String?>? reminderPreset,
       Value<int>? rowid}) {
     return TasksCompanion(
       id: id ?? this.id,
@@ -911,6 +1030,9 @@ class TasksCompanion extends UpdateCompanion<TaskData> {
       skipWeekends: skipWeekends ?? this.skipWeekends,
       dayOfMonth: dayOfMonth ?? this.dayOfMonth,
       weekOfMonth: weekOfMonth ?? this.weekOfMonth,
+      reminderEnabled: reminderEnabled ?? this.reminderEnabled,
+      reminderTime: reminderTime ?? this.reminderTime,
+      reminderPreset: reminderPreset ?? this.reminderPreset,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -981,6 +1103,15 @@ class TasksCompanion extends UpdateCompanion<TaskData> {
     if (weekOfMonth.present) {
       map['week_of_month'] = Variable<int>(weekOfMonth.value);
     }
+    if (reminderEnabled.present) {
+      map['reminder_enabled'] = Variable<bool>(reminderEnabled.value);
+    }
+    if (reminderTime.present) {
+      map['reminder_time'] = Variable<DateTime>(reminderTime.value);
+    }
+    if (reminderPreset.present) {
+      map['reminder_preset'] = Variable<String>(reminderPreset.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -1011,6 +1142,9 @@ class TasksCompanion extends UpdateCompanion<TaskData> {
           ..write('skipWeekends: $skipWeekends, ')
           ..write('dayOfMonth: $dayOfMonth, ')
           ..write('weekOfMonth: $weekOfMonth, ')
+          ..write('reminderEnabled: $reminderEnabled, ')
+          ..write('reminderTime: $reminderTime, ')
+          ..write('reminderPreset: $reminderPreset, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -1444,6 +1578,28 @@ class $EventsTable extends Events with TableInfo<$EventsTable, EventData> {
   late final GeneratedColumn<int> recurrenceCount = GeneratedColumn<int>(
       'recurrence_count', aliasedName, true,
       type: DriftSqlType.int, requiredDuringInsert: false);
+  static const VerificationMeta _reminderEnabledMeta =
+      const VerificationMeta('reminderEnabled');
+  @override
+  late final GeneratedColumn<bool> reminderEnabled = GeneratedColumn<bool>(
+      'reminder_enabled', aliasedName, false,
+      type: DriftSqlType.bool,
+      requiredDuringInsert: false,
+      defaultConstraints: GeneratedColumn.constraintIsAlways(
+          'CHECK ("reminder_enabled" IN (0, 1))'),
+      defaultValue: Constant(false));
+  static const VerificationMeta _reminderTimeMeta =
+      const VerificationMeta('reminderTime');
+  @override
+  late final GeneratedColumn<DateTime> reminderTime = GeneratedColumn<DateTime>(
+      'reminder_time', aliasedName, true,
+      type: DriftSqlType.dateTime, requiredDuringInsert: false);
+  static const VerificationMeta _reminderPresetMeta =
+      const VerificationMeta('reminderPreset');
+  @override
+  late final GeneratedColumn<String> reminderPreset = GeneratedColumn<String>(
+      'reminder_preset', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
   @override
   List<GeneratedColumn> get $columns => [
         id,
@@ -1461,7 +1617,10 @@ class $EventsTable extends Events with TableInfo<$EventsTable, EventData> {
         parentEventId,
         recurrenceExceptionDates,
         recurrenceEndDate,
-        recurrenceCount
+        recurrenceCount,
+        reminderEnabled,
+        reminderTime,
+        reminderPreset
       ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -1565,6 +1724,24 @@ class $EventsTable extends Events with TableInfo<$EventsTable, EventData> {
           recurrenceCount.isAcceptableOrUnknown(
               data['recurrence_count']!, _recurrenceCountMeta));
     }
+    if (data.containsKey('reminder_enabled')) {
+      context.handle(
+          _reminderEnabledMeta,
+          reminderEnabled.isAcceptableOrUnknown(
+              data['reminder_enabled']!, _reminderEnabledMeta));
+    }
+    if (data.containsKey('reminder_time')) {
+      context.handle(
+          _reminderTimeMeta,
+          reminderTime.isAcceptableOrUnknown(
+              data['reminder_time']!, _reminderTimeMeta));
+    }
+    if (data.containsKey('reminder_preset')) {
+      context.handle(
+          _reminderPresetMeta,
+          reminderPreset.isAcceptableOrUnknown(
+              data['reminder_preset']!, _reminderPresetMeta));
+    }
     return context;
   }
 
@@ -1607,6 +1784,12 @@ class $EventsTable extends Events with TableInfo<$EventsTable, EventData> {
           DriftSqlType.dateTime, data['${effectivePrefix}recurrence_end_date']),
       recurrenceCount: attachedDatabase.typeMapping
           .read(DriftSqlType.int, data['${effectivePrefix}recurrence_count']),
+      reminderEnabled: attachedDatabase.typeMapping
+          .read(DriftSqlType.bool, data['${effectivePrefix}reminder_enabled'])!,
+      reminderTime: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}reminder_time']),
+      reminderPreset: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}reminder_preset']),
     );
   }
 
@@ -1633,6 +1816,9 @@ class EventData extends DataClass implements Insertable<EventData> {
   final String? recurrenceExceptionDates;
   final DateTime? recurrenceEndDate;
   final int? recurrenceCount;
+  final bool reminderEnabled;
+  final DateTime? reminderTime;
+  final String? reminderPreset;
   const EventData(
       {required this.id,
       required this.title,
@@ -1649,7 +1835,10 @@ class EventData extends DataClass implements Insertable<EventData> {
       this.parentEventId,
       this.recurrenceExceptionDates,
       this.recurrenceEndDate,
-      this.recurrenceCount});
+      this.recurrenceCount,
+      required this.reminderEnabled,
+      this.reminderTime,
+      this.reminderPreset});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -1689,6 +1878,13 @@ class EventData extends DataClass implements Insertable<EventData> {
     }
     if (!nullToAbsent || recurrenceCount != null) {
       map['recurrence_count'] = Variable<int>(recurrenceCount);
+    }
+    map['reminder_enabled'] = Variable<bool>(reminderEnabled);
+    if (!nullToAbsent || reminderTime != null) {
+      map['reminder_time'] = Variable<DateTime>(reminderTime);
+    }
+    if (!nullToAbsent || reminderPreset != null) {
+      map['reminder_preset'] = Variable<String>(reminderPreset);
     }
     return map;
   }
@@ -1730,6 +1926,13 @@ class EventData extends DataClass implements Insertable<EventData> {
       recurrenceCount: recurrenceCount == null && nullToAbsent
           ? const Value.absent()
           : Value(recurrenceCount),
+      reminderEnabled: Value(reminderEnabled),
+      reminderTime: reminderTime == null && nullToAbsent
+          ? const Value.absent()
+          : Value(reminderTime),
+      reminderPreset: reminderPreset == null && nullToAbsent
+          ? const Value.absent()
+          : Value(reminderPreset),
     );
   }
 
@@ -1755,6 +1958,9 @@ class EventData extends DataClass implements Insertable<EventData> {
       recurrenceEndDate:
           serializer.fromJson<DateTime?>(json['recurrenceEndDate']),
       recurrenceCount: serializer.fromJson<int?>(json['recurrenceCount']),
+      reminderEnabled: serializer.fromJson<bool>(json['reminderEnabled']),
+      reminderTime: serializer.fromJson<DateTime?>(json['reminderTime']),
+      reminderPreset: serializer.fromJson<String?>(json['reminderPreset']),
     );
   }
   @override
@@ -1778,6 +1984,9 @@ class EventData extends DataClass implements Insertable<EventData> {
           serializer.toJson<String?>(recurrenceExceptionDates),
       'recurrenceEndDate': serializer.toJson<DateTime?>(recurrenceEndDate),
       'recurrenceCount': serializer.toJson<int?>(recurrenceCount),
+      'reminderEnabled': serializer.toJson<bool>(reminderEnabled),
+      'reminderTime': serializer.toJson<DateTime?>(reminderTime),
+      'reminderPreset': serializer.toJson<String?>(reminderPreset),
     };
   }
 
@@ -1797,7 +2006,10 @@ class EventData extends DataClass implements Insertable<EventData> {
           Value<String?> parentEventId = const Value.absent(),
           Value<String?> recurrenceExceptionDates = const Value.absent(),
           Value<DateTime?> recurrenceEndDate = const Value.absent(),
-          Value<int?> recurrenceCount = const Value.absent()}) =>
+          Value<int?> recurrenceCount = const Value.absent(),
+          bool? reminderEnabled,
+          Value<DateTime?> reminderTime = const Value.absent(),
+          Value<String?> reminderPreset = const Value.absent()}) =>
       EventData(
         id: id ?? this.id,
         title: title ?? this.title,
@@ -1824,6 +2036,11 @@ class EventData extends DataClass implements Insertable<EventData> {
         recurrenceCount: recurrenceCount.present
             ? recurrenceCount.value
             : this.recurrenceCount,
+        reminderEnabled: reminderEnabled ?? this.reminderEnabled,
+        reminderTime:
+            reminderTime.present ? reminderTime.value : this.reminderTime,
+        reminderPreset:
+            reminderPreset.present ? reminderPreset.value : this.reminderPreset,
       );
   EventData copyWithCompanion(EventsCompanion data) {
     return EventData(
@@ -1861,6 +2078,15 @@ class EventData extends DataClass implements Insertable<EventData> {
       recurrenceCount: data.recurrenceCount.present
           ? data.recurrenceCount.value
           : this.recurrenceCount,
+      reminderEnabled: data.reminderEnabled.present
+          ? data.reminderEnabled.value
+          : this.reminderEnabled,
+      reminderTime: data.reminderTime.present
+          ? data.reminderTime.value
+          : this.reminderTime,
+      reminderPreset: data.reminderPreset.present
+          ? data.reminderPreset.value
+          : this.reminderPreset,
     );
   }
 
@@ -1882,7 +2108,10 @@ class EventData extends DataClass implements Insertable<EventData> {
           ..write('parentEventId: $parentEventId, ')
           ..write('recurrenceExceptionDates: $recurrenceExceptionDates, ')
           ..write('recurrenceEndDate: $recurrenceEndDate, ')
-          ..write('recurrenceCount: $recurrenceCount')
+          ..write('recurrenceCount: $recurrenceCount, ')
+          ..write('reminderEnabled: $reminderEnabled, ')
+          ..write('reminderTime: $reminderTime, ')
+          ..write('reminderPreset: $reminderPreset')
           ..write(')'))
         .toString();
   }
@@ -1904,7 +2133,10 @@ class EventData extends DataClass implements Insertable<EventData> {
       parentEventId,
       recurrenceExceptionDates,
       recurrenceEndDate,
-      recurrenceCount);
+      recurrenceCount,
+      reminderEnabled,
+      reminderTime,
+      reminderPreset);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -1924,7 +2156,10 @@ class EventData extends DataClass implements Insertable<EventData> {
           other.parentEventId == this.parentEventId &&
           other.recurrenceExceptionDates == this.recurrenceExceptionDates &&
           other.recurrenceEndDate == this.recurrenceEndDate &&
-          other.recurrenceCount == this.recurrenceCount);
+          other.recurrenceCount == this.recurrenceCount &&
+          other.reminderEnabled == this.reminderEnabled &&
+          other.reminderTime == this.reminderTime &&
+          other.reminderPreset == this.reminderPreset);
 }
 
 class EventsCompanion extends UpdateCompanion<EventData> {
@@ -1944,6 +2179,9 @@ class EventsCompanion extends UpdateCompanion<EventData> {
   final Value<String?> recurrenceExceptionDates;
   final Value<DateTime?> recurrenceEndDate;
   final Value<int?> recurrenceCount;
+  final Value<bool> reminderEnabled;
+  final Value<DateTime?> reminderTime;
+  final Value<String?> reminderPreset;
   final Value<int> rowid;
   const EventsCompanion({
     this.id = const Value.absent(),
@@ -1962,6 +2200,9 @@ class EventsCompanion extends UpdateCompanion<EventData> {
     this.recurrenceExceptionDates = const Value.absent(),
     this.recurrenceEndDate = const Value.absent(),
     this.recurrenceCount = const Value.absent(),
+    this.reminderEnabled = const Value.absent(),
+    this.reminderTime = const Value.absent(),
+    this.reminderPreset = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   EventsCompanion.insert({
@@ -1981,6 +2222,9 @@ class EventsCompanion extends UpdateCompanion<EventData> {
     this.recurrenceExceptionDates = const Value.absent(),
     this.recurrenceEndDate = const Value.absent(),
     this.recurrenceCount = const Value.absent(),
+    this.reminderEnabled = const Value.absent(),
+    this.reminderTime = const Value.absent(),
+    this.reminderPreset = const Value.absent(),
     this.rowid = const Value.absent(),
   })  : title = Value(title),
         startDateTime = Value(startDateTime),
@@ -2002,6 +2246,9 @@ class EventsCompanion extends UpdateCompanion<EventData> {
     Expression<String>? recurrenceExceptionDates,
     Expression<DateTime>? recurrenceEndDate,
     Expression<int>? recurrenceCount,
+    Expression<bool>? reminderEnabled,
+    Expression<DateTime>? reminderTime,
+    Expression<String>? reminderPreset,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -2022,6 +2269,9 @@ class EventsCompanion extends UpdateCompanion<EventData> {
         'recurrence_exception_dates': recurrenceExceptionDates,
       if (recurrenceEndDate != null) 'recurrence_end_date': recurrenceEndDate,
       if (recurrenceCount != null) 'recurrence_count': recurrenceCount,
+      if (reminderEnabled != null) 'reminder_enabled': reminderEnabled,
+      if (reminderTime != null) 'reminder_time': reminderTime,
+      if (reminderPreset != null) 'reminder_preset': reminderPreset,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -2043,6 +2293,9 @@ class EventsCompanion extends UpdateCompanion<EventData> {
       Value<String?>? recurrenceExceptionDates,
       Value<DateTime?>? recurrenceEndDate,
       Value<int?>? recurrenceCount,
+      Value<bool>? reminderEnabled,
+      Value<DateTime?>? reminderTime,
+      Value<String?>? reminderPreset,
       Value<int>? rowid}) {
     return EventsCompanion(
       id: id ?? this.id,
@@ -2062,6 +2315,9 @@ class EventsCompanion extends UpdateCompanion<EventData> {
           recurrenceExceptionDates ?? this.recurrenceExceptionDates,
       recurrenceEndDate: recurrenceEndDate ?? this.recurrenceEndDate,
       recurrenceCount: recurrenceCount ?? this.recurrenceCount,
+      reminderEnabled: reminderEnabled ?? this.reminderEnabled,
+      reminderTime: reminderTime ?? this.reminderTime,
+      reminderPreset: reminderPreset ?? this.reminderPreset,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -2118,6 +2374,15 @@ class EventsCompanion extends UpdateCompanion<EventData> {
     if (recurrenceCount.present) {
       map['recurrence_count'] = Variable<int>(recurrenceCount.value);
     }
+    if (reminderEnabled.present) {
+      map['reminder_enabled'] = Variable<bool>(reminderEnabled.value);
+    }
+    if (reminderTime.present) {
+      map['reminder_time'] = Variable<DateTime>(reminderTime.value);
+    }
+    if (reminderPreset.present) {
+      map['reminder_preset'] = Variable<String>(reminderPreset.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -2143,6 +2408,9 @@ class EventsCompanion extends UpdateCompanion<EventData> {
           ..write('recurrenceExceptionDates: $recurrenceExceptionDates, ')
           ..write('recurrenceEndDate: $recurrenceEndDate, ')
           ..write('recurrenceCount: $recurrenceCount, ')
+          ..write('reminderEnabled: $reminderEnabled, ')
+          ..write('reminderTime: $reminderTime, ')
+          ..write('reminderPreset: $reminderPreset, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -2175,11 +2443,11 @@ class $ClassesTable extends Classes with TableInfo<$ClassesTable, ClassData> {
   late final GeneratedColumn<DateTime> startTime = GeneratedColumn<DateTime>(
       'start_time', aliasedName, false,
       type: DriftSqlType.dateTime, requiredDuringInsert: true);
-  static const VerificationMeta _endTimeMeta =
-      const VerificationMeta('endTime');
+  static const VerificationMeta _endDateTimeMeta =
+      const VerificationMeta('endDateTime');
   @override
-  late final GeneratedColumn<DateTime> endTime = GeneratedColumn<DateTime>(
-      'end_time', aliasedName, false,
+  late final GeneratedColumn<DateTime> endDateTime = GeneratedColumn<DateTime>(
+      'end_date_time', aliasedName, false,
       type: DriftSqlType.dateTime, requiredDuringInsert: true);
   static const VerificationMeta _dayMeta = const VerificationMeta('day');
   @override
@@ -2190,7 +2458,7 @@ class $ClassesTable extends Classes with TableInfo<$ClassesTable, ClassData> {
       type: DriftSqlType.string,
       requiredDuringInsert: true);
   @override
-  List<GeneratedColumn> get $columns => [id, name, startTime, endTime, day];
+  List<GeneratedColumn> get $columns => [id, name, startTime, endDateTime, day];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -2216,11 +2484,13 @@ class $ClassesTable extends Classes with TableInfo<$ClassesTable, ClassData> {
     } else if (isInserting) {
       context.missing(_startTimeMeta);
     }
-    if (data.containsKey('end_time')) {
-      context.handle(_endTimeMeta,
-          endTime.isAcceptableOrUnknown(data['end_time']!, _endTimeMeta));
+    if (data.containsKey('end_date_time')) {
+      context.handle(
+          _endDateTimeMeta,
+          endDateTime.isAcceptableOrUnknown(
+              data['end_date_time']!, _endDateTimeMeta));
     } else if (isInserting) {
-      context.missing(_endTimeMeta);
+      context.missing(_endDateTimeMeta);
     }
     if (data.containsKey('day')) {
       context.handle(
@@ -2243,8 +2513,8 @@ class $ClassesTable extends Classes with TableInfo<$ClassesTable, ClassData> {
           .read(DriftSqlType.string, data['${effectivePrefix}name'])!,
       startTime: attachedDatabase.typeMapping
           .read(DriftSqlType.dateTime, data['${effectivePrefix}start_time'])!,
-      endTime: attachedDatabase.typeMapping
-          .read(DriftSqlType.dateTime, data['${effectivePrefix}end_time'])!,
+      endDateTime: attachedDatabase.typeMapping.read(
+          DriftSqlType.dateTime, data['${effectivePrefix}end_date_time'])!,
       day: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}day'])!,
     );
@@ -2260,13 +2530,13 @@ class ClassData extends DataClass implements Insertable<ClassData> {
   final String id;
   final String name;
   final DateTime startTime;
-  final DateTime endTime;
+  final DateTime endDateTime;
   final String day;
   const ClassData(
       {required this.id,
       required this.name,
       required this.startTime,
-      required this.endTime,
+      required this.endDateTime,
       required this.day});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -2274,7 +2544,7 @@ class ClassData extends DataClass implements Insertable<ClassData> {
     map['id'] = Variable<String>(id);
     map['name'] = Variable<String>(name);
     map['start_time'] = Variable<DateTime>(startTime);
-    map['end_time'] = Variable<DateTime>(endTime);
+    map['end_date_time'] = Variable<DateTime>(endDateTime);
     map['day'] = Variable<String>(day);
     return map;
   }
@@ -2284,7 +2554,7 @@ class ClassData extends DataClass implements Insertable<ClassData> {
       id: Value(id),
       name: Value(name),
       startTime: Value(startTime),
-      endTime: Value(endTime),
+      endDateTime: Value(endDateTime),
       day: Value(day),
     );
   }
@@ -2296,7 +2566,7 @@ class ClassData extends DataClass implements Insertable<ClassData> {
       id: serializer.fromJson<String>(json['id']),
       name: serializer.fromJson<String>(json['name']),
       startTime: serializer.fromJson<DateTime>(json['startTime']),
-      endTime: serializer.fromJson<DateTime>(json['endTime']),
+      endDateTime: serializer.fromJson<DateTime>(json['endDateTime']),
       day: serializer.fromJson<String>(json['day']),
     );
   }
@@ -2307,7 +2577,7 @@ class ClassData extends DataClass implements Insertable<ClassData> {
       'id': serializer.toJson<String>(id),
       'name': serializer.toJson<String>(name),
       'startTime': serializer.toJson<DateTime>(startTime),
-      'endTime': serializer.toJson<DateTime>(endTime),
+      'endDateTime': serializer.toJson<DateTime>(endDateTime),
       'day': serializer.toJson<String>(day),
     };
   }
@@ -2316,13 +2586,13 @@ class ClassData extends DataClass implements Insertable<ClassData> {
           {String? id,
           String? name,
           DateTime? startTime,
-          DateTime? endTime,
+          DateTime? endDateTime,
           String? day}) =>
       ClassData(
         id: id ?? this.id,
         name: name ?? this.name,
         startTime: startTime ?? this.startTime,
-        endTime: endTime ?? this.endTime,
+        endDateTime: endDateTime ?? this.endDateTime,
         day: day ?? this.day,
       );
   ClassData copyWithCompanion(ClassesCompanion data) {
@@ -2330,7 +2600,8 @@ class ClassData extends DataClass implements Insertable<ClassData> {
       id: data.id.present ? data.id.value : this.id,
       name: data.name.present ? data.name.value : this.name,
       startTime: data.startTime.present ? data.startTime.value : this.startTime,
-      endTime: data.endTime.present ? data.endTime.value : this.endTime,
+      endDateTime:
+          data.endDateTime.present ? data.endDateTime.value : this.endDateTime,
       day: data.day.present ? data.day.value : this.day,
     );
   }
@@ -2341,14 +2612,14 @@ class ClassData extends DataClass implements Insertable<ClassData> {
           ..write('id: $id, ')
           ..write('name: $name, ')
           ..write('startTime: $startTime, ')
-          ..write('endTime: $endTime, ')
+          ..write('endDateTime: $endDateTime, ')
           ..write('day: $day')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(id, name, startTime, endTime, day);
+  int get hashCode => Object.hash(id, name, startTime, endDateTime, day);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -2356,7 +2627,7 @@ class ClassData extends DataClass implements Insertable<ClassData> {
           other.id == this.id &&
           other.name == this.name &&
           other.startTime == this.startTime &&
-          other.endTime == this.endTime &&
+          other.endDateTime == this.endDateTime &&
           other.day == this.day);
 }
 
@@ -2364,14 +2635,14 @@ class ClassesCompanion extends UpdateCompanion<ClassData> {
   final Value<String> id;
   final Value<String> name;
   final Value<DateTime> startTime;
-  final Value<DateTime> endTime;
+  final Value<DateTime> endDateTime;
   final Value<String> day;
   final Value<int> rowid;
   const ClassesCompanion({
     this.id = const Value.absent(),
     this.name = const Value.absent(),
     this.startTime = const Value.absent(),
-    this.endTime = const Value.absent(),
+    this.endDateTime = const Value.absent(),
     this.day = const Value.absent(),
     this.rowid = const Value.absent(),
   });
@@ -2379,18 +2650,18 @@ class ClassesCompanion extends UpdateCompanion<ClassData> {
     this.id = const Value.absent(),
     required String name,
     required DateTime startTime,
-    required DateTime endTime,
+    required DateTime endDateTime,
     required String day,
     this.rowid = const Value.absent(),
   })  : name = Value(name),
         startTime = Value(startTime),
-        endTime = Value(endTime),
+        endDateTime = Value(endDateTime),
         day = Value(day);
   static Insertable<ClassData> custom({
     Expression<String>? id,
     Expression<String>? name,
     Expression<DateTime>? startTime,
-    Expression<DateTime>? endTime,
+    Expression<DateTime>? endDateTime,
     Expression<String>? day,
     Expression<int>? rowid,
   }) {
@@ -2398,7 +2669,7 @@ class ClassesCompanion extends UpdateCompanion<ClassData> {
       if (id != null) 'id': id,
       if (name != null) 'name': name,
       if (startTime != null) 'start_time': startTime,
-      if (endTime != null) 'end_time': endTime,
+      if (endDateTime != null) 'end_date_time': endDateTime,
       if (day != null) 'day': day,
       if (rowid != null) 'rowid': rowid,
     });
@@ -2408,14 +2679,14 @@ class ClassesCompanion extends UpdateCompanion<ClassData> {
       {Value<String>? id,
       Value<String>? name,
       Value<DateTime>? startTime,
-      Value<DateTime>? endTime,
+      Value<DateTime>? endDateTime,
       Value<String>? day,
       Value<int>? rowid}) {
     return ClassesCompanion(
       id: id ?? this.id,
       name: name ?? this.name,
       startTime: startTime ?? this.startTime,
-      endTime: endTime ?? this.endTime,
+      endDateTime: endDateTime ?? this.endDateTime,
       day: day ?? this.day,
       rowid: rowid ?? this.rowid,
     );
@@ -2433,8 +2704,8 @@ class ClassesCompanion extends UpdateCompanion<ClassData> {
     if (startTime.present) {
       map['start_time'] = Variable<DateTime>(startTime.value);
     }
-    if (endTime.present) {
-      map['end_time'] = Variable<DateTime>(endTime.value);
+    if (endDateTime.present) {
+      map['end_date_time'] = Variable<DateTime>(endDateTime.value);
     }
     if (day.present) {
       map['day'] = Variable<String>(day.value);
@@ -2451,7 +2722,7 @@ class ClassesCompanion extends UpdateCompanion<ClassData> {
           ..write('id: $id, ')
           ..write('name: $name, ')
           ..write('startTime: $startTime, ')
-          ..write('endTime: $endTime, ')
+          ..write('endDateTime: $endDateTime, ')
           ..write('day: $day, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -3153,6 +3424,427 @@ class RemindersCompanion extends UpdateCompanion<ReminderData> {
   }
 }
 
+class $NotesTable extends Notes with TableInfo<$NotesTable, Note> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $NotesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+      'id', aliasedName, false,
+      type: DriftSqlType.string,
+      requiredDuringInsert: false,
+      clientDefault: () => const Uuid().v4());
+  static const VerificationMeta _titleMeta = const VerificationMeta('title');
+  @override
+  late final GeneratedColumn<String> title = GeneratedColumn<String>(
+      'title', aliasedName, false,
+      additionalChecks:
+          GeneratedColumn.checkTextLength(minTextLength: 1, maxTextLength: 200),
+      type: DriftSqlType.string,
+      requiredDuringInsert: true);
+  static const VerificationMeta _contentMeta =
+      const VerificationMeta('content');
+  @override
+  late final GeneratedColumn<String> content = GeneratedColumn<String>(
+      'content', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _categoryMeta =
+      const VerificationMeta('category');
+  @override
+  late final GeneratedColumn<String> category = GeneratedColumn<String>(
+      'category', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _colorMeta = const VerificationMeta('color');
+  @override
+  late final GeneratedColumn<String> color = GeneratedColumn<String>(
+      'color', aliasedName, false,
+      type: DriftSqlType.string,
+      requiredDuringInsert: false,
+      defaultValue: const Constant('#FFD700'));
+  static const VerificationMeta _createdAtMeta =
+      const VerificationMeta('createdAt');
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+      'created_at', aliasedName, false,
+      type: DriftSqlType.dateTime, requiredDuringInsert: true);
+  static const VerificationMeta _updatedAtMeta =
+      const VerificationMeta('updatedAt');
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+      'updated_at', aliasedName, false,
+      type: DriftSqlType.dateTime, requiredDuringInsert: true);
+  static const VerificationMeta _isPinnedMeta =
+      const VerificationMeta('isPinned');
+  @override
+  late final GeneratedColumn<bool> isPinned = GeneratedColumn<bool>(
+      'is_pinned', aliasedName, false,
+      type: DriftSqlType.bool,
+      requiredDuringInsert: false,
+      defaultConstraints:
+          GeneratedColumn.constraintIsAlways('CHECK ("is_pinned" IN (0, 1))'),
+      defaultValue: const Constant(false));
+  @override
+  List<GeneratedColumn> get $columns =>
+      [id, title, content, category, color, createdAt, updatedAt, isPinned];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'notes';
+  @override
+  VerificationContext validateIntegrity(Insertable<Note> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('title')) {
+      context.handle(
+          _titleMeta, title.isAcceptableOrUnknown(data['title']!, _titleMeta));
+    } else if (isInserting) {
+      context.missing(_titleMeta);
+    }
+    if (data.containsKey('content')) {
+      context.handle(_contentMeta,
+          content.isAcceptableOrUnknown(data['content']!, _contentMeta));
+    } else if (isInserting) {
+      context.missing(_contentMeta);
+    }
+    if (data.containsKey('category')) {
+      context.handle(_categoryMeta,
+          category.isAcceptableOrUnknown(data['category']!, _categoryMeta));
+    }
+    if (data.containsKey('color')) {
+      context.handle(
+          _colorMeta, color.isAcceptableOrUnknown(data['color']!, _colorMeta));
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(_createdAtMeta,
+          createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta));
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(_updatedAtMeta,
+          updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta));
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    if (data.containsKey('is_pinned')) {
+      context.handle(_isPinnedMeta,
+          isPinned.isAcceptableOrUnknown(data['is_pinned']!, _isPinnedMeta));
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  Note map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return Note(
+      id: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}id'])!,
+      title: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}title'])!,
+      content: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}content'])!,
+      category: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}category']),
+      color: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}color'])!,
+      createdAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}created_at'])!,
+      updatedAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}updated_at'])!,
+      isPinned: attachedDatabase.typeMapping
+          .read(DriftSqlType.bool, data['${effectivePrefix}is_pinned'])!,
+    );
+  }
+
+  @override
+  $NotesTable createAlias(String alias) {
+    return $NotesTable(attachedDatabase, alias);
+  }
+}
+
+class Note extends DataClass implements Insertable<Note> {
+  final String id;
+  final String title;
+  final String content;
+  final String? category;
+  final String color;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  final bool isPinned;
+  const Note(
+      {required this.id,
+      required this.title,
+      required this.content,
+      this.category,
+      required this.color,
+      required this.createdAt,
+      required this.updatedAt,
+      required this.isPinned});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['title'] = Variable<String>(title);
+    map['content'] = Variable<String>(content);
+    if (!nullToAbsent || category != null) {
+      map['category'] = Variable<String>(category);
+    }
+    map['color'] = Variable<String>(color);
+    map['created_at'] = Variable<DateTime>(createdAt);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    map['is_pinned'] = Variable<bool>(isPinned);
+    return map;
+  }
+
+  NotesCompanion toCompanion(bool nullToAbsent) {
+    return NotesCompanion(
+      id: Value(id),
+      title: Value(title),
+      content: Value(content),
+      category: category == null && nullToAbsent
+          ? const Value.absent()
+          : Value(category),
+      color: Value(color),
+      createdAt: Value(createdAt),
+      updatedAt: Value(updatedAt),
+      isPinned: Value(isPinned),
+    );
+  }
+
+  factory Note.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return Note(
+      id: serializer.fromJson<String>(json['id']),
+      title: serializer.fromJson<String>(json['title']),
+      content: serializer.fromJson<String>(json['content']),
+      category: serializer.fromJson<String?>(json['category']),
+      color: serializer.fromJson<String>(json['color']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+      isPinned: serializer.fromJson<bool>(json['isPinned']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'title': serializer.toJson<String>(title),
+      'content': serializer.toJson<String>(content),
+      'category': serializer.toJson<String?>(category),
+      'color': serializer.toJson<String>(color),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+      'isPinned': serializer.toJson<bool>(isPinned),
+    };
+  }
+
+  Note copyWith(
+          {String? id,
+          String? title,
+          String? content,
+          Value<String?> category = const Value.absent(),
+          String? color,
+          DateTime? createdAt,
+          DateTime? updatedAt,
+          bool? isPinned}) =>
+      Note(
+        id: id ?? this.id,
+        title: title ?? this.title,
+        content: content ?? this.content,
+        category: category.present ? category.value : this.category,
+        color: color ?? this.color,
+        createdAt: createdAt ?? this.createdAt,
+        updatedAt: updatedAt ?? this.updatedAt,
+        isPinned: isPinned ?? this.isPinned,
+      );
+  Note copyWithCompanion(NotesCompanion data) {
+    return Note(
+      id: data.id.present ? data.id.value : this.id,
+      title: data.title.present ? data.title.value : this.title,
+      content: data.content.present ? data.content.value : this.content,
+      category: data.category.present ? data.category.value : this.category,
+      color: data.color.present ? data.color.value : this.color,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      isPinned: data.isPinned.present ? data.isPinned.value : this.isPinned,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('Note(')
+          ..write('id: $id, ')
+          ..write('title: $title, ')
+          ..write('content: $content, ')
+          ..write('category: $category, ')
+          ..write('color: $color, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('isPinned: $isPinned')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+      id, title, content, category, color, createdAt, updatedAt, isPinned);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is Note &&
+          other.id == this.id &&
+          other.title == this.title &&
+          other.content == this.content &&
+          other.category == this.category &&
+          other.color == this.color &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt &&
+          other.isPinned == this.isPinned);
+}
+
+class NotesCompanion extends UpdateCompanion<Note> {
+  final Value<String> id;
+  final Value<String> title;
+  final Value<String> content;
+  final Value<String?> category;
+  final Value<String> color;
+  final Value<DateTime> createdAt;
+  final Value<DateTime> updatedAt;
+  final Value<bool> isPinned;
+  final Value<int> rowid;
+  const NotesCompanion({
+    this.id = const Value.absent(),
+    this.title = const Value.absent(),
+    this.content = const Value.absent(),
+    this.category = const Value.absent(),
+    this.color = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.isPinned = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  NotesCompanion.insert({
+    this.id = const Value.absent(),
+    required String title,
+    required String content,
+    this.category = const Value.absent(),
+    this.color = const Value.absent(),
+    required DateTime createdAt,
+    required DateTime updatedAt,
+    this.isPinned = const Value.absent(),
+    this.rowid = const Value.absent(),
+  })  : title = Value(title),
+        content = Value(content),
+        createdAt = Value(createdAt),
+        updatedAt = Value(updatedAt);
+  static Insertable<Note> custom({
+    Expression<String>? id,
+    Expression<String>? title,
+    Expression<String>? content,
+    Expression<String>? category,
+    Expression<String>? color,
+    Expression<DateTime>? createdAt,
+    Expression<DateTime>? updatedAt,
+    Expression<bool>? isPinned,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (title != null) 'title': title,
+      if (content != null) 'content': content,
+      if (category != null) 'category': category,
+      if (color != null) 'color': color,
+      if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (isPinned != null) 'is_pinned': isPinned,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  NotesCompanion copyWith(
+      {Value<String>? id,
+      Value<String>? title,
+      Value<String>? content,
+      Value<String?>? category,
+      Value<String>? color,
+      Value<DateTime>? createdAt,
+      Value<DateTime>? updatedAt,
+      Value<bool>? isPinned,
+      Value<int>? rowid}) {
+    return NotesCompanion(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      content: content ?? this.content,
+      category: category ?? this.category,
+      color: color ?? this.color,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      isPinned: isPinned ?? this.isPinned,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (title.present) {
+      map['title'] = Variable<String>(title.value);
+    }
+    if (content.present) {
+      map['content'] = Variable<String>(content.value);
+    }
+    if (category.present) {
+      map['category'] = Variable<String>(category.value);
+    }
+    if (color.present) {
+      map['color'] = Variable<String>(color.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (isPinned.present) {
+      map['is_pinned'] = Variable<bool>(isPinned.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('NotesCompanion(')
+          ..write('id: $id, ')
+          ..write('title: $title, ')
+          ..write('content: $content, ')
+          ..write('category: $category, ')
+          ..write('color: $color, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('isPinned: $isPinned, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -3161,12 +3853,13 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $EventsTable events = $EventsTable(this);
   late final $ClassesTable classes = $ClassesTable(this);
   late final $RemindersTable reminders = $RemindersTable(this);
+  late final $NotesTable notes = $NotesTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
   @override
   List<DatabaseSchemaEntity> get allSchemaEntities =>
-      [tasks, subtasks, events, classes, reminders];
+      [tasks, subtasks, events, classes, reminders, notes];
 }
 
 typedef $$TasksTableCreateCompanionBuilder = TasksCompanion Function({
@@ -3191,6 +3884,9 @@ typedef $$TasksTableCreateCompanionBuilder = TasksCompanion Function({
   Value<bool> skipWeekends,
   Value<int?> dayOfMonth,
   Value<int?> weekOfMonth,
+  Value<bool> reminderEnabled,
+  Value<DateTime?> reminderTime,
+  Value<String?> reminderPreset,
   Value<int> rowid,
 });
 typedef $$TasksTableUpdateCompanionBuilder = TasksCompanion Function({
@@ -3215,6 +3911,9 @@ typedef $$TasksTableUpdateCompanionBuilder = TasksCompanion Function({
   Value<bool> skipWeekends,
   Value<int?> dayOfMonth,
   Value<int?> weekOfMonth,
+  Value<bool> reminderEnabled,
+  Value<DateTime?> reminderTime,
+  Value<String?> reminderPreset,
   Value<int> rowid,
 });
 
@@ -3312,6 +4011,17 @@ class $$TasksTableFilterComposer extends Composer<_$AppDatabase, $TasksTable> {
 
   ColumnFilters<int> get weekOfMonth => $composableBuilder(
       column: $table.weekOfMonth, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<bool> get reminderEnabled => $composableBuilder(
+      column: $table.reminderEnabled,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get reminderTime => $composableBuilder(
+      column: $table.reminderTime, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get reminderPreset => $composableBuilder(
+      column: $table.reminderPreset,
+      builder: (column) => ColumnFilters(column));
 
   Expression<bool> subtasksRefs(
       Expression<bool> Function($$SubtasksTableFilterComposer f) f) {
@@ -3413,6 +4123,18 @@ class $$TasksTableOrderingComposer
 
   ColumnOrderings<int> get weekOfMonth => $composableBuilder(
       column: $table.weekOfMonth, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<bool> get reminderEnabled => $composableBuilder(
+      column: $table.reminderEnabled,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get reminderTime => $composableBuilder(
+      column: $table.reminderTime,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get reminderPreset => $composableBuilder(
+      column: $table.reminderPreset,
+      builder: (column) => ColumnOrderings(column));
 }
 
 class $$TasksTableAnnotationComposer
@@ -3487,6 +4209,15 @@ class $$TasksTableAnnotationComposer
   GeneratedColumn<int> get weekOfMonth => $composableBuilder(
       column: $table.weekOfMonth, builder: (column) => column);
 
+  GeneratedColumn<bool> get reminderEnabled => $composableBuilder(
+      column: $table.reminderEnabled, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get reminderTime => $composableBuilder(
+      column: $table.reminderTime, builder: (column) => column);
+
+  GeneratedColumn<String> get reminderPreset => $composableBuilder(
+      column: $table.reminderPreset, builder: (column) => column);
+
   Expression<T> subtasksRefs<T extends Object>(
       Expression<T> Function($$SubtasksTableAnnotationComposer a) f) {
     final $$SubtasksTableAnnotationComposer composer = $composerBuilder(
@@ -3553,6 +4284,9 @@ class $$TasksTableTableManager extends RootTableManager<
             Value<bool> skipWeekends = const Value.absent(),
             Value<int?> dayOfMonth = const Value.absent(),
             Value<int?> weekOfMonth = const Value.absent(),
+            Value<bool> reminderEnabled = const Value.absent(),
+            Value<DateTime?> reminderTime = const Value.absent(),
+            Value<String?> reminderPreset = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
               TasksCompanion(
@@ -3577,6 +4311,9 @@ class $$TasksTableTableManager extends RootTableManager<
             skipWeekends: skipWeekends,
             dayOfMonth: dayOfMonth,
             weekOfMonth: weekOfMonth,
+            reminderEnabled: reminderEnabled,
+            reminderTime: reminderTime,
+            reminderPreset: reminderPreset,
             rowid: rowid,
           ),
           createCompanionCallback: ({
@@ -3601,6 +4338,9 @@ class $$TasksTableTableManager extends RootTableManager<
             Value<bool> skipWeekends = const Value.absent(),
             Value<int?> dayOfMonth = const Value.absent(),
             Value<int?> weekOfMonth = const Value.absent(),
+            Value<bool> reminderEnabled = const Value.absent(),
+            Value<DateTime?> reminderTime = const Value.absent(),
+            Value<String?> reminderPreset = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
               TasksCompanion.insert(
@@ -3625,6 +4365,9 @@ class $$TasksTableTableManager extends RootTableManager<
             skipWeekends: skipWeekends,
             dayOfMonth: dayOfMonth,
             weekOfMonth: weekOfMonth,
+            reminderEnabled: reminderEnabled,
+            reminderTime: reminderTime,
+            reminderPreset: reminderPreset,
             rowid: rowid,
           ),
           withReferenceMapper: (p0) => p0
@@ -3952,6 +4695,9 @@ typedef $$EventsTableCreateCompanionBuilder = EventsCompanion Function({
   Value<String?> recurrenceExceptionDates,
   Value<DateTime?> recurrenceEndDate,
   Value<int?> recurrenceCount,
+  Value<bool> reminderEnabled,
+  Value<DateTime?> reminderTime,
+  Value<String?> reminderPreset,
   Value<int> rowid,
 });
 typedef $$EventsTableUpdateCompanionBuilder = EventsCompanion Function({
@@ -3971,6 +4717,9 @@ typedef $$EventsTableUpdateCompanionBuilder = EventsCompanion Function({
   Value<String?> recurrenceExceptionDates,
   Value<DateTime?> recurrenceEndDate,
   Value<int?> recurrenceCount,
+  Value<bool> reminderEnabled,
+  Value<DateTime?> reminderTime,
+  Value<String?> reminderPreset,
   Value<int> rowid,
 });
 
@@ -4034,6 +4783,17 @@ class $$EventsTableFilterComposer
 
   ColumnFilters<int> get recurrenceCount => $composableBuilder(
       column: $table.recurrenceCount,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<bool> get reminderEnabled => $composableBuilder(
+      column: $table.reminderEnabled,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get reminderTime => $composableBuilder(
+      column: $table.reminderTime, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get reminderPreset => $composableBuilder(
+      column: $table.reminderPreset,
       builder: (column) => ColumnFilters(column));
 }
 
@@ -4100,6 +4860,18 @@ class $$EventsTableOrderingComposer
   ColumnOrderings<int> get recurrenceCount => $composableBuilder(
       column: $table.recurrenceCount,
       builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<bool> get reminderEnabled => $composableBuilder(
+      column: $table.reminderEnabled,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get reminderTime => $composableBuilder(
+      column: $table.reminderTime,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get reminderPreset => $composableBuilder(
+      column: $table.reminderPreset,
+      builder: (column) => ColumnOrderings(column));
 }
 
 class $$EventsTableAnnotationComposer
@@ -4158,6 +4930,15 @@ class $$EventsTableAnnotationComposer
 
   GeneratedColumn<int> get recurrenceCount => $composableBuilder(
       column: $table.recurrenceCount, builder: (column) => column);
+
+  GeneratedColumn<bool> get reminderEnabled => $composableBuilder(
+      column: $table.reminderEnabled, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get reminderTime => $composableBuilder(
+      column: $table.reminderTime, builder: (column) => column);
+
+  GeneratedColumn<String> get reminderPreset => $composableBuilder(
+      column: $table.reminderPreset, builder: (column) => column);
 }
 
 class $$EventsTableTableManager extends RootTableManager<
@@ -4199,6 +4980,9 @@ class $$EventsTableTableManager extends RootTableManager<
             Value<String?> recurrenceExceptionDates = const Value.absent(),
             Value<DateTime?> recurrenceEndDate = const Value.absent(),
             Value<int?> recurrenceCount = const Value.absent(),
+            Value<bool> reminderEnabled = const Value.absent(),
+            Value<DateTime?> reminderTime = const Value.absent(),
+            Value<String?> reminderPreset = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
               EventsCompanion(
@@ -4218,6 +5002,9 @@ class $$EventsTableTableManager extends RootTableManager<
             recurrenceExceptionDates: recurrenceExceptionDates,
             recurrenceEndDate: recurrenceEndDate,
             recurrenceCount: recurrenceCount,
+            reminderEnabled: reminderEnabled,
+            reminderTime: reminderTime,
+            reminderPreset: reminderPreset,
             rowid: rowid,
           ),
           createCompanionCallback: ({
@@ -4237,6 +5024,9 @@ class $$EventsTableTableManager extends RootTableManager<
             Value<String?> recurrenceExceptionDates = const Value.absent(),
             Value<DateTime?> recurrenceEndDate = const Value.absent(),
             Value<int?> recurrenceCount = const Value.absent(),
+            Value<bool> reminderEnabled = const Value.absent(),
+            Value<DateTime?> reminderTime = const Value.absent(),
+            Value<String?> reminderPreset = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
               EventsCompanion.insert(
@@ -4256,6 +5046,9 @@ class $$EventsTableTableManager extends RootTableManager<
             recurrenceExceptionDates: recurrenceExceptionDates,
             recurrenceEndDate: recurrenceEndDate,
             recurrenceCount: recurrenceCount,
+            reminderEnabled: reminderEnabled,
+            reminderTime: reminderTime,
+            reminderPreset: reminderPreset,
             rowid: rowid,
           ),
           withReferenceMapper: (p0) => p0
@@ -4281,7 +5074,7 @@ typedef $$ClassesTableCreateCompanionBuilder = ClassesCompanion Function({
   Value<String> id,
   required String name,
   required DateTime startTime,
-  required DateTime endTime,
+  required DateTime endDateTime,
   required String day,
   Value<int> rowid,
 });
@@ -4289,7 +5082,7 @@ typedef $$ClassesTableUpdateCompanionBuilder = ClassesCompanion Function({
   Value<String> id,
   Value<String> name,
   Value<DateTime> startTime,
-  Value<DateTime> endTime,
+  Value<DateTime> endDateTime,
   Value<String> day,
   Value<int> rowid,
 });
@@ -4312,8 +5105,8 @@ class $$ClassesTableFilterComposer
   ColumnFilters<DateTime> get startTime => $composableBuilder(
       column: $table.startTime, builder: (column) => ColumnFilters(column));
 
-  ColumnFilters<DateTime> get endTime => $composableBuilder(
-      column: $table.endTime, builder: (column) => ColumnFilters(column));
+  ColumnFilters<DateTime> get endDateTime => $composableBuilder(
+      column: $table.endDateTime, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<String> get day => $composableBuilder(
       column: $table.day, builder: (column) => ColumnFilters(column));
@@ -4337,8 +5130,8 @@ class $$ClassesTableOrderingComposer
   ColumnOrderings<DateTime> get startTime => $composableBuilder(
       column: $table.startTime, builder: (column) => ColumnOrderings(column));
 
-  ColumnOrderings<DateTime> get endTime => $composableBuilder(
-      column: $table.endTime, builder: (column) => ColumnOrderings(column));
+  ColumnOrderings<DateTime> get endDateTime => $composableBuilder(
+      column: $table.endDateTime, builder: (column) => ColumnOrderings(column));
 
   ColumnOrderings<String> get day => $composableBuilder(
       column: $table.day, builder: (column) => ColumnOrderings(column));
@@ -4362,8 +5155,8 @@ class $$ClassesTableAnnotationComposer
   GeneratedColumn<DateTime> get startTime =>
       $composableBuilder(column: $table.startTime, builder: (column) => column);
 
-  GeneratedColumn<DateTime> get endTime =>
-      $composableBuilder(column: $table.endTime, builder: (column) => column);
+  GeneratedColumn<DateTime> get endDateTime => $composableBuilder(
+      column: $table.endDateTime, builder: (column) => column);
 
   GeneratedColumn<String> get day =>
       $composableBuilder(column: $table.day, builder: (column) => column);
@@ -4395,7 +5188,7 @@ class $$ClassesTableTableManager extends RootTableManager<
             Value<String> id = const Value.absent(),
             Value<String> name = const Value.absent(),
             Value<DateTime> startTime = const Value.absent(),
-            Value<DateTime> endTime = const Value.absent(),
+            Value<DateTime> endDateTime = const Value.absent(),
             Value<String> day = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
@@ -4403,7 +5196,7 @@ class $$ClassesTableTableManager extends RootTableManager<
             id: id,
             name: name,
             startTime: startTime,
-            endTime: endTime,
+            endDateTime: endDateTime,
             day: day,
             rowid: rowid,
           ),
@@ -4411,7 +5204,7 @@ class $$ClassesTableTableManager extends RootTableManager<
             Value<String> id = const Value.absent(),
             required String name,
             required DateTime startTime,
-            required DateTime endTime,
+            required DateTime endDateTime,
             required String day,
             Value<int> rowid = const Value.absent(),
           }) =>
@@ -4419,7 +5212,7 @@ class $$ClassesTableTableManager extends RootTableManager<
             id: id,
             name: name,
             startTime: startTime,
-            endTime: endTime,
+            endDateTime: endDateTime,
             day: day,
             rowid: rowid,
           ),
@@ -4746,6 +5539,215 @@ typedef $$RemindersTableProcessedTableManager = ProcessedTableManager<
     ),
     ReminderData,
     PrefetchHooks Function()>;
+typedef $$NotesTableCreateCompanionBuilder = NotesCompanion Function({
+  Value<String> id,
+  required String title,
+  required String content,
+  Value<String?> category,
+  Value<String> color,
+  required DateTime createdAt,
+  required DateTime updatedAt,
+  Value<bool> isPinned,
+  Value<int> rowid,
+});
+typedef $$NotesTableUpdateCompanionBuilder = NotesCompanion Function({
+  Value<String> id,
+  Value<String> title,
+  Value<String> content,
+  Value<String?> category,
+  Value<String> color,
+  Value<DateTime> createdAt,
+  Value<DateTime> updatedAt,
+  Value<bool> isPinned,
+  Value<int> rowid,
+});
+
+class $$NotesTableFilterComposer extends Composer<_$AppDatabase, $NotesTable> {
+  $$NotesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get title => $composableBuilder(
+      column: $table.title, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get content => $composableBuilder(
+      column: $table.content, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get category => $composableBuilder(
+      column: $table.category, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get color => $composableBuilder(
+      column: $table.color, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+      column: $table.createdAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+      column: $table.updatedAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<bool> get isPinned => $composableBuilder(
+      column: $table.isPinned, builder: (column) => ColumnFilters(column));
+}
+
+class $$NotesTableOrderingComposer
+    extends Composer<_$AppDatabase, $NotesTable> {
+  $$NotesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get title => $composableBuilder(
+      column: $table.title, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get content => $composableBuilder(
+      column: $table.content, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get category => $composableBuilder(
+      column: $table.category, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get color => $composableBuilder(
+      column: $table.color, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+      column: $table.createdAt, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+      column: $table.updatedAt, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<bool> get isPinned => $composableBuilder(
+      column: $table.isPinned, builder: (column) => ColumnOrderings(column));
+}
+
+class $$NotesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $NotesTable> {
+  $$NotesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get title =>
+      $composableBuilder(column: $table.title, builder: (column) => column);
+
+  GeneratedColumn<String> get content =>
+      $composableBuilder(column: $table.content, builder: (column) => column);
+
+  GeneratedColumn<String> get category =>
+      $composableBuilder(column: $table.category, builder: (column) => column);
+
+  GeneratedColumn<String> get color =>
+      $composableBuilder(column: $table.color, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<bool> get isPinned =>
+      $composableBuilder(column: $table.isPinned, builder: (column) => column);
+}
+
+class $$NotesTableTableManager extends RootTableManager<
+    _$AppDatabase,
+    $NotesTable,
+    Note,
+    $$NotesTableFilterComposer,
+    $$NotesTableOrderingComposer,
+    $$NotesTableAnnotationComposer,
+    $$NotesTableCreateCompanionBuilder,
+    $$NotesTableUpdateCompanionBuilder,
+    (Note, BaseReferences<_$AppDatabase, $NotesTable, Note>),
+    Note,
+    PrefetchHooks Function()> {
+  $$NotesTableTableManager(_$AppDatabase db, $NotesTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$NotesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$NotesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$NotesTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<String> id = const Value.absent(),
+            Value<String> title = const Value.absent(),
+            Value<String> content = const Value.absent(),
+            Value<String?> category = const Value.absent(),
+            Value<String> color = const Value.absent(),
+            Value<DateTime> createdAt = const Value.absent(),
+            Value<DateTime> updatedAt = const Value.absent(),
+            Value<bool> isPinned = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              NotesCompanion(
+            id: id,
+            title: title,
+            content: content,
+            category: category,
+            color: color,
+            createdAt: createdAt,
+            updatedAt: updatedAt,
+            isPinned: isPinned,
+            rowid: rowid,
+          ),
+          createCompanionCallback: ({
+            Value<String> id = const Value.absent(),
+            required String title,
+            required String content,
+            Value<String?> category = const Value.absent(),
+            Value<String> color = const Value.absent(),
+            required DateTime createdAt,
+            required DateTime updatedAt,
+            Value<bool> isPinned = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              NotesCompanion.insert(
+            id: id,
+            title: title,
+            content: content,
+            category: category,
+            color: color,
+            createdAt: createdAt,
+            updatedAt: updatedAt,
+            isPinned: isPinned,
+            rowid: rowid,
+          ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ));
+}
+
+typedef $$NotesTableProcessedTableManager = ProcessedTableManager<
+    _$AppDatabase,
+    $NotesTable,
+    Note,
+    $$NotesTableFilterComposer,
+    $$NotesTableOrderingComposer,
+    $$NotesTableAnnotationComposer,
+    $$NotesTableCreateCompanionBuilder,
+    $$NotesTableUpdateCompanionBuilder,
+    (Note, BaseReferences<_$AppDatabase, $NotesTable, Note>),
+    Note,
+    PrefetchHooks Function()>;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -4760,4 +5762,6 @@ class $AppDatabaseManager {
       $$ClassesTableTableManager(_db, _db.classes);
   $$RemindersTableTableManager get reminders =>
       $$RemindersTableTableManager(_db, _db.reminders);
+  $$NotesTableTableManager get notes =>
+      $$NotesTableTableManager(_db, _db.notes);
 }

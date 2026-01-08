@@ -24,6 +24,11 @@ class Event {
   DateTime? recurrenceEndDate; // When recurrence stops
   int? recurrenceCount; // Number of occurrences
 
+  // Reminder fields
+  bool? reminderEnabled; // Whether reminder notification is enabled
+  DateTime? reminderTime; // When to show the reminder notification
+  String? reminderPreset; // Preset type: 'at_time', '15min', '30min', '1hour', '1day', 'custom'
+
   Event({
     String? id, // Allow null for auto-generation
     required this.title,
@@ -43,6 +48,9 @@ class Event {
     this.recurrenceExceptionDates,
     this.recurrenceEndDate,
     this.recurrenceCount,
+    this.reminderEnabled, 
+    this.reminderTime, 
+    this.reminderPreset, 
   }) : id = id ?? const Uuid().v4(); // Auto-generate ID if not provided
 
   // Conversion method from EventData to Event
@@ -68,6 +76,9 @@ class Event {
     .toList(),
       recurrenceEndDate: eventData.recurrenceEndDate,
       recurrenceCount: eventData.recurrenceCount,
+      reminderEnabled: eventData.reminderEnabled,
+      reminderTime: eventData.reminderTime, 
+      reminderPreset: eventData.reminderPreset, 
     );
   }
 
@@ -91,6 +102,9 @@ class Event {
       'recurrenceExceptionDates': recurrenceExceptionDates?.map((d) => d.toIso8601String()).join(','),
       'recurrenceEndDate': recurrenceEndDate?.toIso8601String(),
       'recurrenceCount': recurrenceCount,
+      'reminderEnabled': reminderEnabled, 
+      'reminderTime': reminderTime?.toIso8601String(), 
+      'reminderPreset': reminderPreset, 
     };
   }
 
@@ -123,6 +137,11 @@ class Event {
           ? DateTime.parse(map['recurrenceEndDate'])
           : null,
       recurrenceCount: map['recurrenceCount'],
+      reminderEnabled: map['reminderEnabled'], 
+      reminderTime: map['reminderTime'] != null 
+          ? DateTime.parse(map['reminderTime'])
+          : null,
+      reminderPreset: map['reminderPreset'], 
     );
   }
 
@@ -146,6 +165,9 @@ class Event {
     List<DateTime>? recurrenceExceptionDates,
     DateTime? recurrenceEndDate,
     int? recurrenceCount,
+    bool? reminderEnabled, 
+    DateTime? reminderTime, 
+    String? reminderPreset, 
   }) {
     return Event(
       id: id ?? this.id,
@@ -166,6 +188,9 @@ class Event {
       recurrenceExceptionDates: recurrenceExceptionDates ?? this.recurrenceExceptionDates,
       recurrenceEndDate: recurrenceEndDate ?? this.recurrenceEndDate,
       recurrenceCount: recurrenceCount ?? this.recurrenceCount,
+      reminderEnabled: reminderEnabled ?? this.reminderEnabled, 
+      reminderTime: reminderTime ?? this.reminderTime, 
+      reminderPreset: reminderPreset ?? this.reminderPreset,
     );
   }
 
@@ -184,6 +209,9 @@ class Event {
                      DateTime.now().month == date.month && 
                      DateTime.now().year == date.year;
   bool get isUpcoming => DateTime.now().isBefore(startDateTime);
+  
+  //  Helper method to check if reminder is set
+  bool get hasReminder => reminderEnabled == true && reminderTime != null;
 
   // Generate RRULE string based on pattern
   String generateRRule() {

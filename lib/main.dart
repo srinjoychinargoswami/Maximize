@@ -6,15 +6,18 @@ import 'package:maximize/models/database.dart';
 import 'package:maximize/screens/calendar_page.dart';
 import 'package:maximize/screens/task_list_screen.dart';
 import 'package:maximize/screens/reminder_page.dart';
+import 'package:maximize/screens/notes_page.dart'; 
 import 'package:maximize/services/api_service.dart';
 import 'package:maximize/services/calendar_service.dart';
 import 'package:maximize/services/task_service.dart';
 import 'package:maximize/services/reminder_service.dart';
+import 'package:maximize/services/note_service.dart'; 
 import 'package:maximize/models/task_model.dart';
 import 'package:maximize/models/event_model.dart';
 import 'package:maximize/models/reminder_model.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/data/latest.dart' as tz_data;
+
 
 // CustomScrollBehavior to fix RefreshIndicator on Windows desktop
 class CustomScrollBehavior extends ScrollBehavior {
@@ -26,14 +29,18 @@ class CustomScrollBehavior extends ScrollBehavior {
   };
 }
 
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
 
   // Initialize timezone for notifications
   tz_data.initializeTimeZones();
 
+
   // Initialize your NotificationService (singleton)
   await NotificationService.instance.initialize();
+
 
   // Request POST_NOTIFICATIONS permission for Android 13+
   if (Platform.isAndroid) {
@@ -43,18 +50,22 @@ void main() async {
     await androidPlugin?.requestNotificationsPermission();
   }
 
+
   // Initialize Drift database
   final database = AppDatabase.instance;
   final apiService = ApiService(db: database);
+
 
   // Start the app
   runApp(MyApp(database: database, apiService: apiService));
 }
 
+
 class MyApp extends StatelessWidget {
   final AppDatabase database;
   final ApiService apiService;
   const MyApp({super.key, required this.database, required this.apiService});
+
 
   @override
   Widget build(BuildContext context) {
@@ -79,16 +90,20 @@ class MyApp extends StatelessWidget {
   }
 }
 
+
 /* HOME PAGE – Drawer, Bottom Nav, and IndexedStack */
+
 
 class MyHomePage extends StatefulWidget {
   final AppDatabase database;
   final ApiService apiService;
   const MyHomePage({super.key, required this.database, required this.apiService});
 
+
   @override
   State<MyHomePage> createState() => _MyHomePageState();
 }
+
 
 class _MyHomePageState extends State<MyHomePage> {
   final _scaffoldKey = GlobalKey<ScaffoldState>();
@@ -98,9 +113,12 @@ class _MyHomePageState extends State<MyHomePage> {
   final GlobalKey<_OverviewPageState> _overviewKey = GlobalKey<_OverviewPageState>();
   final GlobalKey<State> _tasksKey = GlobalKey<State>();
   final GlobalKey<State> _calendarKey = GlobalKey<State>();
+  final GlobalKey<State> _notesKey = GlobalKey<State>(); 
   final GlobalKey<State> _remindersKey = GlobalKey<State>();
 
+
   late final List<Widget> _screens;
+
 
   @override
   void initState() {
@@ -110,17 +128,19 @@ class _MyHomePageState extends State<MyHomePage> {
       OverviewPage(key: _overviewKey, database: widget.database),
       TaskListScreen(key: _tasksKey, database: widget.database),
       CalendarPage(key: _calendarKey, calendarService: CalendarService(widget.database)),
-      NotesPage(database: widget.database),
+      NotesPage(key: _notesKey, noteService: NoteService(widget.database)), 
       ReminderPage(key: _remindersKey, database: widget.database),
       SettingsPage(api: widget.apiService),
     ];
   }
+
 
   void _jumpTo(int index) {
     setState(() {
       _currentIndex = index;
     });
   }
+
 
   // ADDED: Refresh method that calls appropriate page refresh
   Future<void> _refreshCurrentPage() async {
@@ -136,7 +156,7 @@ class _MyHomePageState extends State<MyHomePage> {
           (_calendarKey.currentState as dynamic)?._loadEvents();
           break;
         case 3: // Notes
-          // No refresh needed for notes yet
+          (_notesKey.currentState as dynamic)?._loadNotes(); 
           break;
         case 4: // Reminders
           (_remindersKey.currentState as dynamic)?._loadReminders();
@@ -152,6 +172,7 @@ class _MyHomePageState extends State<MyHomePage> {
       );
     }
   }
+
 
   @override
   Widget build(BuildContext context) {
@@ -173,6 +194,7 @@ class _MyHomePageState extends State<MyHomePage> {
         ],
       ),
 
+
       /*  DRAWER  */
       drawer: Drawer(
         child: ListView(
@@ -192,8 +214,10 @@ class _MyHomePageState extends State<MyHomePage> {
         ),
       ),
 
+
       /*  MAIN CONTENT  */
       body: IndexedStack(index: _currentIndex, children: _screens),
+
 
       /*  BOTTOM NAVIGATION */
       bottomNavigationBar: BottomNavigationBar(
@@ -215,6 +239,7 @@ class _MyHomePageState extends State<MyHomePage> {
     );
   }
 
+
   ListTile _drawerTile({required String title, required IconData icon, required int index}) {
     return ListTile(
       leading: Icon(icon),
@@ -230,7 +255,9 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 }
 
+
 /* OVERVIEW PAGE */
+
 
 class OverviewPage extends StatefulWidget {
   final AppDatabase database;
@@ -239,10 +266,12 @@ class OverviewPage extends StatefulWidget {
   State<OverviewPage> createState() => _OverviewPageState();
 }
 
+
 class _OverviewPageState extends State<OverviewPage> {
   late final TaskService _taskService;
   late final CalendarService _calendarService;
   late final ReminderService _reminderService;
+
 
   @override
   void initState() {
@@ -251,6 +280,7 @@ class _OverviewPageState extends State<OverviewPage> {
     _calendarService = CalendarService(widget.database);
     _reminderService = ReminderService(widget.database);
   }
+
 
   // UPDATED: Made public so parent can call it
   Future<void> _refreshData() async {
@@ -263,9 +293,11 @@ class _OverviewPageState extends State<OverviewPage> {
     );
   }
 
+
   @override
   Widget build(BuildContext context) {
     final today = DateTime.now();
+
 
     return ScrollConfiguration(
       behavior: CustomScrollBehavior(),
@@ -294,6 +326,7 @@ class _OverviewPageState extends State<OverviewPage> {
     );
   }
 
+
   Padding _sectionHeader(String text) => Padding(
     padding: const EdgeInsets.all(16),
     child: Text(text, style: Theme.of(context).textTheme.titleMedium?.copyWith(
@@ -302,6 +335,7 @@ class _OverviewPageState extends State<OverviewPage> {
       fontSize: 18,
     )),
   );
+
 
   SizedBox _taskSection(DateTime today) {
     return SizedBox(
@@ -317,6 +351,7 @@ class _OverviewPageState extends State<OverviewPage> {
             return Center(child: Text('Error loading tasks: ${snapshot.error}'));
           }
 
+
           final tasks = snapshot.data ?? [];
           
           if (tasks.isEmpty) {
@@ -327,6 +362,7 @@ class _OverviewPageState extends State<OverviewPage> {
               ),
             );
           }
+
 
           return ListView.builder(
             physics: AlwaysScrollableScrollPhysics(),
@@ -411,6 +447,7 @@ class _OverviewPageState extends State<OverviewPage> {
     );
   }
 
+
   SizedBox _eventSection(DateTime today) {
     return SizedBox(
       height: 200,
@@ -421,11 +458,14 @@ class _OverviewPageState extends State<OverviewPage> {
             return const Center(child: CircularProgressIndicator());
           }
 
+
           if (snapshot.hasError) {
             return Center(child: Text('Error loading events: ${snapshot.error}'));
           }
 
+
           final events = snapshot.data ?? [];
+
 
           if (events.isEmpty) {
             return const Center(
@@ -435,6 +475,7 @@ class _OverviewPageState extends State<OverviewPage> {
               ),
             );
           }
+
 
           return ListView.builder(
             physics: AlwaysScrollableScrollPhysics(),
@@ -481,6 +522,7 @@ class _OverviewPageState extends State<OverviewPage> {
     );
   }
 
+
   SizedBox _reminderSection(DateTime today) {
     return SizedBox(
       height: 200,
@@ -491,11 +533,14 @@ class _OverviewPageState extends State<OverviewPage> {
             return const Center(child: CircularProgressIndicator());
           }
 
+
           if (snapshot.hasError) {
             return Center(child: Text('Error loading reminders: ${snapshot.error}'));
           }
 
+
           final reminders = snapshot.data ?? [];
+
 
           if (reminders.isEmpty) {
             return const Center(
@@ -505,6 +550,7 @@ class _OverviewPageState extends State<OverviewPage> {
               ),
             );
           }
+
 
           return ListView.builder(
             physics: AlwaysScrollableScrollPhysics(),
@@ -560,6 +606,7 @@ class _OverviewPageState extends State<OverviewPage> {
     );
   }
 
+
   Widget _buildPriorityIndicator(String priority) {
     Color color;
     switch (priority.toLowerCase()) {
@@ -589,6 +636,7 @@ class _OverviewPageState extends State<OverviewPage> {
     );
   }
 
+
   Future<void> _toggleTaskCompletion(String taskId, bool? isCompleted) async {
     try {
       if (isCompleted == true) {
@@ -603,6 +651,7 @@ class _OverviewPageState extends State<OverviewPage> {
       );
     }
   }
+
 
   Future<void> _toggleSubtaskCompletion(String subtaskId, bool? isCompleted) async {
     try {
@@ -630,6 +679,7 @@ class _OverviewPageState extends State<OverviewPage> {
     }
   }
 
+
   Future<void> _toggleEventCompletion(String eventId, bool? isCompleted) async {
     try {
       if (isCompleted == true) {
@@ -644,6 +694,7 @@ class _OverviewPageState extends State<OverviewPage> {
       );
     }
   }
+
 
   Future<void> _toggleReminderCompletion(String reminderId, bool? isCompleted) async {
     try {
@@ -661,25 +712,31 @@ class _OverviewPageState extends State<OverviewPage> {
   }
 }
 
+
 // Settings page
 class SettingsPage extends StatefulWidget {
   final ApiService api;
 
+
   const SettingsPage({super.key, required this.api});
+
 
   @override
   State<SettingsPage> createState() => _SettingsPageState();
 }
+
 
 class _SettingsPageState extends State<SettingsPage> {
   final TextEditingController _tokenController = TextEditingController();
   final TextEditingController _usernameController = TextEditingController();
   final TextEditingController _repoController = TextEditingController();
 
+
   bool _tokenSaved = false;
   bool _usernameSaved = false;
   bool _repoSaved = false;
   bool _obscureText = true;
+
 
   @override
   void initState() {
@@ -687,28 +744,34 @@ class _SettingsPageState extends State<SettingsPage> {
     _loadSavedData();
   }
 
+
   Future<void> _loadSavedData() async {
     final storedToken = await widget.api.getStoredToken();
     final storedUsername = await widget.api.getGitHubUsername();
     final storedRepo = await widget.api.getGitHubRepo();
+
 
     if (storedToken != null) {
       _tokenController.text = storedToken;
       _tokenSaved = true;
     }
 
+
     if (storedUsername.isNotEmpty) {
       _usernameController.text = storedUsername;
       _usernameSaved = true;
     }
+
 
     if (storedRepo.isNotEmpty) {
       _repoController.text = storedRepo;
       _repoSaved = true;
     }
 
+
     setState(() {});
   }
+
 
   @override
   void dispose() {
@@ -717,6 +780,7 @@ class _SettingsPageState extends State<SettingsPage> {
     _repoController.dispose();
     super.dispose();
   }
+
 
   @override
   Widget build(BuildContext context) {
@@ -798,7 +862,9 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
           ),
 
+
           const SizedBox(height: 32),
+
 
           Text(
             'GitHub Username',
@@ -813,7 +879,9 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
           ),
 
+
           const SizedBox(height: 24),
+
 
           Text(
             'GitHub Repository Name',
@@ -828,7 +896,9 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
           ),
 
+
           const SizedBox(height: 24),
+
 
           Text(
             'GitHub Token',
@@ -855,13 +925,16 @@ class _SettingsPageState extends State<SettingsPage> {
             autocorrect: false,
           ),
 
+
           const SizedBox(height: 12),
+
 
           ElevatedButton(
             onPressed: () async {
               final token = _tokenController.text.trim();
               final username = _usernameController.text.trim();
               final repo = _repoController.text.trim();
+
 
               if (token.isEmpty || username.isEmpty || repo.isEmpty) {
                 ScaffoldMessenger.of(context).showSnackBar(
@@ -870,15 +943,18 @@ class _SettingsPageState extends State<SettingsPage> {
                 return;
               }
 
+
               await widget.api.saveGitHubToken(token);
               await widget.api.saveGitHubUsername(username);
               await widget.api.saveGitHubRepo(repo);
+
 
               setState(() {
                 _tokenSaved = true;
                 _usernameSaved = true;
                 _repoSaved = true;
               });
+
 
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text('Sync Information saved successfully!')),
@@ -887,7 +963,9 @@ class _SettingsPageState extends State<SettingsPage> {
             child: Text(_tokenSaved && _usernameSaved && _repoSaved ? 'Update Sync Information' : 'Save Sync Information'),
           ),
 
+
           const SizedBox(height: 8),
+
 
           if (_tokenSaved || _usernameSaved || _repoSaved)
             ElevatedButton(
@@ -900,15 +978,18 @@ class _SettingsPageState extends State<SettingsPage> {
                 await widget.api.deleteGitHubUsername();
                 await widget.api.deleteGitHubRepo();
 
+
                 _tokenController.clear();
                 _usernameController.clear();
                 _repoController.clear();
+
 
                 setState(() {
                   _tokenSaved = false;
                   _usernameSaved = false;
                   _repoSaved = false;
                 });
+
 
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text('All GitHub Sync Information Deleted Successfully.')),
@@ -920,12 +1001,4 @@ class _SettingsPageState extends State<SettingsPage> {
       ),
     );
   }
-}
-
-// Notes page
-class NotesPage extends StatelessWidget {
-  final AppDatabase database;
-  const NotesPage({super.key, required this.database});
-  @override
-  Widget build(BuildContext context) => const Center(child: Text('Notes page'));
 }

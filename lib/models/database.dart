@@ -11,7 +11,6 @@ import 'package:http/http.dart' as http;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:maximize/utils/encryption_helper.dart';
 
-
 // Import models
 import 'package:maximize/models/task_model.dart';
 import 'package:maximize/models/event_model.dart';
@@ -28,6 +27,7 @@ class DatabaseException implements Exception {
 }
 
 // Task Table - Updated with recurring fields (completion already exists)
+// Reminder fields
 @DataClassName('TaskData')
 class Tasks extends Table {
   TextColumn get id => text().clientDefault(() => const Uuid().v1())();
@@ -54,6 +54,11 @@ class Tasks extends Table {
   IntColumn get dayOfMonth => integer().nullable()(); // specific day of month for monthly
   IntColumn get weekOfMonth => integer().nullable()(); // week of month for monthly
   
+  // Reminder fields for tasks
+  BoolColumn get reminderEnabled => boolean().withDefault(Constant(false))();
+  DateTimeColumn get reminderTime => dateTime().nullable()();
+  TextColumn get reminderPreset => text().nullable()(); // 'at_time', '15min', '30min', '1hour', '1day', 'custom'
+  
   @override
   Set<Column> get primaryKey => {id};
 }
@@ -72,6 +77,7 @@ class Subtasks extends Table {
 }
 
 // Event Table - ENHANCED with completion tracking and recurring fields
+// Reminder fields
 @DataClassName('EventData')
 class Events extends Table {
   TextColumn get id => text().clientDefault(() => const Uuid().v1())();
@@ -93,6 +99,11 @@ class Events extends Table {
   DateTimeColumn get recurrenceEndDate => dateTime().nullable()(); // When recurrence stops
   IntColumn get recurrenceCount => integer().nullable()(); // Number of occurrences
   
+  // Reminder fields for events
+  BoolColumn get reminderEnabled => boolean().withDefault(Constant(false))();
+  DateTimeColumn get reminderTime => dateTime().nullable()();
+  TextColumn get reminderPreset => text().nullable()(); // 'at_time', '15min', '30min', '1hour', '1day', 'custom'
+  
   @override
   Set<Column> get primaryKey => {id};
 }
@@ -103,7 +114,7 @@ class Classes extends Table {
   TextColumn get id => text().clientDefault(() => const Uuid().v1())();
   TextColumn get name => text().withLength(min: 1, max: 100)();
   DateTimeColumn get startTime => dateTime()(); // Store as DateTime
-  DateTimeColumn get endTime => dateTime()(); // Store as DateTime
+  DateTimeColumn get endDateTime => dateTime()(); // Store as DateTime
   TextColumn get day => text().withLength(min: 1, max: 10)();
   
   @override
@@ -133,8 +144,24 @@ class Reminders extends Table {
   Set<Column> get primaryKey => {id};
 }
 
+//Notes Table
+@DataClassName('Note')
+class Notes extends Table {
+  TextColumn get id => text().clientDefault(() => const Uuid().v4())();
+  TextColumn get title => text().withLength(min: 1, max: 200)();
+  TextColumn get content => text()();
+  TextColumn get category => text().nullable()();
+  TextColumn get color => text().withDefault(const Constant('#FFD700'))();
+  DateTimeColumn get createdAt => dateTime()();
+  DateTimeColumn get updatedAt => dateTime()();
+  BoolColumn get isPinned => boolean().withDefault(const Constant(false))();
+  
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
 // Drift Database Class
-@DriftDatabase(tables: [Tasks, Subtasks, Events, Classes, Reminders])
+@DriftDatabase(tables: [Tasks, Subtasks, Events, Classes, Reminders, Notes]) // ✅ ADDED Notes
 class AppDatabase extends _$AppDatabase {
   AppDatabase._() : super(_openConnection());
   static final AppDatabase instance = AppDatabase._();
@@ -148,9 +175,9 @@ class AppDatabase extends _$AppDatabase {
   final FlutterSecureStorage _secureStorage = const FlutterSecureStorage();
 
   @override
-  int get schemaVersion => 8; // FIXED: Updated to match migration logic
+  int get schemaVersion => 10; // Incremented from 9 to 10 for notes table
 
-  // FIXED: Complete migrations with proper versioning
+  // Migrations with reminder fields
   @override
   MigrationStrategy get migration => MigrationStrategy(
     onUpgrade: (Migrator m, int from, int to) async {
@@ -345,6 +372,50 @@ class AppDatabase extends _$AppDatabase {
           if (!e.toString().contains('no such column')) rethrow;
         }
       }
+      // Migration for reminder fields
+      if (from < 9 && to >= 9) {
+        // Add reminder fields to tasks table
+        try {
+          await m.addColumn(tasks, tasks.reminderEnabled);
+        } catch (e) {
+          if (!e.toString().contains('duplicate column')) rethrow;
+        }
+        
+        try {
+          await m.addColumn(tasks, tasks.reminderTime);
+        } catch (e) {
+          if (!e.toString().contains('duplicate column')) rethrow;
+        }
+        
+        try {
+          await m.addColumn(tasks, tasks.reminderPreset);
+        } catch (e) {
+          if (!e.toString().contains('duplicate column')) rethrow;
+        }
+        
+        // Add reminder fields to events table
+        try {
+          await m.addColumn(events, events.reminderEnabled);
+        } catch (e) {
+          if (!e.toString().contains('duplicate column')) rethrow;
+        }
+        
+        try {
+          await m.addColumn(events, events.reminderTime);
+        } catch (e) {
+          if (!e.toString().contains('duplicate column')) rethrow;
+        }
+        
+        try {
+          await m.addColumn(events, events.reminderPreset);
+        } catch (e) {
+          if (!e.toString().contains('duplicate column')) rethrow;
+        }
+      }
+      // Migration for notes table
+      if (from < 10 && to >= 10) {
+        await m.createTable(notes);
+      }
     },
   );
 
@@ -357,12 +428,13 @@ class AppDatabase extends _$AppDatabase {
     });
   }
 
-  // FIXED: Complete export method for sync
+  // Export method with reminder fields
   Future<Map<String, dynamic>> getAllDataAsJson() async {
     try {
       final tasks = await getAllTasks();
       final reminders = await getAllReminders();
       final events = await getAllEvents();
+      final notesList = await getAllNotes();
 
       return {
         'tasks': tasks.map((t) => {
@@ -387,6 +459,9 @@ class AppDatabase extends _$AppDatabase {
           'skipWeekends': t.skipWeekends,
           'dayOfMonth': t.dayOfMonth,
           'weekOfMonth': t.weekOfMonth,
+          'reminderEnabled': t.reminderEnabled, // NEW
+          'reminderTime': t.reminderTime?.toIso8601String(), // NEW
+          'reminderPreset': t.reminderPreset, // NEW
         }).toList(),
         'reminders': reminders.map((r) => {
           'id': r.id,
@@ -420,7 +495,20 @@ class AppDatabase extends _$AppDatabase {
           'recurrenceExceptionDates': e.recurrenceExceptionDates,
           'recurrenceEndDate': e.recurrenceEndDate?.toIso8601String(),
           'recurrenceCount': e.recurrenceCount,
+          'reminderEnabled': e.reminderEnabled, // NEW
+          'reminderTime': e.reminderTime?.toIso8601String(), // NEW
+          'reminderPreset': e.reminderPreset, //  NEW
         }).toList(),
+      'notes': notesList.map((n) => {
+        'id': n.id,
+        'title': n.title,
+        'content': n.content,
+        'category': n.category,
+        'color': n.color,
+        'createdAt': n.createdAt.toIso8601String(),
+        'updatedAt': n.updatedAt.toIso8601String(),
+        'isPinned': n.isPinned,
+      }).toList(),
       };
     } catch (e) {
       print('Error exporting data as JSON: $e');
@@ -428,7 +516,7 @@ class AppDatabase extends _$AppDatabase {
     }
   }
 
-  // FIXED: Complete import method for sync
+  // Import method with reminder fields
   Future<void> insertAllFromJson(Map<String, dynamic> data) async {
     try {
       await batch((batch) {
@@ -457,6 +545,9 @@ class AppDatabase extends _$AppDatabase {
               skipWeekends: Value(taskJson['skipWeekends'] ?? false),
               dayOfMonth: taskJson['dayOfMonth'] != null ? Value(taskJson['dayOfMonth']) : const Value.absent(),
               weekOfMonth: taskJson['weekOfMonth'] != null ? Value(taskJson['weekOfMonth']) : const Value.absent(),
+              reminderEnabled: Value(taskJson['reminderEnabled'] ?? false), 
+              reminderTime: taskJson['reminderTime'] != null ? Value(DateTime.parse(taskJson['reminderTime'])) : const Value.absent(), 
+              reminderPreset: taskJson['reminderPreset'] != null ? Value(taskJson['reminderPreset']) : const Value.absent(), 
             );
             batch.insert(tasks, taskCompanion, mode: InsertMode.insertOrReplace);
           }
@@ -504,10 +595,28 @@ class AppDatabase extends _$AppDatabase {
               recurrenceExceptionDates: eventJson['recurrenceExceptionDates'] != null ? Value(eventJson['recurrenceExceptionDates']) : const Value.absent(),
               recurrenceEndDate: eventJson['recurrenceEndDate'] != null ? Value(DateTime.parse(eventJson['recurrenceEndDate'])) : const Value.absent(),
               recurrenceCount: eventJson['recurrenceCount'] != null ? Value(eventJson['recurrenceCount']) : const Value.absent(),
+              reminderEnabled: Value(eventJson['reminderEnabled'] ?? false), 
+              reminderTime: eventJson['reminderTime'] != null ? Value(DateTime.parse(eventJson['reminderTime'])) : const Value.absent(), 
+              reminderPreset: eventJson['reminderPreset'] != null ? Value(eventJson['reminderPreset']) : const Value.absent(), 
             );
             batch.insert(events, eventCompanion, mode: InsertMode.insertOrReplace);
           }
         }
+        if (data['notes'] != null) {
+        for (final noteJson in data['notes']) {
+          final noteCompanion = NotesCompanion(
+            id: Value(noteJson['id']),
+            title: Value(noteJson['title']),
+            content: Value(noteJson['content']),
+            category: noteJson['category'] != null ? Value(noteJson['category']) : const Value.absent(),
+            color: Value(noteJson['color'] ?? '#FFD700'),
+            createdAt: Value(DateTime.parse(noteJson['createdAt'])),
+            updatedAt: Value(DateTime.parse(noteJson['updatedAt'])),
+            isPinned: Value(noteJson['isPinned'] ?? false),
+          );
+          batch.insert(notes, noteCompanion, mode: InsertMode.insertOrReplace);
+        }
+      }
       });
     } catch (e) {
       print('Error importing data from JSON: $e');
@@ -650,7 +759,7 @@ class AppDatabase extends _$AppDatabase {
     }
   }
 
-  // ENHANCED: Insert task with completion tracking
+  // Insert task with reminder fields
   Future<int> insertTask(TaskModel task) async {
     try {
       final taskCompanion = TasksCompanion(
@@ -676,6 +785,10 @@ class AppDatabase extends _$AppDatabase {
         skipWeekends: Value(task.skipWeekends),
         dayOfMonth: task.dayOfMonth != null ? Value(task.dayOfMonth) : const Value.absent(),
         weekOfMonth: task.weekOfMonth != null ? Value(task.weekOfMonth) : const Value.absent(),
+        // Reminder fields
+        reminderEnabled: Value(task.reminderEnabled ?? false),
+        reminderTime: task.reminderTime != null ? Value(task.reminderTime) : const Value.absent(),
+        reminderPreset: task.reminderPreset != null ? Value(task.reminderPreset) : const Value.absent(),
       );
       return await into(tasks).insert(taskCompanion);
     } catch (e) {
@@ -704,7 +817,7 @@ class AppDatabase extends _$AppDatabase {
     }
   }
 
-  // ENHANCED: Update task with completion tracking
+  // Update task with reminder fields
   Future<void> updateTask(TaskModel task) async {
     try {
       final taskCompanion = TasksCompanion(
@@ -730,6 +843,10 @@ class AppDatabase extends _$AppDatabase {
         skipWeekends: Value(task.skipWeekends),
         dayOfMonth: task.dayOfMonth != null ? Value(task.dayOfMonth) : const Value.absent(),
         weekOfMonth: task.weekOfMonth != null ? Value(task.weekOfMonth) : const Value.absent(),
+        // Reminder fields
+        reminderEnabled: Value(task.reminderEnabled ?? false),
+        reminderTime: task.reminderTime != null ? Value(task.reminderTime) : const Value.absent(),
+        reminderPreset: task.reminderPreset != null ? Value(task.reminderPreset) : const Value.absent(),
       );
       await (update(tasks)..where((tbl) => tbl.id.equals(task.id))).write(taskCompanion);
     } catch (e) {
@@ -788,7 +905,6 @@ class AppDatabase extends _$AppDatabase {
   }
 }
 
-
   // ENHANCED: Insert subtask with completion tracking
   Future<int> insertSubtask(SubtaskModel subtask) async {
     try {
@@ -832,7 +948,7 @@ class AppDatabase extends _$AppDatabase {
     }
   }
 
-  // Event Methods - ENHANCED with completion tracking and recurring support
+  // Event Methods with reminder fields
   Future<int> insertEvent(Event event) async {
     try {
       final eventCompanion = EventsCompanion(
@@ -854,6 +970,10 @@ class AppDatabase extends _$AppDatabase {
             : const Value.absent(),
         recurrenceEndDate: event.recurrenceEndDate != null ? Value(event.recurrenceEndDate) : const Value.absent(),
         recurrenceCount: event.recurrenceCount != null ? Value(event.recurrenceCount) : const Value.absent(),
+        // Reminder fields
+        reminderEnabled: Value(event.reminderEnabled ?? false),
+        reminderTime: event.reminderTime != null ? Value(event.reminderTime) : const Value.absent(),
+        reminderPreset: event.reminderPreset != null ? Value(event.reminderPreset) : const Value.absent(),
       );
       return await into(events).insert(eventCompanion);
     } catch (e) {
@@ -903,7 +1023,7 @@ class AppDatabase extends _$AppDatabase {
     }
   }
 
-  // ENHANCED: Update event with completion tracking
+  // Update event with reminder fields
   Future<void> updateEvent(Event event) async {
     try {
       if (event.id.isEmpty) {
@@ -929,6 +1049,10 @@ class AppDatabase extends _$AppDatabase {
             : const Value.absent(),
         recurrenceEndDate: event.recurrenceEndDate != null ? Value(event.recurrenceEndDate) : const Value.absent(),
         recurrenceCount: event.recurrenceCount != null ? Value(event.recurrenceCount) : const Value.absent(),
+        // Reminder fields
+        reminderEnabled: Value(event.reminderEnabled ?? false),
+        reminderTime: event.reminderTime != null ? Value(event.reminderTime) : const Value.absent(),
+        reminderPreset: event.reminderPreset != null ? Value(event.reminderPreset) : const Value.absent(),
       );
 
       await (update(events)..where((tbl) => tbl.id.equals(event.id))).write(eventCompanion);
@@ -1078,6 +1202,43 @@ class AppDatabase extends _$AppDatabase {
     } catch (e) {
       print('Error fetching reminders in range: $e');
       throw DatabaseException('Error fetching reminders in range: $e');
+    }
+  }
+
+  // Note CRUD Methods
+  Future<List<Note>> getAllNotes() async {
+    try {
+      return await select(notes).get();
+    } catch (e) {
+      print('Error fetching notes: $e');
+      throw DatabaseException('Error fetching notes: $e');
+    }
+  }
+
+  Future<int> insertNote(NotesCompanion note) async {
+    try {
+      return await into(notes).insert(note);
+    } catch (e) {
+      print('Error inserting note: $e');
+      throw DatabaseException('Error inserting note: $e');
+    }
+  }
+
+  Future<bool> updateNote(NotesCompanion note) async {
+    try {
+      return await update(notes).replace(note);
+    } catch (e) {
+      print('Error updating note: $e');
+      throw DatabaseException('Error updating note: $e');
+    }
+  }
+
+  Future<int> deleteNote(String noteId) async {
+    try {
+      return await (delete(notes)..where((n) => n.id.equals(noteId))).go();
+    } catch (e) {
+      print('Error deleting note: $e');
+      throw DatabaseException('Error deleting note: $e');
     }
   }
 }

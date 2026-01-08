@@ -37,6 +37,11 @@ TaskModel _$TaskModelFromJson(Map<String, dynamic> json) => TaskModel(
       subtasks: (json['subtasks'] as List<dynamic>?)
           ?.map((e) => SubtaskModel.fromJson(e as Map<String, dynamic>))
           .toList(),
+      reminderEnabled: json['reminderEnabled'] as bool?,
+      reminderTime: json['reminderTime'] == null
+          ? null
+          : DateTime.parse(json['reminderTime'] as String),
+      reminderPreset: json['reminderPreset'] as String?,
     );
 
 Map<String, dynamic> _$TaskModelToJson(TaskModel instance) => <String, dynamic>{
@@ -62,6 +67,9 @@ Map<String, dynamic> _$TaskModelToJson(TaskModel instance) => <String, dynamic>{
       'weekOfMonth': instance.weekOfMonth,
       'completedAt': instance.completedAt?.toIso8601String(),
       'subtasks': instance.subtasks,
+      'reminderEnabled': instance.reminderEnabled,
+      'reminderTime': instance.reminderTime?.toIso8601String(),
+      'reminderPreset': instance.reminderPreset,
     };
 
 SubtaskModel _$SubtaskModelFromJson(Map<String, dynamic> json) => SubtaskModel(
