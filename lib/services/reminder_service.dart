@@ -1,30 +1,32 @@
 import 'dart:io';
+import 'dart:async';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:maximize/models/reminder_model.dart';
-import 'package:maximize/models/database.dart'; // ADDED: Import database for reminder management
+import 'package:maximize/models/database.dart';
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 import 'package:win_toast/win_toast.dart';
-import 'dart:async';
 
-// ADDED: Proper ReminderService class for database operations
+// ==============================================================================
+// 1. ReminderService
+// Handles Database Operations & Business Logic
+// ==============================================================================
+
 class ReminderService {
   final AppDatabase _database;
 
   ReminderService(this._database);
 
-  // FIXED: Fetch all reminders from database using fromData constructor
   Future<List<ReminderModel>> getReminders() async {
     try {
       final reminderDataList = await _database.getAllReminders();
-      return reminderDataList.map((reminderData) => ReminderModel.fromData(reminderData)).toList(); // FIXED: Use fromData instead of fromMap
+      return reminderDataList.map((reminderData) => ReminderModel.fromData(reminderData)).toList();
     } catch (e) {
       print('Error fetching reminders: $e');
       return [];
     }
   }
 
-  // ADDED: Fetch reminders with filtering options
   Future<List<ReminderModel>> getRemindersFiltered({
     bool? completed,
     bool? isToday,
@@ -44,7 +46,6 @@ class ReminderService {
     }
   }
 
-  // ADDED: Get today's reminders for dashboard
   Future<List<ReminderModel>> getTodaysReminders() async {
     try {
       return await getRemindersFiltered(isToday: true);
@@ -54,7 +55,6 @@ class ReminderService {
     }
   }
 
-  // ADDED: Get completed reminders for productivity tracking
   Future<List<ReminderModel>> getCompletedReminders({DateTime? date}) async {
     try {
       final reminders = await getReminders();
@@ -71,7 +71,6 @@ class ReminderService {
     }
   }
 
-  // ADDED: Get overdue reminders
   Future<List<ReminderModel>> getOverdueReminders() async {
     try {
       final reminders = await getReminders();
@@ -85,12 +84,10 @@ class ReminderService {
     }
   }
 
-  // FIXED: Add reminder to database and schedule notification
   Future<void> addReminder(ReminderModel reminder) async {
     try {
-      await _database.insertReminder(reminder); // FIXED: Remove return assignment since insertReminder returns void
+      await _database.insertReminder(reminder);
       
-      // Schedule notification if reminder is not completed and in future
       if (!reminder.completed && reminder.scheduledTime.isAfter(DateTime.now())) {
         await NotificationService.instance.scheduleNotification(reminder);
       }
@@ -99,12 +96,10 @@ class ReminderService {
     }
   }
 
-  // ADDED: Update reminder in database
   Future<void> updateReminder(ReminderModel reminder) async {
     try {
       await _database.updateReminder(reminder);
       
-      // Cancel existing notification and reschedule if needed
       await NotificationService.instance.cancelNotification(reminder.id);
       
       if (!reminder.completed && reminder.scheduledTime.isAfter(DateTime.now())) {
@@ -115,7 +110,6 @@ class ReminderService {
     }
   }
 
-  // ADDED: Toggle reminder completion status (for checkbox functionality)
   Future<void> toggleReminderCompletion(String reminderId) async {
     try {
       final reminder = await getReminderById(reminderId);
@@ -123,7 +117,6 @@ class ReminderService {
         final updatedReminder = reminder.toggleCompletion();
         await updateReminder(updatedReminder);
         
-        // Cancel notification if completed
         if (updatedReminder.completed) {
           await NotificationService.instance.cancelNotification(reminderId);
         }
@@ -133,7 +126,6 @@ class ReminderService {
     }
   }
 
-  // ADDED: Mark reminder as completed (for checkbox functionality)
   Future<void> markReminderCompleted(String reminderId) async {
     try {
       final reminder = await getReminderById(reminderId);
@@ -143,8 +135,6 @@ class ReminderService {
           completedAt: DateTime.now(),
         );
         await updateReminder(updatedReminder);
-        
-        // Cancel notification since it's completed
         await NotificationService.instance.cancelNotification(reminderId);
       }
     } catch (e) {
@@ -152,7 +142,6 @@ class ReminderService {
     }
   }
 
-  // ADDED: Mark reminder as incomplete (for checkbox functionality)
   Future<void> markReminderIncomplete(String reminderId) async {
     try {
       final reminder = await getReminderById(reminderId);
@@ -163,7 +152,6 @@ class ReminderService {
         );
         await updateReminder(updatedReminder);
         
-        // Reschedule notification if it's still in the future
         if (updatedReminder.scheduledTime.isAfter(DateTime.now())) {
           await NotificationService.instance.scheduleNotification(updatedReminder);
         }
@@ -173,7 +161,6 @@ class ReminderService {
     }
   }
 
-  // ADDED: Get reminder by ID
   Future<ReminderModel?> getReminderById(String id) async {
     try {
       final reminders = await getReminders();
@@ -187,15 +174,11 @@ class ReminderService {
     }
   }
 
-  // ADDED: Delete reminder from database and cancel notifications
   Future<void> deleteReminder(String reminderId) async {
     try {
       final reminder = await getReminderById(reminderId);
       if (reminder != null) {
-        // Cancel all notifications for this reminder
         await NotificationService.instance.deleteReminderWithCleanup(reminder);
-        
-        // Delete from database
         await _database.deleteReminder(reminderId);
       }
     } catch (e) {
@@ -203,7 +186,6 @@ class ReminderService {
     }
   }
 
-  // ADDED: Get reminder statistics for productivity tracking
   Future<Map<String, int>> getReminderStats() async {
     try {
       final reminders = await getReminders();
@@ -224,13 +206,16 @@ class ReminderService {
     }
   }
 
-  // ADDED: Helper method to check if two dates are the same day
   bool _isSameDay(DateTime a, DateTime b) {
     return a.year == b.year && a.month == b.month && a.day == b.day;
   }
 }
 
-// ENHANCED: NotificationService class with better integration
+// ==============================================================================
+// 2. NotificationService
+// Handles Platform-Specific Notifications (Windows, Android, macOS)
+// ==============================================================================
+
 class NotificationService {
   NotificationService._internal();
   static final NotificationService _instance = NotificationService._internal();
@@ -240,7 +225,6 @@ class NotificationService {
   FlutterLocalNotificationsPlugin? _flutterLocalNotificationsPlugin;
   bool _isInitialized = false;
   
-  // Store Windows timers for proper scheduling
   final Map<String, Timer> _windowsTimers = {};
 
   Future<void> initialize() async {
@@ -249,15 +233,16 @@ class NotificationService {
     try {
       tz.initializeTimeZones();
       
-      // Set proper timezone based on system
+      // Set proper timezone
       if (Platform.isWindows) {
-        // Use system timezone for Windows - ENHANCED: Make this more dynamic
-        tz.setLocalLocation(tz.getLocation('America/New_York')); // You can make this dynamic
+        tz.setLocalLocation(tz.getLocation('America/New_York')); 
       } else {
+        // macOS and Android usually handle local time correctly automatically
         tz.setLocalLocation(tz.local);
       }
 
       if (Platform.isWindows) {
+        // --- WINDOWS INIT ---
         final result = await WinToast.instance().initialize(
           aumId: 'com.maximize.productivity',
           displayName: 'Maximize Productivity App',
@@ -268,21 +253,48 @@ class NotificationService {
             ? '[NotificationService] WinToast initialized for Windows'
             : '[NotificationService] Failed to initialize WinToast');
       } else {
+        // --- ANDROID & MACOS INIT ---
         _flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
-        const initializationSettings = InitializationSettings(
-          android: AndroidInitializationSettings('@mipmap/ic_launcher'),
+        
+        // Android Settings
+        const AndroidInitializationSettings initializationSettingsAndroid =
+            AndroidInitializationSettings('@mipmap/ic_launcher');
+            
+        // ADDED: macOS Settings (Critical for MacBook support)
+        const DarwinInitializationSettings initializationSettingsDarwin =
+            DarwinInitializationSettings(
+          requestAlertPermission: true,
+          requestBadgePermission: true,
+          requestSoundPermission: true,
         );
         
-        // ENHANCED: Add notification tap handling
+        // Combine Settings
+        final InitializationSettings initializationSettings = InitializationSettings(
+          android: initializationSettingsAndroid,
+          macOS: initializationSettingsDarwin, // <--- ADDED THIS
+          iOS: initializationSettingsDarwin,   // Good practice
+        );
+        
         await _flutterLocalNotificationsPlugin!.initialize(
           initializationSettings,
-          onDidReceiveNotificationResponse: _onNotificationTap, // ADDED: Handle notification taps
+          onDidReceiveNotificationResponse: _onNotificationTap,
         );
 
+        // Request Permissions Explicitly
         if (Platform.isAndroid) {
           final androidPlugin = _flutterLocalNotificationsPlugin!
               .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
           await androidPlugin?.requestNotificationsPermission();
+        } 
+        // ADDED: macOS Permission Request
+        else if (Platform.isMacOS) {
+           await _flutterLocalNotificationsPlugin!
+              .resolvePlatformSpecificImplementation<MacOSFlutterLocalNotificationsPlugin>()
+              ?.requestPermissions(
+                alert: true,
+                badge: true,
+                sound: true,
+              );
         }
       }
 
@@ -294,24 +306,19 @@ class NotificationService {
     }
   }
 
-  // ADDED: Handle notification tap events
   void _onNotificationTap(NotificationResponse response) {
     print('[NotificationService] Notification tapped: ${response.payload}');
-    // TODO: Add navigation logic here to open specific reminder/task
-    // You can use this to navigate to the reminder details page
   }
 
   Future<void> scheduleNotification(ReminderModel reminder) async {
     try {
       if (!_isInitialized) await initialize();
 
-      // ENHANCED: Skip scheduling if reminder is already completed
       if (reminder.completed) {
         print('[NotificationService] Reminder is completed, skipping scheduling');
         return;
       }
 
-      // Validate that the scheduled time is in the future
       final now = DateTime.now();
       if (reminder.scheduledTime.isBefore(now)) {
         print('[NotificationService] Scheduled time is in the past: ${reminder.scheduledTime}');
@@ -360,23 +367,14 @@ class NotificationService {
     final now = DateTime.now();
     final delay = reminder.scheduledTime.difference(now);
     
-    print('[NotificationService] Windows notification delay: ${delay.inMinutes} minutes');
-    
     if (delay.isNegative) {
-      print('[NotificationService] Time is in the past, showing immediately');
       await _showWindowsToast(reminder.title, reminder.body);
     } else {
-      // Cancel any existing timer for this reminder
       _windowsTimers[reminder.id]?.cancel();
-      
-      // Create new timer
       _windowsTimers[reminder.id] = Timer(delay, () async {
-        print('[NotificationService] Firing Windows notification for: ${reminder.title}');
         await _showWindowsToast(reminder.title, reminder.body);
         _windowsTimers.remove(reminder.id);
       });
-      
-      print('[NotificationService] Windows timer set for ${delay.inMinutes} minutes from now');
     }
   }
 
@@ -385,7 +383,6 @@ class NotificationService {
       final limitedTitle = (title.trim().isNotEmpty ? title.trim() : "Reminder");
       final limitedBody = (body.trim().isNotEmpty ? body.trim() : "Notification");
       
-      // Ensure we don't exceed Windows toast limits
       final finalTitle = limitedTitle.length > 100 ? limitedTitle.substring(0, 100) : limitedTitle;
       final finalBody = limitedBody.length > 200 ? limitedBody.substring(0, 200) : limitedBody;
       
@@ -404,7 +401,6 @@ class NotificationService {
           ],
         ),
       );
-      print('[NotificationService] Windows toast shown: $finalTitle');
     } catch (e) {
       print('[NotificationService] Error showing Windows toast: $e');
     }
@@ -413,12 +409,9 @@ class NotificationService {
   Future<void> _scheduleFlutterNotification(ReminderModel reminder) async {
     try {
       final notificationIdInt = int.tryParse(reminder.notificationId);
-      if (notificationIdInt == null) { 
-        print('[Error] Invalid notificationId: ${reminder.notificationId}');
-        return;
-      }
+      if (notificationIdInt == null) return;
 
-      // ENHANCED: Add action buttons for dismiss/snooze (foundation for future feature)
+      // Android Details
       const androidDetails = AndroidNotificationDetails(
         'reminder_channel_id',
         'Reminders',
@@ -427,34 +420,33 @@ class NotificationService {
         priority: Priority.high,
         enableVibration: true,
         playSound: true,
-        // ADDED: Foundation for future snooze/dismiss functionality
         actions: <AndroidNotificationAction>[
           AndroidNotificationAction(
             'dismiss',
             'Dismiss',
             cancelNotification: true,
           ),
-          // TODO: Add snooze action in future update
         ],
       );
 
-      const platformChannelSpecifics = NotificationDetails(
-        android: androidDetails,
+      // ADDED: macOS Details (Critical for MacBook)
+      const darwinDetails = DarwinNotificationDetails(
+        presentAlert: true,
+        presentBadge: true,
+        presentSound: true,
       );
 
-      // Convert to timezone-aware datetime
+      // Combine Details
+      const platformChannelSpecifics = NotificationDetails(
+        android: androidDetails,
+        macOS: darwinDetails, // <--- ADDED THIS
+        iOS: darwinDetails,
+      );
+
       final scheduledDate = tz.TZDateTime.from(reminder.scheduledTime, tz.local);
       final now = tz.TZDateTime.now(tz.local);
       
-      print('[NotificationService] Current time: $now');
-      print('[NotificationService] Scheduled time: $scheduledDate');
-      print('[NotificationService] Time difference: ${scheduledDate.difference(now).inMinutes} minutes');
-
-      // Double-check that we're scheduling for the future
-      if (scheduledDate.isBefore(now)) {
-        print('[NotificationService] Scheduled date is in the past, cannot schedule');
-        return;
-      }
+      if (scheduledDate.isBefore(now)) return;
 
       await _flutterLocalNotificationsPlugin!.zonedSchedule(
         notificationIdInt,
@@ -464,7 +456,7 @@ class NotificationService {
         platformChannelSpecifics,
         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
         uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
-        payload: reminder.id // ENHANCED: Use reminder ID for better tracking
+        payload: reminder.id
       );
       
       print('[NotificationService] Flutter notification scheduled successfully');
@@ -473,79 +465,46 @@ class NotificationService {
     }
   }
 
-  // Cancel a specific notification
   Future<void> cancelNotification(String reminderId) async {
     try {
-      // Cancel Windows timer if exists
       _windowsTimers[reminderId]?.cancel();
       _windowsTimers.remove(reminderId);
       
-      // Cancel Flutter notification
       if (_flutterLocalNotificationsPlugin != null) {
         final notificationId = int.tryParse(reminderId);
         if (notificationId != null) {
           await _flutterLocalNotificationsPlugin!.cancel(notificationId);
         }
       }
-      
-      print('[NotificationService] Cancelled notification: $reminderId');
     } catch (e) {
       print('[NotificationService] Error cancelling notification: $e');
     }
   }
 
-  // ENHANCED: Cancel notifications with better error handling
+  // Legacy method wrapper
   Future<void> cancelNotifications(ReminderModel reminder) async {
-    try {
-      // Cancel Windows timer
-      _windowsTimers[reminder.id]?.cancel();
-      _windowsTimers.remove(reminder.id);
-
-      // Cancel Flutter notification
-      if (_flutterLocalNotificationsPlugin != null) {
-        final notificationId = int.tryParse(reminder.notificationId);
-        if (notificationId != null) {
-          await _flutterLocalNotificationsPlugin!.cancel(notificationId);
-        }
-      }
-
-      print('[NotificationService] Cancelled notification: ${reminder.notificationId}');
-    } catch (e) {
-      print('[NotificationService] Error cancelling notification: $e');
-    }
+      await cancelNotification(reminder.notificationId);
   }
 
-  // Cancel all recurring instances generated from a base reminder
   Future<void> cancelRecurringInstances(String baseNotificationId, {int maxInstances = 10}) async {
     for (int i = 0; i < maxInstances; i++) {
-      final instanceId = '$baseNotificationId\_$i';
+      final instanceId = '${baseNotificationId}_$i'; // Fixed string interpolation
       final parsedId = int.tryParse(instanceId);
 
-      // Cancel scheduled Android/iOS notification
       if (_flutterLocalNotificationsPlugin != null && parsedId != null) {
         await _flutterLocalNotificationsPlugin!.cancel(parsedId);
-        print('[NotificationService] Cancelled recurring Flutter notification ID: $parsedId');
       }
-
-      // Cancel Windows timer if exists
       _windowsTimers.removeWhere((key, _) => key == instanceId);
     }
-
-    print('[NotificationService] Cancelled all recurring instances of: $baseNotificationId');
   }
 
-  // ENHANCED: Complete reminder cleanup with better integration
   Future<void> deleteReminderWithCleanup(ReminderModel reminder) async {
     await cancelNotification(reminder.notificationId);
     if (reminder.isRecurring) {
       await cancelRecurringInstances(reminder.notificationId);
     }
-
-    // Note: Database deletion should be handled by ReminderService
-    print('[NotificationService] Cleaned up notifications for reminder: ${reminder.id}');
   }
 
-  // ENHANCED: Generate recurrence occurrences with better limits
   List<DateTime> _generateRecurrenceOccurrences(
     DateTime startDate,
     String rrule,
@@ -572,11 +531,7 @@ class NotificationService {
       }
       current = _getNextOccurrence(current, frequency!, interval);
       
-      // ENHANCED: Better safety check to prevent infinite loops
-      if (occurrenceCount > 50) {
-        print('[NotificationService] Reached maximum occurrences limit (50)');
-        break;
-      }
+      if (occurrenceCount > 50) break;
     }
 
     return occurrences;
@@ -605,13 +560,10 @@ class NotificationService {
   bool _isSameDay(DateTime a, DateTime b) =>
       a.year == b.year && a.month == b.month && a.day == b.day;
 
-  // ENHANCED: Cleanup method with better resource management
   void dispose() {
-    print('[NotificationService] Disposing ${_windowsTimers.length} Windows timers');
     for (final timer in _windowsTimers.values) {
       timer.cancel();
     }
     _windowsTimers.clear();
-    print('[NotificationService] Disposed successfully');
   }
 }
