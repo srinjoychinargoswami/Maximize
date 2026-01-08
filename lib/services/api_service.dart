@@ -139,7 +139,7 @@ class ApiService {
     }
   }
 
-  // Sync with deletion detection
+  // Sync with deletion detection - UPDATED WITH NOTES
   Future<void> _syncWithDeletionDetection(Map<String, dynamic> githubData) async {
     print('[ApiService] Starting sync with deletion detection...');
     
@@ -148,29 +148,33 @@ class ApiService {
     final githubSubtaskIds = _extractIds(githubData['subtasks']);
     final githubEventIds = _extractIds(githubData['events']);
     final githubReminderIds = _extractIds(githubData['reminders']);
+    final githubNoteIds = _extractIds(githubData['notes']); // ADDED
     
-    print('[ApiService] GitHub has: ${githubTaskIds.length} tasks, ${githubSubtaskIds.length} subtasks, ${githubEventIds.length} events, ${githubReminderIds.length} reminders');
+    print('[ApiService] GitHub has: ${githubTaskIds.length} tasks, ${githubSubtaskIds.length} subtasks, ${githubEventIds.length} events, ${githubReminderIds.length} reminders, ${githubNoteIds.length} notes');
     
     // Step 2: Get IDs from local database
     final localTasks = await db.getAllTasks();
     final localSubtasks = await db.getAllSubtasks(''); // Empty string gets all subtasks
     final localEvents = await db.getAllEvents();
     final localReminders = await db.getAllReminders();
+    final localNotes = await db.getAllNotes(); // ADDED
     
     final localTaskIds = localTasks.map((t) => t.id).toSet();
     final localSubtaskIds = localSubtasks.map((s) => s.id).toSet();
     final localEventIds = localEvents.map((e) => e.id).toSet();
     final localReminderIds = localReminders.map((r) => r.id).toSet();
+    final localNoteIds = localNotes.map((n) => n.id).toSet(); // ADDED
     
-    print('[ApiService] Local has: ${localTaskIds.length} tasks, ${localSubtaskIds.length} subtasks, ${localEventIds.length} events, ${localReminderIds.length} reminders');
+    print('[ApiService] Local has: ${localTaskIds.length} tasks, ${localSubtaskIds.length} subtasks, ${localEventIds.length} events, ${localReminderIds.length} reminders, ${localNoteIds.length} notes');
     
     // Step 3: Find items to delete (exist locally but not in GitHub)
     final tasksToDelete = localTaskIds.difference(githubTaskIds);
     final subtasksToDelete = localSubtaskIds.difference(githubSubtaskIds);
     final eventsToDelete = localEventIds.difference(githubEventIds);
     final remindersToDelete = localReminderIds.difference(githubReminderIds);
+    final notesToDelete = localNoteIds.difference(githubNoteIds); // ADDED
     
-    print('[ApiService] Items to delete: ${tasksToDelete.length} tasks, ${subtasksToDelete.length} subtasks, ${eventsToDelete.length} events, ${remindersToDelete.length} reminders');
+    print('[ApiService] Items to delete: ${tasksToDelete.length} tasks, ${subtasksToDelete.length} subtasks, ${eventsToDelete.length} events, ${remindersToDelete.length} reminders, ${notesToDelete.length} notes');
     
     // Step 4: Delete orphaned items from local database
     for (final taskId in tasksToDelete) {
@@ -191,6 +195,12 @@ class ApiService {
     for (final reminderId in remindersToDelete) {
       print('[ApiService] Deleting orphaned reminder: $reminderId');
       await db.deleteReminder(reminderId);
+    }
+    
+    // ADDED: Delete orphaned notes
+    for (final noteId in notesToDelete) {
+      print('[ApiService] Deleting orphaned note: $noteId');
+      await db.deleteNote(noteId);
     }
     
     // Step 5: Insert/update items from GitHub (existing functionality)
