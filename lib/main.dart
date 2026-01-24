@@ -19,6 +19,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/data/latest.dart' as tz_data;
 
 
+
 // CustomScrollBehavior to fix RefreshIndicator on Windows desktop
 class CustomScrollBehavior extends ScrollBehavior {
   @override
@@ -30,16 +31,20 @@ class CustomScrollBehavior extends ScrollBehavior {
 }
 
 
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
 
 
   // Initialize timezone for notifications
   tz_data.initializeTimeZones();
 
 
+
   // Initialize your NotificationService (singleton)
   await NotificationService.instance.initialize();
+
 
 
   // Request POST_NOTIFICATIONS permission for Android 13+
@@ -51,9 +56,11 @@ void main() async {
   }
 
 
+
   // Initialize Drift database
   final database = AppDatabase.instance;
   final apiService = ApiService(db: database);
+
 
 
   // Start the app
@@ -61,10 +68,12 @@ void main() async {
 }
 
 
+
 class MyApp extends StatelessWidget {
   final AppDatabase database;
   final ApiService apiService;
   const MyApp({super.key, required this.database, required this.apiService});
+
 
 
   @override
@@ -91,7 +100,9 @@ class MyApp extends StatelessWidget {
 }
 
 
+
 /* HOME PAGE – Drawer, Bottom Nav, and IndexedStack */
+
 
 
 class MyHomePage extends StatefulWidget {
@@ -100,9 +111,11 @@ class MyHomePage extends StatefulWidget {
   const MyHomePage({super.key, required this.database, required this.apiService});
 
 
+
   @override
   State<MyHomePage> createState() => _MyHomePageState();
 }
+
 
 
 class _MyHomePageState extends State<MyHomePage> {
@@ -117,7 +130,9 @@ class _MyHomePageState extends State<MyHomePage> {
   final GlobalKey<State> _remindersKey = GlobalKey<State>();
 
 
+
   late final List<Widget> _screens;
+
 
 
   @override
@@ -135,11 +150,13 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
 
+
   void _jumpTo(int index) {
     setState(() {
       _currentIndex = index;
     });
   }
+
 
 
   // ADDED: Refresh method that calls appropriate page refresh
@@ -174,6 +191,7 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
 
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -193,6 +211,7 @@ class _MyHomePageState extends State<MyHomePage> {
           ),
         ],
       ),
+
 
 
       /*  DRAWER  */
@@ -215,8 +234,10 @@ class _MyHomePageState extends State<MyHomePage> {
       ),
 
 
+
       /*  MAIN CONTENT  */
       body: IndexedStack(index: _currentIndex, children: _screens),
+
 
 
       /*  BOTTOM NAVIGATION */
@@ -240,6 +261,7 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
 
+
   ListTile _drawerTile({required String title, required IconData icon, required int index}) {
     return ListTile(
       leading: Icon(icon),
@@ -256,7 +278,9 @@ class _MyHomePageState extends State<MyHomePage> {
 }
 
 
+
 /* OVERVIEW PAGE */
+
 
 
 class OverviewPage extends StatefulWidget {
@@ -267,10 +291,12 @@ class OverviewPage extends StatefulWidget {
 }
 
 
+
 class _OverviewPageState extends State<OverviewPage> {
   late final TaskService _taskService;
   late final CalendarService _calendarService;
   late final ReminderService _reminderService;
+
 
 
   @override
@@ -280,6 +306,7 @@ class _OverviewPageState extends State<OverviewPage> {
     _calendarService = CalendarService(widget.database);
     _reminderService = ReminderService(widget.database);
   }
+
 
 
   // UPDATED: Made public so parent can call it
@@ -294,9 +321,11 @@ class _OverviewPageState extends State<OverviewPage> {
   }
 
 
+
   @override
   Widget build(BuildContext context) {
     final today = DateTime.now();
+
 
 
     return ScrollConfiguration(
@@ -313,6 +342,40 @@ class _OverviewPageState extends State<OverviewPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // ADDED: Dashboard Header
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [Colors.blue.shade700, Colors.blue.shade500],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Dashboard',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 32,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      DateFormat('EEEE, MMMM dd, yyyy').format(today),
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.9),
+                        fontSize: 16,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              
               _sectionHeader('Today\'s Tasks'),
               _taskSection(today),
               _sectionHeader('Today\'s Events'),
@@ -327,6 +390,7 @@ class _OverviewPageState extends State<OverviewPage> {
   }
 
 
+
   Padding _sectionHeader(String text) => Padding(
     padding: const EdgeInsets.all(16),
     child: Text(text, style: Theme.of(context).textTheme.titleMedium?.copyWith(
@@ -335,6 +399,7 @@ class _OverviewPageState extends State<OverviewPage> {
       fontSize: 18,
     )),
   );
+
 
 
   SizedBox _taskSection(DateTime today) {
@@ -352,6 +417,7 @@ class _OverviewPageState extends State<OverviewPage> {
           }
 
 
+
           final tasks = snapshot.data ?? [];
           
           if (tasks.isEmpty) {
@@ -362,6 +428,7 @@ class _OverviewPageState extends State<OverviewPage> {
               ),
             );
           }
+
 
 
           return ListView.builder(
@@ -448,6 +515,7 @@ class _OverviewPageState extends State<OverviewPage> {
   }
 
 
+
   SizedBox _eventSection(DateTime today) {
     return SizedBox(
       height: 200,
@@ -459,12 +527,15 @@ class _OverviewPageState extends State<OverviewPage> {
           }
 
 
+
           if (snapshot.hasError) {
             return Center(child: Text('Error loading events: ${snapshot.error}'));
           }
 
 
+
           final events = snapshot.data ?? [];
+
 
 
           if (events.isEmpty) {
@@ -475,6 +546,7 @@ class _OverviewPageState extends State<OverviewPage> {
               ),
             );
           }
+
 
 
           return ListView.builder(
@@ -523,6 +595,7 @@ class _OverviewPageState extends State<OverviewPage> {
   }
 
 
+
   SizedBox _reminderSection(DateTime today) {
     return SizedBox(
       height: 200,
@@ -534,12 +607,15 @@ class _OverviewPageState extends State<OverviewPage> {
           }
 
 
+
           if (snapshot.hasError) {
             return Center(child: Text('Error loading reminders: ${snapshot.error}'));
           }
 
 
+
           final reminders = snapshot.data ?? [];
+
 
 
           if (reminders.isEmpty) {
@@ -550,6 +626,7 @@ class _OverviewPageState extends State<OverviewPage> {
               ),
             );
           }
+
 
 
           return ListView.builder(
@@ -607,6 +684,7 @@ class _OverviewPageState extends State<OverviewPage> {
   }
 
 
+
   Widget _buildPriorityIndicator(String priority) {
     Color color;
     switch (priority.toLowerCase()) {
@@ -637,6 +715,7 @@ class _OverviewPageState extends State<OverviewPage> {
   }
 
 
+
   Future<void> _toggleTaskCompletion(String taskId, bool? isCompleted) async {
     try {
       if (isCompleted == true) {
@@ -651,6 +730,7 @@ class _OverviewPageState extends State<OverviewPage> {
       );
     }
   }
+
 
 
   Future<void> _toggleSubtaskCompletion(String subtaskId, bool? isCompleted) async {
@@ -680,6 +760,7 @@ class _OverviewPageState extends State<OverviewPage> {
   }
 
 
+
   Future<void> _toggleEventCompletion(String eventId, bool? isCompleted) async {
     try {
       if (isCompleted == true) {
@@ -694,6 +775,7 @@ class _OverviewPageState extends State<OverviewPage> {
       );
     }
   }
+
 
 
   Future<void> _toggleReminderCompletion(String reminderId, bool? isCompleted) async {
@@ -713,17 +795,21 @@ class _OverviewPageState extends State<OverviewPage> {
 }
 
 
+
 // Settings page
 class SettingsPage extends StatefulWidget {
   final ApiService api;
 
 
+
   const SettingsPage({super.key, required this.api});
+
 
 
   @override
   State<SettingsPage> createState() => _SettingsPageState();
 }
+
 
 
 class _SettingsPageState extends State<SettingsPage> {
@@ -732,10 +818,12 @@ class _SettingsPageState extends State<SettingsPage> {
   final TextEditingController _repoController = TextEditingController();
 
 
+
   bool _tokenSaved = false;
   bool _usernameSaved = false;
   bool _repoSaved = false;
   bool _obscureText = true;
+
 
 
   @override
@@ -745,10 +833,12 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
 
+
   Future<void> _loadSavedData() async {
     final storedToken = await widget.api.getStoredToken();
     final storedUsername = await widget.api.getGitHubUsername();
     final storedRepo = await widget.api.getGitHubRepo();
+
 
 
     if (storedToken != null) {
@@ -757,10 +847,12 @@ class _SettingsPageState extends State<SettingsPage> {
     }
 
 
+
     if (storedUsername.isNotEmpty) {
       _usernameController.text = storedUsername;
       _usernameSaved = true;
     }
+
 
 
     if (storedRepo.isNotEmpty) {
@@ -769,8 +861,10 @@ class _SettingsPageState extends State<SettingsPage> {
     }
 
 
+
     setState(() {});
   }
+
 
 
   @override
@@ -780,6 +874,7 @@ class _SettingsPageState extends State<SettingsPage> {
     _repoController.dispose();
     super.dispose();
   }
+
 
 
   @override
@@ -863,7 +958,9 @@ class _SettingsPageState extends State<SettingsPage> {
           ),
 
 
+
           const SizedBox(height: 32),
+
 
 
           Text(
@@ -880,7 +977,9 @@ class _SettingsPageState extends State<SettingsPage> {
           ),
 
 
+
           const SizedBox(height: 24),
+
 
 
           Text(
@@ -897,7 +996,9 @@ class _SettingsPageState extends State<SettingsPage> {
           ),
 
 
+
           const SizedBox(height: 24),
+
 
 
           Text(
@@ -926,7 +1027,9 @@ class _SettingsPageState extends State<SettingsPage> {
           ),
 
 
+
           const SizedBox(height: 12),
+
 
 
           ElevatedButton(
@@ -934,6 +1037,7 @@ class _SettingsPageState extends State<SettingsPage> {
               final token = _tokenController.text.trim();
               final username = _usernameController.text.trim();
               final repo = _repoController.text.trim();
+
 
 
               if (token.isEmpty || username.isEmpty || repo.isEmpty) {
@@ -944,9 +1048,11 @@ class _SettingsPageState extends State<SettingsPage> {
               }
 
 
+
               await widget.api.saveGitHubToken(token);
               await widget.api.saveGitHubUsername(username);
               await widget.api.saveGitHubRepo(repo);
+
 
 
               setState(() {
@@ -954,6 +1060,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 _usernameSaved = true;
                 _repoSaved = true;
               });
+
 
 
               ScaffoldMessenger.of(context).showSnackBar(
@@ -964,7 +1071,9 @@ class _SettingsPageState extends State<SettingsPage> {
           ),
 
 
+
           const SizedBox(height: 8),
+
 
 
           if (_tokenSaved || _usernameSaved || _repoSaved)
@@ -979,9 +1088,11 @@ class _SettingsPageState extends State<SettingsPage> {
                 await widget.api.deleteGitHubRepo();
 
 
+
                 _tokenController.clear();
                 _usernameController.clear();
                 _repoController.clear();
+
 
 
                 setState(() {
@@ -989,6 +1100,7 @@ class _SettingsPageState extends State<SettingsPage> {
                   _usernameSaved = false;
                   _repoSaved = false;
                 });
+
 
 
                 ScaffoldMessenger.of(context).showSnackBar(
