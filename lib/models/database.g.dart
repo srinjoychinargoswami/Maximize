@@ -3928,7 +3928,7 @@ final class $$TasksTableReferences
 
   $$SubtasksTableProcessedTableManager get subtasksRefs {
     final manager = $$SubtasksTableTableManager($_db, $_db.subtasks)
-        .filter((f) => f.taskId.id($_item.id));
+        .filter((f) => f.taskId.id.sqlEquals($_itemColumn<String>('id')!));
 
     final cache = $_typedResult.readTableOrNull(_subtasksRefsTable($_db));
     return ProcessedTableManager(
@@ -4382,7 +4382,8 @@ class $$TasksTableTableManager extends RootTableManager<
               getPrefetchedDataCallback: (items) async {
                 return [
                   if (subtasksRefs)
-                    await $_getPrefetchedData(
+                    await $_getPrefetchedData<TaskData, $TasksTable,
+                            SubtaskData>(
                         currentTable: table,
                         referencedTable:
                             $$TasksTableReferences._subtasksRefsTable(db),
@@ -4436,8 +4437,10 @@ final class $$SubtasksTableReferences
       .createAlias($_aliasNameGenerator(db.subtasks.taskId, db.tasks.id));
 
   $$TasksTableProcessedTableManager get taskId {
+    final $_column = $_itemColumn<String>('task_id')!;
+
     final manager = $$TasksTableTableManager($_db, $_db.tasks)
-        .filter((f) => f.id($_item.taskId));
+        .filter((f) => f.id.sqlEquals($_column));
     final item = $_typedResult.readTableOrNull(_taskIdTable($_db));
     if (item == null) return manager;
     return ProcessedTableManager(

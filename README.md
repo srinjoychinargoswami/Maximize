@@ -1,6 +1,6 @@
 # maximize
 
-A new Flutter project.
+A Productivity App, meant to help those who feel that other Productivity apps are not useful for them. Current App is compatible is Windows, Android and MacOS. The goal is eventually be a completely free app, able to be free for myself and others, with the ability to customize the app to meet ones needs. 
 
 ## Getting Started
 
