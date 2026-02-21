@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:maximize/models/database.dart';
 import 'package:maximize/screens/calendar_page.dart';
 import 'package:maximize/screens/task_list_screen.dart';
+import 'package:maximize/screens/search_page.dart';
 import 'package:maximize/screens/reminder_page.dart';
 import 'package:maximize/screens/notes_page.dart'; 
 import 'package:maximize/services/api_service.dart';
@@ -129,6 +130,15 @@ class _MyHomePageState extends State<MyHomePage> {
   final GlobalKey<State> _notesKey = GlobalKey<State>(); 
   final GlobalKey<State> _remindersKey = GlobalKey<State>();
 
+  void _navigateToSearch() { 
+    Navigator.push(
+      context, 
+      MaterialPageRoute(
+        builder: (context) => SearchPage(database: widget.database),
+      ),
+    );
+  }
+
 
 
   late final List<Widget> _screens;
@@ -209,6 +219,11 @@ class _MyHomePageState extends State<MyHomePage> {
             onPressed: _refreshCurrentPage,
             tooltip: 'Refresh',
           ),
+          IconButton(
+            icon: const Icon(Icons.search),
+            onPressed: () => _navigateToSearch(),
+            tooltip: 'Search',
+          )
         ],
       ),
 
