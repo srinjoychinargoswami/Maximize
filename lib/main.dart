@@ -19,6 +19,8 @@ import 'package:maximize/models/reminder_model.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/data/latest.dart' as tz_data;
 
+
+
 // CustomScrollBehavior to fix RefreshIndicator on Windows desktop
 class CustomScrollBehavior extends ScrollBehavior {
   @override
@@ -29,14 +31,22 @@ class CustomScrollBehavior extends ScrollBehavior {
   };
 }
 
+
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+
 
   // Initialize timezone for notifications
   tz_data.initializeTimeZones();
 
+
+
   // Initialize your NotificationService (singleton)
   await NotificationService.instance.initialize();
+
+
 
   // Request POST_NOTIFICATIONS permission for Android 13+
   if (Platform.isAndroid) {
@@ -46,18 +56,26 @@ void main() async {
     await androidPlugin?.requestNotificationsPermission();
   }
 
+
+
   // Initialize Drift database
   final database = AppDatabase.instance;
   final apiService = ApiService(db: database);
+
+
 
   // Start the app
   runApp(MyApp(database: database, apiService: apiService));
 }
 
+
+
 class MyApp extends StatelessWidget {
   final AppDatabase database;
   final ApiService apiService;
   const MyApp({super.key, required this.database, required this.apiService});
+
+
 
   @override
   Widget build(BuildContext context) {
@@ -82,16 +100,24 @@ class MyApp extends StatelessWidget {
   }
 }
 
+
+
 /* HOME PAGE – Drawer, Bottom Nav, and IndexedStack */
+
+
 
 class MyHomePage extends StatefulWidget {
   final AppDatabase database;
   final ApiService apiService;
   const MyHomePage({super.key, required this.database, required this.apiService});
 
+
+
   @override
   State<MyHomePage> createState() => _MyHomePageState();
 }
+
+
 
 class _MyHomePageState extends State<MyHomePage> {
   final _scaffoldKey = GlobalKey<ScaffoldState>();
@@ -104,9 +130,20 @@ class _MyHomePageState extends State<MyHomePage> {
   final GlobalKey<State> _notesKey = GlobalKey<State>(); 
   final GlobalKey<State> _remindersKey = GlobalKey<State>();
 
+  void _navigateToSearch() { 
+    Navigator.push(
+      context, 
+      MaterialPageRoute(
+        builder: (context) => SearchPage(database: widget.database),
+      )
+    );
+  }
+
 
 
   late final List<Widget> _screens;
+
+
 
   @override
   void initState() {
@@ -122,11 +159,15 @@ class _MyHomePageState extends State<MyHomePage> {
     ];
   }
 
+
+
   void _jumpTo(int index) {
     setState(() {
       _currentIndex = index;
     });
   }
+
+
 
   // ADDED: Refresh method that calls appropriate page refresh
   Future<void> _refreshCurrentPage() async {
@@ -159,6 +200,8 @@ class _MyHomePageState extends State<MyHomePage> {
     }
   }
 
+
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -178,7 +221,7 @@ class _MyHomePageState extends State<MyHomePage> {
           ),
           IconButton(
             icon: const Icon(Icons.search),
-            onPressed: () => _navigateToSearch(),
+            onPressed: () => _navigateToSearch,
             tooltip: 'Search',
           )
         ],
