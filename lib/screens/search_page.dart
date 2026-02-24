@@ -1,12 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import '../models/database.dart'; // Your Drift DB
+import '../models/database.dart';
 import 'package:maximize/models/task_model.dart';
 import 'package:maximize/models/event_model.dart';
 import 'package:maximize/models/note_model.dart';
 import 'package:maximize/models/reminder_model.dart';
-
-
 
 class SearchPage extends StatefulWidget {
   final AppDatabase database;
@@ -21,37 +19,52 @@ class SearchPageState extends State<SearchPage> {
   bool isSearching = false;
   List<TaskData> matchedTasks = [];
   List<EventData> matchedEvents = [];
-  List<NoteModel> matchedNotes = []; // Adjust if no notes yet
+  List<NoteModel> matchedNotes = [];
   List<ReminderData> matchedReminders = [];
-  
 
   Future<void> _performSearch(String q) async {
-  if (q.length < 2) {
-    setState(() {
-      matchedTasks.clear();
-      matchedEvents.clear();
-      matchedNotes.clear();
-      matchedReminders.clear();  // FIXED: Clear all
-    });
-    return;
-  }
+    if (q.length < 2) {
+      setState(() {
+        matchedTasks.clear();
+        matchedEvents.clear();
+        matchedNotes.clear();
+        matchedReminders.clear();
+      });
+      return;
+    }
 
     setState(() => isSearching = true);
 
     try {
-      // Query ALL databases simultaneously
       final futures = await Future.wait([
         widget.database.getAllTasks(),
         widget.database.getAllEvents(),
-        widget.database.getAllReminders(),
-
-        // widget.database.getAllNotes(), // Uncomment when ready
+        widget.database.getAllReminders?.call() ?? Future.value(<ReminderData>[]),
+        widget.database.getAllNotes?.call() ?? Future.value([]),
       ]);
 
       final tasks = futures[0] as List<TaskData>;
       final events = futures[1] as List<EventData>;
-      final reminders = futures[2] as List<ReminderData>;
-      // final notes = futures[2] as List<NoteData>;
+      final remindersRaw = futures[2];
+      final notesRaw = futures[3];
+
+      final reminders = remindersRaw is List
+          ? (remindersRaw as List).cast<ReminderData>()
+          : <ReminderData>[];
+
+      //  Map raw Drift Note → NoteModel (no cast, explicit conversion)
+      final notes = notesRaw is List
+          ? (notesRaw as List).map((n) => NoteModel(
+                id: n.id,
+                title: n.title,
+                content: n.content,
+                category: n.category,
+                color: n.color,
+                isPinned: n.isPinned,
+                createdAt: n.createdAt,
+                updatedAt: n.updatedAt,
+              )).toList()
+          : <NoteModel>[];
 
       final lowerQuery = q.toLowerCase();
 
@@ -66,16 +79,15 @@ class SearchPageState extends State<SearchPage> {
             (event.description?.toLowerCase().contains(lowerQuery) ?? false)
         ).toList();
 
-        // In setState filtering (after matchedEvents):
-matchedReminders = reminders.where((reminder) =>
-  reminder.title.toLowerCase().contains(lowerQuery) ||
-  (reminder.body?.toLowerCase().contains(lowerQuery) ?? false)  // Adjust 'body' if your field is different
-).toList();  // ADD THIS
+        matchedReminders = reminders.where((reminder) =>
+            reminder.title.toLowerCase().contains(lowerQuery) ||
+            (reminder.body?.toLowerCase().contains(lowerQuery) ?? false)
+        ).toList();
 
-        // matchedNotes = notes.where((note) =>
-        //     note.title.toLowerCase().contains(lowerQuery) ||
-        //     note.content.toLowerCase().contains(lowerQuery)
-        // ).toList();
+        matchedNotes = notes.where((note) =>
+            note.title.toLowerCase().contains(lowerQuery) ||
+            note.content.toLowerCase().contains(lowerQuery)
+        ).toList();
       });
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -94,7 +106,7 @@ matchedReminders = reminders.where((reminder) =>
           autofocus: true,
           style: TextStyle(color: Colors.white),
           decoration: InputDecoration(
-            hintText: 'Search tasks, events, notes...',
+            hintText: 'Search tasks, events, reminders, notes...',
             hintStyle: TextStyle(color: Colors.white70),
             border: InputBorder.none,
             suffixIcon: query.isNotEmpty
@@ -106,6 +118,7 @@ matchedReminders = reminders.where((reminder) =>
                         matchedTasks.clear();
                         matchedEvents.clear();
                         matchedNotes.clear();
+                        matchedReminders.clear();
                       });
                     },
                   )
@@ -133,10 +146,10 @@ matchedReminders = reminders.where((reminder) =>
         children: [
           Icon(Icons.search, size: 80, color: Colors.grey),
           SizedBox(height: 16),
-          Text('Search tasks, events, and notes', 
-               style: TextStyle(fontSize: 18, color: Colors.grey)),
-          Text('Type 2+ characters to start', 
-               style: TextStyle(color: Colors.grey[600])),
+          Text('Search tasks, events, reminders & notes',
+              style: TextStyle(fontSize: 18, color: Colors.grey)),
+          Text('Type 2+ characters to start',
+              style: TextStyle(color: Colors.grey[600])),
         ],
       ),
     );
@@ -153,20 +166,19 @@ matchedReminders = reminders.where((reminder) =>
           _sectionHeader('Events (${matchedEvents.length})'),
           ...matchedEvents.map((event) => _buildEventTile(event)).toList(),
         ],
-
-        if (matchedReminders.isNotEmpty) ...[  // ADD THIS WHOLE BLOCK
-  _sectionHeader('Reminders (${matchedReminders.length})'),
-  ...matchedReminders.map((reminder) => _buildReminderTile(reminder)).toList(),
-],
-
-        // if (matchedNotes.isNotEmpty) ...[
-        //   _sectionHeader('Notes (${matchedNotes.length})'),
-        //   ...matchedNotes.map((note) => _buildNoteTile(note)).toList(),
-        // ],
-        if (query.isNotEmpty && 
-            matchedTasks.isEmpty && 
+        if (matchedReminders.isNotEmpty) ...[
+          _sectionHeader('Reminders (${matchedReminders.length})'),
+          ...matchedReminders.map((reminder) => _buildReminderTile(reminder)).toList(),
+        ],
+        if (matchedNotes.isNotEmpty) ...[
+          _sectionHeader('Notes (${matchedNotes.length})'),
+          ...matchedNotes.map((note) => _buildNoteTile(note)).toList(),
+        ],
+        if (query.isNotEmpty &&
+            matchedTasks.isEmpty &&
             matchedEvents.isEmpty &&
-            matchedReminders.isEmpty /*&& matchedNotes.isEmpty*/)
+            matchedReminders.isEmpty &&
+            matchedNotes.isEmpty)
           _noResults(),
       ],
     );
@@ -176,8 +188,8 @@ matchedReminders = reminders.where((reminder) =>
     return Padding(
       padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
       child: Text(title, style: TextStyle(
-        fontWeight: FontWeight.bold, 
-        fontSize: 16, 
+        fontWeight: FontWeight.bold,
+        fontSize: 16,
         color: Theme.of(context).primaryColor
       )),
     );
@@ -185,10 +197,7 @@ matchedReminders = reminders.where((reminder) =>
 
   Widget _buildTaskTile(TaskData task) {
     return ListTile(
-      leading: CircleAvatar(
-        backgroundColor: Colors.blue,
-        child: Icon(Icons.task, color: Colors.white),
-      ),
+      leading: CircleAvatar(backgroundColor: Colors.blue, child: Icon(Icons.task, color: Colors.white)),
       title: Text(task.title),
       subtitle: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -198,42 +207,37 @@ matchedReminders = reminders.where((reminder) =>
           Text('Due: ${DateFormat('MMM dd').format(task.dueDate)}'),
         ],
       ),
-      onTap: () {
-        // Navigate to task detail/edit
-        Navigator.pop(context);
-        // Your task navigation logic
-      },
+      onTap: () => Navigator.pop(context),
     );
   }
 
   Widget _buildEventTile(EventData event) {
     return ListTile(
-      leading: CircleAvatar(
-        backgroundColor: Colors.green,
-        child: Icon(Icons.event, color: Colors.white),
-      ),
+      leading: CircleAvatar(backgroundColor: Colors.green, child: Icon(Icons.event, color: Colors.white)),
       title: Text(event.title),
       subtitle: Text('${DateFormat('MMM dd').format(event.startDateTime)} • '
                      '${DateFormat('h:mm a').format(event.startDateTime)}'),
-      onTap: () {
-        // Navigate to event detail/edit
-        Navigator.pop(context);
-      },
+      onTap: () => Navigator.pop(context),
     );
   }
 
+  Widget _buildReminderTile(ReminderData reminder) {
+    return ListTile(
+      leading: CircleAvatar(backgroundColor: Colors.orange, child: Icon(Icons.alarm, color: Colors.white)),
+      title: Text(reminder.title),
+      subtitle: Text('Time: ${DateFormat('MMM dd, h:mm a').format(reminder.scheduledTime ?? DateTime.now())}'),
+      onTap: () => Navigator.pop(context),
+    );
+  }
 
-Widget _buildReminderTile(ReminderData reminder) {  // ADD THIS
-  return ListTile(
-    leading: CircleAvatar(
-      backgroundColor: Colors.orange,
-      child: Icon(Icons.alarm, color: Colors.white),
-    ),
-    title: Text(reminder.title),
-    subtitle: Text('Time: ${DateFormat('MMM dd, h:mm a').format(reminder.scheduledTime ?? DateTime.now())}'),
-    onTap: () => Navigator.pop(context),  // TODO: Navigate to Reminders page
-  );
-}
+  Widget _buildNoteTile(NoteModel note) {
+    return ListTile(
+      leading: CircleAvatar(backgroundColor: Colors.purple, child: Icon(Icons.note, color: Colors.white)),
+      title: Text(note.title),
+      subtitle: Text(note.content, maxLines: 2, overflow: TextOverflow.ellipsis),
+      onTap: () => Navigator.pop(context),
+    );
+  }
 
   Widget _noResults() {
     return Center(
