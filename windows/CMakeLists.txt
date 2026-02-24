@@ -57,6 +57,8 @@ add_subdirectory("runner")
 # them to the application.
 include(flutter/generated_plugins.cmake)
 
+target_link_libraries(win_toast_plugin PRIVATE runtimeobject.lib)
+
 
 # === Installation ===
 # Support files are copied into place next to the executable, so that it can
