@@ -46,6 +46,9 @@ class _TaskListScreenState extends State<TaskListScreen> with TickerProviderStat
   // Filter visibility
   bool _showFilters = false;
 
+  String _searchQuery = '';
+  final TextEditingController _searchController = TextEditingController();
+
   @override
   void initState() {
     super.initState();
@@ -63,6 +66,7 @@ class _TaskListScreenState extends State<TaskListScreen> with TickerProviderStat
   @override
   void dispose() {
     _animationController.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -117,7 +121,11 @@ class _TaskListScreenState extends State<TaskListScreen> with TickerProviderStat
       final matchesRecurrence = _selectedRecurrenceFilter == 'All' || 
           (_selectedRecurrenceFilter == 'Recurring' && task.isRecurring) ||
           (_selectedRecurrenceFilter == 'One-time' && !task.isRecurring);
-      return matchesCategory && matchesPriority && matchesDueDate && matchesRecurrence;
+     final matchesSearch = _searchQuery.isEmpty ||
+    task.title.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+    (task.description?.toLowerCase().contains(_searchQuery.toLowerCase()) ?? false);
+
+return matchesCategory && matchesPriority && matchesDueDate && matchesRecurrence && matchesSearch;
     }).toList();
   }
 
@@ -245,6 +253,31 @@ class _TaskListScreenState extends State<TaskListScreen> with TickerProviderStat
           displacement: 40.0,
           child: Column(
             children: [
+              Padding(
+      padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
+      child: TextField(
+        controller: _searchController,
+        style: const TextStyle(color: Colors.white),
+        decoration: InputDecoration(
+          hintText: 'Search tasks...',
+          hintStyle: TextStyle(color: Colors.grey[400]),
+          prefixIcon: Icon(Icons.search, color: Colors.grey[400]),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+          filled: true,
+          fillColor: Colors.grey[800],
+          suffixIcon: _searchQuery.isNotEmpty
+              ? IconButton(
+                  icon: Icon(Icons.clear, color: Colors.grey[400]),
+                  onPressed: () {
+                    _searchController.clear();
+                    setState(() => _searchQuery = '');
+                  },
+                )
+              : null,
+        ),
+        onChanged: (value) => setState(() => _searchQuery = value),
+      ),
+    ),
               // Filter section with animation
               AnimatedContainer(
                 duration: const Duration(milliseconds: 300),
