@@ -13,10 +13,10 @@ class SearchPage extends StatefulWidget {
   const SearchPage({Key? key, required this.database}) : super(key: key);
 
   @override
-  _SearchPageState createState() => _SearchPageState();
+  SearchPageState createState() => SearchPageState();
 }
 
-class _SearchPageState extends State<SearchPage> {
+class SearchPageState extends State<SearchPage> {
   String query = '';
   bool isSearching = false;
   List<TaskData> matchedTasks = [];
@@ -26,14 +26,15 @@ class _SearchPageState extends State<SearchPage> {
   
 
   Future<void> _performSearch(String q) async {
-    if (q.length < 2) {
-      setState(() {
-        matchedTasks.clear();
-        matchedEvents.clear();
-        matchedNotes.clear();
-      });
-      return;
-    }
+  if (q.length < 2) {
+    setState(() {
+      matchedTasks.clear();
+      matchedEvents.clear();
+      matchedNotes.clear();
+      matchedReminders.clear();  // FIXED: Clear all
+    });
+    return;
+  }
 
     setState(() => isSearching = true);
 
@@ -42,11 +43,14 @@ class _SearchPageState extends State<SearchPage> {
       final futures = await Future.wait([
         widget.database.getAllTasks(),
         widget.database.getAllEvents(),
+        widget.database.getAllReminders(),
+
         // widget.database.getAllNotes(), // Uncomment when ready
       ]);
 
       final tasks = futures[0] as List<TaskData>;
       final events = futures[1] as List<EventData>;
+      final reminders = futures[2] as List<ReminderData>;
       // final notes = futures[2] as List<NoteData>;
 
       final lowerQuery = q.toLowerCase();
@@ -61,6 +65,12 @@ class _SearchPageState extends State<SearchPage> {
             event.title.toLowerCase().contains(lowerQuery) ||
             (event.description?.toLowerCase().contains(lowerQuery) ?? false)
         ).toList();
+
+        // In setState filtering (after matchedEvents):
+matchedReminders = reminders.where((reminder) =>
+  reminder.title.toLowerCase().contains(lowerQuery) ||
+  (reminder.body?.toLowerCase().contains(lowerQuery) ?? false)  // Adjust 'body' if your field is different
+).toList();  // ADD THIS
 
         // matchedNotes = notes.where((note) =>
         //     note.title.toLowerCase().contains(lowerQuery) ||
@@ -143,13 +153,20 @@ class _SearchPageState extends State<SearchPage> {
           _sectionHeader('Events (${matchedEvents.length})'),
           ...matchedEvents.map((event) => _buildEventTile(event)).toList(),
         ],
+
+        if (matchedReminders.isNotEmpty) ...[  // ADD THIS WHOLE BLOCK
+  _sectionHeader('Reminders (${matchedReminders.length})'),
+  ...matchedReminders.map((reminder) => _buildReminderTile(reminder)).toList(),
+],
+
         // if (matchedNotes.isNotEmpty) ...[
         //   _sectionHeader('Notes (${matchedNotes.length})'),
         //   ...matchedNotes.map((note) => _buildNoteTile(note)).toList(),
         // ],
         if (query.isNotEmpty && 
             matchedTasks.isEmpty && 
-            matchedEvents.isEmpty /*&& matchedNotes.isEmpty*/)
+            matchedEvents.isEmpty &&
+            matchedReminders.isEmpty /*&& matchedNotes.isEmpty*/)
           _noResults(),
       ],
     );
@@ -204,6 +221,19 @@ class _SearchPageState extends State<SearchPage> {
       },
     );
   }
+
+
+Widget _buildReminderTile(ReminderData reminder) {  // ADD THIS
+  return ListTile(
+    leading: CircleAvatar(
+      backgroundColor: Colors.orange,
+      child: Icon(Icons.alarm, color: Colors.white),
+    ),
+    title: Text(reminder.title),
+    subtitle: Text('Time: ${DateFormat('MMM dd, h:mm a').format(reminder.scheduledTime ?? DateTime.now())}'),
+    onTap: () => Navigator.pop(context),  // TODO: Navigate to Reminders page
+  );
+}
 
   Widget _noResults() {
     return Center(
