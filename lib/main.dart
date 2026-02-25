@@ -125,19 +125,68 @@ class _MyHomePageState extends State<MyHomePage> {
   
   // ADDED: Keys to access refresh methods in child pages
   final GlobalKey<_OverviewPageState> _overviewKey = GlobalKey<_OverviewPageState>();
-  final GlobalKey<State> _tasksKey = GlobalKey<State>();
-  final GlobalKey<State> _calendarKey = GlobalKey<State>();
-  final GlobalKey<State> _notesKey = GlobalKey<State>(); 
-  final GlobalKey<State> _remindersKey = GlobalKey<State>();
+  final GlobalKey<TaskListScreenState> _tasksKey = GlobalKey<TaskListScreenState>();
+  final GlobalKey<CalendarPageState> _calendarKey = GlobalKey<CalendarPageState>();
+  final GlobalKey<NotesPageState> _notesKey = GlobalKey<NotesPageState>(); 
+  final GlobalKey<ReminderPageState> _remindersKey = GlobalKey<ReminderPageState>();
 
-  void _navigateToSearch() { 
-    Navigator.push(
-      context, 
-      MaterialPageRoute(
-        builder: (context) => SearchPage(database: widget.database),
-      )
-    );
-  }
+  void _navigateToSearch() {
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (context) => SearchPage(database: widget.database),
+    ),
+  ).then((result) {
+    if (result == null || result is! Map<String, dynamic>) return;
+
+    final type = result['type'] as String;
+    final id = result['id'] as String;
+    final title = result['title'] as String;
+
+    switch (type) {
+      case 'task':
+        _jumpTo(1);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Showing task: $title')),
+        );
+        Future.delayed(const Duration(milliseconds: 300), () {
+          _tasksKey.currentState?.scrollToItem(id);
+        });
+        break;
+
+      case 'event':
+        _jumpTo(2);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Showing event: $title')),
+        );
+        Future.delayed(const Duration(milliseconds: 300), () {
+          _calendarKey.currentState?.scrollToItem(id);
+        });
+        break;
+
+      case 'note':
+        _jumpTo(3);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Showing note: $title')),
+        );
+        Future.delayed(const Duration(milliseconds: 300), () {
+          _notesKey.currentState?.scrollToItem(id);
+        });
+        break;
+
+      case 'reminder':
+        _jumpTo(4);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Showing reminder: $title')),
+        );
+        Future.delayed(const Duration(milliseconds: 300), () {
+          _remindersKey.currentState?.scrollToItem(id);
+        });
+        break;
+    }
+  });
+}
+
 
 
 
