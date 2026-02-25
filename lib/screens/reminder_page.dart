@@ -21,10 +21,10 @@ class ReminderPage extends StatefulWidget {
   const ReminderPage({Key? key, required this.database}) : super(key: key);
 
   @override
-  State<ReminderPage> createState() => _ReminderPageState();
+  State<ReminderPage> createState() => ReminderPageState();
 }
 
-class _ReminderPageState extends State<ReminderPage> {
+class ReminderPageState extends State<ReminderPage> {
   final TextEditingController _titleController = TextEditingController();
   DateTime? _selectedDateTime;
 
@@ -36,6 +36,10 @@ class _ReminderPageState extends State<ReminderPage> {
   bool _isNotificationServiceReady = false;
   bool _isRefreshing = false; // ADDED: Track refresh state
 
+  String _searchQuery = '';
+  final TextEditingController _searchController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
+
   @override
   void initState() {
     super.initState();
@@ -44,6 +48,14 @@ class _ReminderPageState extends State<ReminderPage> {
     _reminderService = ReminderService(widget.database);
     _initializeNotificationService();
     _loadRemindersFromDatabase();
+  }
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _searchController.dispose();
+    _scrollController.dispose();
+    super.dispose();
   }
 
   Future<void> _initializeNotificationService() async {
@@ -93,6 +105,26 @@ class _ReminderPageState extends State<ReminderPage> {
       );
     }
   }
+// ✅ ADD _filterReminders() RIGHT HERE before build()
+  List<ReminderModel> _filterReminders() {
+    if (_searchQuery.isEmpty) return _expandedReminders;
+    final q = _searchQuery.toLowerCase();
+    return _expandedReminders.where((reminder) =>
+        reminder.title.toLowerCase().contains(q) ||
+        (reminder.body.toLowerCase().contains(q))
+    ).toList();
+  }
+
+void scrollToItem(String id) {
+  final index = _expandedReminders.indexWhere((r) => r.id == id);
+  if (index != -1) {
+    _scrollController.animateTo(
+      index * 120.0,
+      duration: const Duration(milliseconds: 400),
+      curve: Curves.easeInOut,
+    );
+  }
+}
 
   // Refresh method for pull-to-refresh functionality
   Future<void> _refreshReminders() async {
@@ -1013,15 +1045,16 @@ class _ReminderPageState extends State<ReminderPage> {
     });
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Reminders'),
-        actions: [
-          // ADDED: Refresh button with loading indicator
-          IconButton(
-            icon: _isRefreshing 
+ @override
+Widget build(BuildContext context) {
+  final visibleReminders = _filterReminders(); // ✅ Added
+
+  return Scaffold(
+    appBar: AppBar(
+      title: const Text('Reminders'),
+      actions: [
+        IconButton(
+          icon: _isRefreshing
               ? const SizedBox(
                   width: 20,
                   height: 20,
@@ -1031,175 +1064,222 @@ class _ReminderPageState extends State<ReminderPage> {
                   ),
                 )
               : const Icon(Icons.refresh),
-            onPressed: _isRefreshing ? null : _loadReminders,
-            tooltip: 'Refresh',
+          onPressed: _isRefreshing ? null : _loadReminders,
+          tooltip: 'Refresh',
+        ),
+        if (!_isNotificationServiceReady)
+          const Padding(
+            padding: EdgeInsets.all(16.0),
+            child: SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
           ),
-          if (!_isNotificationServiceReady)
-            const Padding(
-              padding: EdgeInsets.all(16.0),
-              child: SizedBox(
-                width: 16,
-                height: 16,
-                child: CircularProgressIndicator(strokeWidth: 2),
+      ],
+    ),
+    body: Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        children: [
+          // Reminder title input — unchanged
+          TextField(
+            controller: _titleController,
+            decoration: const InputDecoration(
+              labelText: 'Reminder Title',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: Text(_selectedDateTime == null
+                    ? 'No time selected'
+                    : 'At: ${_selectedDateTime!.toLocal().toString().substring(0, 16)}'),
               ),
-            ),
-        ],
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            TextField(
-              controller: _titleController,
-              decoration: const InputDecoration(
-                labelText: 'Reminder Title',
-                border: OutlineInputBorder(),
+              ElevatedButton(
+                onPressed: _pickDateTime,
+                child: const Text('Pick Date & Time'),
               ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton(
+                  onPressed:
+                      _isNotificationServiceReady ? _addReminder : null,
+                  child: Text(_isNotificationServiceReady
+                      ? 'Add Simple Reminder'
+                      : 'Initializing...'),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: _isNotificationServiceReady
+                      ? _showAddReminderDialog
+                      : null,
+                  child: const Text('Add Advanced Reminder'),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          // ✅ Search bar added here
+          TextField(
+            controller: _searchController,
+            style: const TextStyle(color: Colors.white),
+            decoration: InputDecoration(
+              hintText: 'Search reminders...',
+              hintStyle: TextStyle(color: Colors.grey[400]),
+              prefixIcon: Icon(Icons.search, color: Colors.grey[400]),
+              border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8)),
+              filled: true,
+              fillColor: Colors.grey[800],
+              suffixIcon: _searchQuery.isNotEmpty
+                  ? IconButton(
+                      icon: Icon(Icons.clear, color: Colors.grey[400]),
+                      onPressed: () {
+                        _searchController.clear();
+                        setState(() => _searchQuery = '');
+                      },
+                    )
+                  : null,
             ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: Text(_selectedDateTime == null
-                      ? 'No time selected'
-                      : 'At: ${_selectedDateTime!.toLocal().toString().substring(0, 16)}'),
-                ),
-                ElevatedButton(
-                  onPressed: _pickDateTime,
-                  child: const Text('Pick Date & Time'),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: _isNotificationServiceReady ? _addReminder : null,
-                    child: Text(_isNotificationServiceReady 
-                        ? 'Add Simple Reminder' 
-                        : 'Initializing...'),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: _isNotificationServiceReady ? _showAddReminderDialog : null,
-                    child: const Text('Add Advanced Reminder'),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Expanded(
-              child: ScrollConfiguration(
-                behavior: CustomScrollBehavior(),
-                child: RefreshIndicator(
-                  onRefresh: _refreshReminders,
-                  color: Colors.blue,
-                  backgroundColor: Colors.white,
-                  strokeWidth: 2.0,
-                  displacement: 40.0,
-                  child: ListView.builder(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    itemCount: _expandedReminders.length,
-                    itemBuilder: (context, index) {
-                      final reminder = _expandedReminders[index];
-                      bool isRecurringInstance = reminder.parentReminderId != null;
-                      
-                      return Card(
-                        color: reminder.completed ? Colors.grey[700] : Colors.grey[800],
-                        child: ListTile(
-                          leading: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                isRecurringInstance ? Icons.repeat : Icons.alarm, 
-                                color: isRecurringInstance ? Colors.blue : Colors.orange,
-                              ),
-                              if (isRecurringInstance) const SizedBox(width: 4),
-                            ],
-                          ),
-                          title: Text(
-                            reminder.title,
-                            style: TextStyle(
-                              color: Colors.white,
-                              decoration: reminder.completed ? TextDecoration.lineThrough : null,
+            onChanged: (value) => setState(() => _searchQuery = value),
+          ),
+          const SizedBox(height: 16),
+
+          Expanded(
+            child: ScrollConfiguration(
+              behavior: CustomScrollBehavior(),
+              child: RefreshIndicator(
+                onRefresh: _refreshReminders,
+                color: Colors.blue,
+                backgroundColor: Colors.white,
+                strokeWidth: 2.0,
+                displacement: 40.0,
+                child: ListView.builder(
+                  controller: _scrollController, // ✅ Added
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  itemCount: visibleReminders.length, // ✅ was _expandedReminders.length
+                  itemBuilder: (context, index) {
+                    final reminder = visibleReminders[index]; // ✅ was _expandedReminders[index]
+                    bool isRecurringInstance =
+                        reminder.parentReminderId != null;
+
+                    return Card(
+                      color: reminder.completed
+                          ? Colors.grey[700]
+                          : Colors.grey[800],
+                      child: ListTile(
+                        leading: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              isRecurringInstance
+                                  ? Icons.repeat
+                                  : Icons.alarm,
+                              color: isRecurringInstance
+                                  ? Colors.blue
+                                  : Colors.orange,
                             ),
-                          ),
-                          subtitle: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Scheduled: ${reminder.scheduledTime.toLocal().toString().substring(0, 16)}',
-                                style: const TextStyle(color: Colors.grey),
-                              ),
-                              if (reminder.body.isNotEmpty)
-                                Text(
-                                  reminder.body,
-                                  style: const TextStyle(color: Colors.grey),
-                                ),
-                              if (reminder.isRecurring && !isRecurringInstance)
-                                Text(
-                                  reminder.recurrenceDescription,
-                                  style: TextStyle(
-                                    color: Colors.blue[600],
-                                    fontSize: 12,
-                                    fontStyle: FontStyle.italic,
-                                  ),
-                                ),
-                              if (isRecurringInstance)
-                                Text(
-                                  'Part of recurring series',
-                                  style: TextStyle(
-                                    color: Colors.blue[600],
-                                    fontSize: 12,
-                                    fontStyle: FontStyle.italic,
-                                  ),
-                                ),
-                              if (reminder.completed && reminder.completedAt != null)
-                                Text(
-                                  'Completed: ${reminder.completedAt!.toLocal().toString().substring(0, 16)}',
-                                  style: TextStyle(
-                                    color: Colors.green[600],
-                                    fontSize: 12,
-                                    fontStyle: FontStyle.italic,
-                                  ),
-                                ),
-                            ],
-                          ),
-                          trailing: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Checkbox(
-                                value: reminder.completed,
-                                onChanged: (value) => _toggleReminderCompletion(reminder, value),
-                                activeColor: Colors.green,
-                              ),
-                              IconButton(
-                                icon: const Icon(Icons.edit),
-                                onPressed: _isNotificationServiceReady 
-                                    ? () => _editReminder(reminder)
-                                    : null,
-                              ),
-                              IconButton(
-                                icon: const Icon(Icons.delete, color: Colors.red),
-                                onPressed: _isNotificationServiceReady 
-                                    ? () => _deleteReminder(reminder)
-                                    : null,
-                              ),
-                            ],
+                            if (isRecurringInstance)
+                              const SizedBox(width: 4),
+                          ],
+                        ),
+                        title: Text(
+                          reminder.title,
+                          style: TextStyle(
+                            color: Colors.white,
+                            decoration: reminder.completed
+                                ? TextDecoration.lineThrough
+                                : null,
                           ),
                         ),
-                      );
-                    },
-                  ),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Scheduled: ${reminder.scheduledTime.toLocal().toString().substring(0, 16)}',
+                              style: const TextStyle(color: Colors.grey),
+                            ),
+                            if (reminder.body.isNotEmpty)
+                              Text(
+                                reminder.body,
+                                style:
+                                    const TextStyle(color: Colors.grey),
+                              ),
+                            if (reminder.isRecurring && !isRecurringInstance)
+                              Text(
+                                reminder.recurrenceDescription,
+                                style: TextStyle(
+                                  color: Colors.blue[600],
+                                  fontSize: 12,
+                                  fontStyle: FontStyle.italic,
+                                ),
+                              ),
+                            if (isRecurringInstance)
+                              Text(
+                                'Part of recurring series',
+                                style: TextStyle(
+                                  color: Colors.blue[600],
+                                  fontSize: 12,
+                                  fontStyle: FontStyle.italic,
+                                ),
+                              ),
+                            if (reminder.completed &&
+                                reminder.completedAt != null)
+                              Text(
+                                'Completed: ${reminder.completedAt!.toLocal().toString().substring(0, 16)}',
+                                style: TextStyle(
+                                  color: Colors.green[600],
+                                  fontSize: 12,
+                                  fontStyle: FontStyle.italic,
+                                ),
+                              ),
+                          ],
+                        ),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Checkbox(
+                              value: reminder.completed,
+                              onChanged: (value) =>
+                                  _toggleReminderCompletion(
+                                      reminder, value),
+                              activeColor: Colors.green,
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.edit),
+                              onPressed: _isNotificationServiceReady
+                                  ? () => _editReminder(reminder)
+                                  : null,
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.delete,
+                                  color: Colors.red),
+                              onPressed: _isNotificationServiceReady
+                                  ? () => _deleteReminder(reminder)
+                                  : null,
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
                 ),
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
-    );
-  }
+    ),
+  );
+}
 }

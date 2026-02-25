@@ -23,10 +23,10 @@ class TaskListScreen extends StatefulWidget {
   const TaskListScreen({super.key, required this.database});
 
   @override
-  _TaskListScreenState createState() => _TaskListScreenState();
+  TaskListScreenState createState() => TaskListScreenState();
 }
 
-class _TaskListScreenState extends State<TaskListScreen> with TickerProviderStateMixin {
+class TaskListScreenState extends State<TaskListScreen> with TickerProviderStateMixin {
   List<TaskModel> _tasks = [];
   late final TaskService _taskService;
   bool _isLoading = true;
@@ -48,6 +48,7 @@ class _TaskListScreenState extends State<TaskListScreen> with TickerProviderStat
 
   String _searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
 
   @override
   void initState() {
@@ -67,6 +68,7 @@ class _TaskListScreenState extends State<TaskListScreen> with TickerProviderStat
   void dispose() {
     _animationController.dispose();
     _searchController.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -83,6 +85,17 @@ class _TaskListScreenState extends State<TaskListScreen> with TickerProviderStat
       setState(() => _isLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Failed to load tasks: $e')),
+      );
+    }
+  }
+
+  void scrollToItem(String id) {
+    final index = _tasks.indexWhere((t) => t.id == id);
+    if (index != -1) {
+      _scrollController.animateTo(
+        index * 120.0,
+        duration: const Duration(milliseconds: 400),
+        curve: Curves.easeInOut,
       );
     }
   }
@@ -439,19 +452,21 @@ return matchesCategory && matchesPriority && matchesDueDate && matchesRecurrence
   }
 
   Widget _buildTaskList(List<TaskModel> filteredTasks) {
-    return ListView.builder(
-      physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.all(16.0),
-      itemCount: filteredTasks.length,
-      itemBuilder: (context, index) {
-        final task = filteredTasks[index];
-        return AnimatedContainer(
-          duration: Duration(milliseconds: 300 + (index * 50)),
-          child: _buildTaskCard(task),
-        );
-      },
-    );
-  }
+  return ListView.builder(
+    controller: _scrollController, // ✅ ADD THIS LINE
+    physics: const AlwaysScrollableScrollPhysics(),
+    padding: const EdgeInsets.all(16.0),
+    itemCount: filteredTasks.length,
+    itemBuilder: (context, index) {
+      final task = filteredTasks[index];
+      return AnimatedContainer(
+        duration: Duration(milliseconds: 300 + (index * 50)),
+        child: _buildTaskCard(task),
+      );
+    },
+  );
+}
+
 
   Widget _buildTaskCard(TaskModel task) {
     final isExpanded = _expandedRecurringTasks[task.id] ?? false;

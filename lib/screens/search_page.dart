@@ -207,7 +207,13 @@ class SearchPageState extends State<SearchPage> {
           Text('Due: ${DateFormat('MMM dd').format(task.dueDate)}'),
         ],
       ),
-      onTap: () => Navigator.pop(context),
+      onTap: () { 
+        Navigator.pop(context, {
+          'type': 'task',
+          'id': task.id, 
+          'title': task.title
+        });
+      }
     );
   }
 
@@ -217,7 +223,14 @@ class SearchPageState extends State<SearchPage> {
       title: Text(event.title),
       subtitle: Text('${DateFormat('MMM dd').format(event.startDateTime)} • '
                      '${DateFormat('h:mm a').format(event.startDateTime)}'),
-      onTap: () => Navigator.pop(context),
+      onTap: () {
+        Navigator.pop(context, {
+          'type': 'event', 
+          'id': event.id,
+          'title': event.title,
+
+        });
+      }
     );
   }
 
@@ -226,7 +239,13 @@ class SearchPageState extends State<SearchPage> {
       leading: CircleAvatar(backgroundColor: Colors.orange, child: Icon(Icons.alarm, color: Colors.white)),
       title: Text(reminder.title),
       subtitle: Text('Time: ${DateFormat('MMM dd, h:mm a').format(reminder.scheduledTime ?? DateTime.now())}'),
-      onTap: () => Navigator.pop(context),
+      onTap: () {
+        Navigator.pop(context, { 
+          'type': 'reminder',
+          'id': reminder.id,
+          'title': reminder.title,
+        });
+      },
     );
   }
 
@@ -235,7 +254,13 @@ class SearchPageState extends State<SearchPage> {
       leading: CircleAvatar(backgroundColor: Colors.purple, child: Icon(Icons.note, color: Colors.white)),
       title: Text(note.title),
       subtitle: Text(note.content, maxLines: 2, overflow: TextOverflow.ellipsis),
-      onTap: () => Navigator.pop(context),
+      onTap: () {
+        Navigator.pop(context, {
+          'type': 'note',
+          'id': note.id, 
+          'title': note.title,
+        });
+      },
     );
   }
 

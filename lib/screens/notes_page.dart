@@ -10,15 +10,16 @@ class NotesPage extends StatefulWidget {
   const NotesPage({super.key, required this.noteService});
 
   @override
-  State<NotesPage> createState() => _NotesPageState();
+  State<NotesPage> createState() => NotesPageState();
 }
 
-class _NotesPageState extends State<NotesPage> {
+class NotesPageState extends State<NotesPage> {
   List<NoteModel> _notes = [];
   List<NoteModel> _filteredNotes = [];
   bool _isLoading = true;
   bool _isGridView = true;
   final TextEditingController _searchController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
   String? _selectedCategory;
 
   @override
@@ -30,6 +31,7 @@ class _NotesPageState extends State<NotesPage> {
   @override
   void dispose() {
     _searchController.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -68,6 +70,17 @@ class _NotesPageState extends State<NotesPage> {
         ).toList();
       }
     });
+  }
+
+  void scrollToItem(String id) {
+    final index = _filteredNotes.indexWhere((n) => n.id == id);
+    if (index != -1) {
+      _scrollController.animateTo(
+        index * 120.0,
+        duration: const Duration(milliseconds: 400),
+        curve: Curves.easeInOut,
+      );
+    }
   }
 
   void _showAddNoteDialog() {
@@ -374,6 +387,7 @@ class _NotesPageState extends State<NotesPage> {
 
   Widget _buildGridView() {
     return GridView.builder(
+      controller: _scrollController,
       padding: const EdgeInsets.all(8),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
@@ -391,6 +405,7 @@ class _NotesPageState extends State<NotesPage> {
 
   Widget _buildListView() {
     return ListView.builder(
+      controller: _scrollController,
       padding: const EdgeInsets.all(8),
       itemCount: _filteredNotes.length,
       itemBuilder: (context, index) {

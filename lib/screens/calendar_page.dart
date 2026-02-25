@@ -22,10 +22,10 @@ class CalendarPage extends StatefulWidget {
   const CalendarPage({super.key, required this.calendarService});
 
   @override
-  _CalendarPageState createState() => _CalendarPageState();
+  CalendarPageState createState() => CalendarPageState();
 }
 
-class _CalendarPageState extends State<CalendarPage> {
+class CalendarPageState extends State<CalendarPage> {
   DateTime _selectedDay = DateTime.now();
   DateTime _focusedDay = DateTime.now();
   List<Event> _events = [];
@@ -47,12 +47,24 @@ class _CalendarPageState extends State<CalendarPage> {
   {'value': 'custom', 'label': 'Custom time'},
 ];
 
+String _searchQuery = ''; 
+final TextEditingController _searchController = TextEditingController();
+final ScrollController _scrollController = ScrollController();
 
   @override
   void initState() {
     super.initState();
     _loadEvents();
   }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    _scrollController.dispose();
+  }
+
+
+
 
   // ENHANCED: Load events with completion status from database
   Future<void> _loadEvents() async {
@@ -96,6 +108,27 @@ class _CalendarPageState extends State<CalendarPage> {
       );
     }
   }
+
+List<Event> _filterEvents() {
+    if (_searchQuery.isEmpty) return _expandedEvents;
+    final q = _searchQuery.toLowerCase();
+    return _expandedEvents.where((event) =>
+        event.title.toLowerCase().contains(q) ||
+        (event.description?.toLowerCase().contains(q) ?? false)
+    ).toList();
+  }
+
+  void scrollToItem(String id) {
+    final index = _expandedEvents.indexWhere((e) => e.id == id);
+    if (index != -1) {
+      _scrollController.animateTo(
+        index * 120.0,
+        duration: const Duration(milliseconds: 400),
+        curve: Curves.easeInOut,
+      );
+    }
+  }
+
 
   // Get events for a specific day (using expanded events)
   List<Event> _getEventsForDay(DateTime day) {
@@ -1356,196 +1389,211 @@ Future<void> _pickCustomEventReminderTime(
     );
   }
 
-  // ENHANCED: Event list with database-backed checkboxes
-  Widget _buildEventList() {
-    List<Event> selectedDayEvents = _getSortedEventsForDay(_selectedDay);
-    
-    if (selectedDayEvents.isEmpty) {
-      return Container(
-        padding: EdgeInsets.all(20),
-        child: Text(
-          'No events for ${DateFormat.yMMMd().format(_selectedDay)}',
-          style: TextStyle(color: Colors.white70, fontSize: 16),
-          textAlign: TextAlign.center,
-        ),
-      );
-    }
+ // ENHANCED: Event list with database-backed checkboxes
+Widget _buildEventList(List<Event> visibleEvents) { // ✅ Added parameter
+  // ✅ Filter visibleEvents (already search-filtered) to selected day, then sort
+  List<Event> selectedDayEvents = visibleEvents
+      .where((e) => isSameDay(e.date, _selectedDay))
+      .toList()
+    ..sort((a, b) => a.startDateTime.compareTo(b.startDateTime));
 
-    return ListView.builder(
-      shrinkWrap: true,
-      physics: AlwaysScrollableScrollPhysics(),
-      itemCount: selectedDayEvents.length,
-      itemBuilder: (context, index) {
-        Event event = selectedDayEvents[index];
-        bool isRecurringInstance = event.parentEventId != null;
-        
-        return Card(
-          color: event.completed ? Colors.grey[700] : Colors.grey[800],
-          margin: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          child: ListTile(
-            leading: Container(
-              width: 4,
-              height: double.infinity,
-              color: Color(int.parse(event.color.replaceFirst('#', '0xff'))),
-            ),
-            title: Row(
-              children: [
-                if (isRecurringInstance) 
-                  Icon(Icons.repeat, size: 16, color: Colors.grey[400]),
-                if (isRecurringInstance) SizedBox(width: 4),
-                Expanded(
-                  child: Text(
-                    event.title,
-                    style: TextStyle(
-                      color: Colors.white, 
-                      fontWeight: FontWeight.bold,
-                      decoration: event.completed ? TextDecoration.lineThrough : null,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            subtitle: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '${DateFormat.jm().format(event.startDateTime)} - ${DateFormat.jm().format(event.endDateTime)}',
-                  style: TextStyle(color: Colors.grey[300]),
-                ),
-                if (event.description != null && event.description!.isNotEmpty)
-                  Text(
-                    event.description!,
-                    style: TextStyle(color: Colors.grey[400]),
-                  ),
-                if (event.customCategory != null && event.customCategory!.isNotEmpty)
-                  Text(
-                    'Category: ${event.customCategory}',
-                    style: TextStyle(color: Colors.grey[400]),
-                  ),
-                if (isRecurringInstance)
-                  Text(
-                    'Recurring event',
-                    style: TextStyle(color: Colors.blue[300], fontSize: 12),
-                  ),
-              ],
-            ),
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Checkbox(
-                  value: event.completed,
-                  onChanged: (value) => _toggleEventCompletion(event, value),
-                  activeColor: Colors.green,
-                ),
-                IconButton(
-                  icon: Icon(Icons.edit, color: Colors.blue),
-                  onPressed: () => _editEvent(event),
-                ),
-                IconButton(
-                  icon: Icon(Icons.delete, color: Colors.red),
-                  onPressed: () => _showDeleteConfirmationDialog(event),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
+  if (selectedDayEvents.isEmpty) {
+    return Container(
+      padding: EdgeInsets.all(20),
+      child: Text(
+        _searchQuery.isNotEmpty
+            ? 'No matching events for ${DateFormat.yMMMd().format(_selectedDay)}' // ✅ Search-aware message
+            : 'No events for ${DateFormat.yMMMd().format(_selectedDay)}',
+        style: TextStyle(color: Colors.white70, fontSize: 16),
+        textAlign: TextAlign.center,
+      ),
     );
   }
 
-  // ENHANCED: All events list with database-backed checkboxes
-  Widget _buildAllEventsList() {
-    if (_expandedEvents.isEmpty) {
-      return Container(
-        padding: EdgeInsets.all(20),
-        child: Text(
-          'No events found',
-          style: TextStyle(color: Colors.white70, fontSize: 16),
-          textAlign: TextAlign.center,
+  return ListView.builder(
+    controller: _scrollController, // ✅ Added
+    shrinkWrap: true,
+    physics: AlwaysScrollableScrollPhysics(),
+    itemCount: selectedDayEvents.length,
+    itemBuilder: (context, index) {
+      Event event = selectedDayEvents[index];
+      bool isRecurringInstance = event.parentEventId != null;
+
+      return Card(
+        color: event.completed ? Colors.grey[700] : Colors.grey[800],
+        margin: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        child: ListTile(
+          leading: Container(
+            width: 4,
+            height: double.infinity,
+            color: Color(int.parse(event.color.replaceFirst('#', '0xff'))),
+          ),
+          title: Row(
+            children: [
+              if (isRecurringInstance)
+                Icon(Icons.repeat, size: 16, color: Colors.grey[400]),
+              if (isRecurringInstance) SizedBox(width: 4),
+              Expanded(
+                child: Text(
+                  event.title,
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    decoration: event.completed
+                        ? TextDecoration.lineThrough
+                        : null,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          subtitle: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '${DateFormat.jm().format(event.startDateTime)} - ${DateFormat.jm().format(event.endDateTime)}',
+                style: TextStyle(color: Colors.grey[300]),
+              ),
+              if (event.description != null && event.description!.isNotEmpty)
+                Text(
+                  event.description!,
+                  style: TextStyle(color: Colors.grey[400]),
+                ),
+              if (event.customCategory != null &&
+                  event.customCategory!.isNotEmpty)
+                Text(
+                  'Category: ${event.customCategory}',
+                  style: TextStyle(color: Colors.grey[400]),
+                ),
+              if (isRecurringInstance)
+                Text(
+                  'Recurring event',
+                  style: TextStyle(color: Colors.blue[300], fontSize: 12),
+                ),
+            ],
+          ),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Checkbox(
+                value: event.completed,
+                onChanged: (value) => _toggleEventCompletion(event, value),
+                activeColor: Colors.green,
+              ),
+              IconButton(
+                icon: Icon(Icons.edit, color: Colors.blue),
+                onPressed: () => _editEvent(event),
+              ),
+              IconButton(
+                icon: Icon(Icons.delete, color: Colors.red),
+                onPressed: () => _showDeleteConfirmationDialog(event),
+              ),
+            ],
+          ),
         ),
       );
-    }
+    },
+  );
+}
 
-    return ListView.builder(
-      physics: AlwaysScrollableScrollPhysics(),
-      itemCount: _expandedEvents.length,
-      itemBuilder: (context, index) {
-        Event event = _expandedEvents[index];
-        bool isRecurringInstance = event.parentEventId != null;
-        
-        return Card(
-          color: event.completed ? Colors.grey[700] : Colors.grey[800],
-          margin: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          child: ListTile(
-            leading: Container(
-              width: 4,
-              height: double.infinity,
-              color: Color(int.parse(event.color.replaceFirst('#', '0xff'))),
-            ),
-            title: Row(
-              children: [
-                if (isRecurringInstance) 
-                  Icon(Icons.repeat, size: 16, color: Colors.grey[400]),
-                if (isRecurringInstance) SizedBox(width: 4),
-                Expanded(
-                  child: Text(
-                    event.title,
-                    style: TextStyle(
-                      color: Colors.white, 
-                      fontWeight: FontWeight.bold,
-                      decoration: event.completed ? TextDecoration.lineThrough : null,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            subtitle: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '${DateFormat.yMMMd().format(event.date)} - ${DateFormat.jm().format(event.startDateTime)} to ${DateFormat.jm().format(event.endDateTime)}',
-                  style: TextStyle(color: Colors.grey[300]),
-                ),
-                if (event.description != null && event.description!.isNotEmpty)
-                  Text(
-                    event.description!,
-                    style: TextStyle(color: Colors.grey[400]),
-                  ),
-                if (event.customCategory != null && event.customCategory!.isNotEmpty)
-                  Text(
-                    'Category: ${event.customCategory}',
-                    style: TextStyle(color: Colors.grey[400]),
-                  ),
-                if (isRecurringInstance)
-                  Text(
-                    'Recurring event',
-                    style: TextStyle(color: Colors.blue[300], fontSize: 12),
-                  ),
-              ],
-            ),
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Checkbox(
-                  value: event.completed,
-                  onChanged: (value) => _toggleEventCompletion(event, value),
-                  activeColor: Colors.green,
-                ),
-                IconButton(
-                  icon: Icon(Icons.edit, color: Colors.blue),
-                  onPressed: () => _editEvent(event),
-                ),
-                IconButton(
-                  icon: Icon(Icons.delete, color: Colors.red),
-                  onPressed: () => _showDeleteConfirmationDialog(event),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
+ // ENHANCED: All events list with database-backed checkboxes
+Widget _buildAllEventsList(List<Event> visibleEvents) { // ✅ Added parameter
+  if (visibleEvents.isEmpty) { // ✅ was _expandedEvents
+    return Container(
+      padding: EdgeInsets.all(20),
+      child: Text(
+        'No events found',
+        style: TextStyle(color: Colors.white70, fontSize: 16),
+        textAlign: TextAlign.center,
+      ),
     );
   }
+
+  return ListView.builder(
+    controller: _scrollController, // ✅ Added
+    physics: AlwaysScrollableScrollPhysics(),
+    itemCount: visibleEvents.length, // ✅ was _expandedEvents.length
+    itemBuilder: (context, index) {
+      Event event = visibleEvents[index]; // ✅ was _expandedEvents[index]
+      bool isRecurringInstance = event.parentEventId != null;
+
+      return Card(
+        color: event.completed ? Colors.grey[700] : Colors.grey[800],
+        margin: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        child: ListTile(
+          leading: Container(
+            width: 4,
+            height: double.infinity,
+            color: Color(int.parse(event.color.replaceFirst('#', '0xff'))),
+          ),
+          title: Row(
+            children: [
+              if (isRecurringInstance)
+                Icon(Icons.repeat, size: 16, color: Colors.grey[400]),
+              if (isRecurringInstance) SizedBox(width: 4),
+              Expanded(
+                child: Text(
+                  event.title,
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    decoration: event.completed
+                        ? TextDecoration.lineThrough
+                        : null,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          subtitle: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '${DateFormat.yMMMd().format(event.date)} - ${DateFormat.jm().format(event.startDateTime)} to ${DateFormat.jm().format(event.endDateTime)}',
+                style: TextStyle(color: Colors.grey[300]),
+              ),
+              if (event.description != null && event.description!.isNotEmpty)
+                Text(
+                  event.description!,
+                  style: TextStyle(color: Colors.grey[400]),
+                ),
+              if (event.customCategory != null &&
+                  event.customCategory!.isNotEmpty)
+                Text(
+                  'Category: ${event.customCategory}',
+                  style: TextStyle(color: Colors.grey[400]),
+                ),
+              if (isRecurringInstance)
+                Text(
+                  'Recurring event',
+                  style: TextStyle(color: Colors.blue[300], fontSize: 12),
+                ),
+            ],
+          ),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Checkbox(
+                value: event.completed,
+                onChanged: (value) => _toggleEventCompletion(event, value),
+                activeColor: Colors.green,
+              ),
+              IconButton(
+                icon: Icon(Icons.edit, color: Colors.blue),
+                onPressed: () => _editEvent(event),
+              ),
+              IconButton(
+                icon: Icon(Icons.delete, color: Colors.red),
+                onPressed: () => _showDeleteConfirmationDialog(event),
+              ),
+            ],
+          ),
+        ),
+      );
+    },
+  );
+}
+
 
   // ENHANCED: Day view with database-backed checkboxes
   Widget _buildDayView() {
@@ -1943,88 +1991,87 @@ Future<void> _pickCustomEventReminderTime(
     );
   }
 
-  Widget _buildBodyContent() {
-    if (_currentView == 'calendar') {
-      return Column(
-        children: [
-          TableCalendar<Event>(
-            firstDay: DateTime.utc(2020, 1, 1),
-            lastDay: DateTime.utc(2030, 12, 31),
-            focusedDay: _focusedDay,
-            selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
-            onDaySelected: (selectedDay, focusedDay) {
-              setState(() {
-                _selectedDay = selectedDay;
-                _focusedDay = focusedDay;
-              });
-            },
-            calendarFormat: _calendarFormat,
-            onFormatChanged: (format) {
-              setState(() {
-                _calendarFormat = format;
-              });
-            },
-            eventLoader: _getEventsForDay,
-            
-            // ENHANCED: Bigger calendar with proper spacing
-            rowHeight: 90, // ENHANCED: Increased from default ~52 to 90 for more space
-            daysOfWeekHeight: 40, // ENHANCED: More space for day headers
-            
-            headerStyle: HeaderStyle(
-              formatButtonVisible: false,
-              titleCentered: true,
-              leftChevronIcon: Icon(Icons.chevron_left, color: Colors.white),
-              rightChevronIcon: Icon(Icons.chevron_right, color: Colors.white),
-            ),
-            calendarStyle: CalendarStyle(
-              selectedDecoration: BoxDecoration(
-                color: Colors.blue,
-                shape: BoxShape.circle,
-              ),
-              todayDecoration: BoxDecoration(
-                color: Colors.orange,
-                shape: BoxShape.circle,
-              ),
-              // Remove default markers since we'll use custom ones
-              markerDecoration: BoxDecoration(
-                color: Colors.transparent,
-              ),
-              // ENHANCED: Better cell padding for date visibility
-              cellPadding: EdgeInsets.all(4), // More padding around dates
-            ),
-            // ENHANCED: Custom calendar builder with Google Calendar-style markers
-            calendarBuilders: CalendarBuilders<Event>(
-              markerBuilder: (context, day, events) {
-                return _buildMonthEventMarkers(day); // No Positioned wrapper needed
-              },
-            ),
+ Widget _buildBodyContent() {
+  final visibleEvents = _filterEvents(); // ✅ Compute filtered list here
+
+  if (_currentView == 'calendar') {
+    return Column(
+      children: [
+        TableCalendar<Event>(
+          firstDay: DateTime.utc(2020, 1, 1),
+          lastDay: DateTime.utc(2030, 12, 31),
+          focusedDay: _focusedDay,
+          selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
+          onDaySelected: (selectedDay, focusedDay) {
+            setState(() {
+              _selectedDay = selectedDay;
+              _focusedDay = focusedDay;
+            });
+          },
+          calendarFormat: _calendarFormat,
+          onFormatChanged: (format) {
+            setState(() {
+              _calendarFormat = format;
+            });
+          },
+          eventLoader: _getEventsForDay,
+          rowHeight: 90,
+          daysOfWeekHeight: 40,
+          headerStyle: HeaderStyle(
+            formatButtonVisible: false,
+            titleCentered: true,
+            leftChevronIcon: Icon(Icons.chevron_left, color: Colors.white),
+            rightChevronIcon: Icon(Icons.chevron_right, color: Colors.white),
           ),
-          Container(
-            height: 350, // ENHANCED: Reduced to give more space to calendar
-            child: _buildEventList(),
+          calendarStyle: CalendarStyle(
+            selectedDecoration: BoxDecoration(
+              color: Colors.blue,
+              shape: BoxShape.circle,
+            ),
+            todayDecoration: BoxDecoration(
+              color: Colors.orange,
+              shape: BoxShape.circle,
+            ),
+            markerDecoration: BoxDecoration(
+              color: Colors.transparent,
+            ),
+            cellPadding: EdgeInsets.all(4),
           ),
-        ],
-      );
-    } else if (_currentView == 'week') {
-      return Container(
-        height: 600, // Fixed height for scroll
-        child: _buildWeekView(),
-      );
-    } else if (_currentView == 'day') {
-      return Container(
-        height: 600, // Fixed height for scroll
-        child: _buildDayView(),
-      );
-    } else {
-      return Container(
-        height: 600, // Fixed height for scroll
-        child: _buildAllEventsList(),
-      );
-    }
+          calendarBuilders: CalendarBuilders<Event>(
+            markerBuilder: (context, day, events) {
+              return _buildMonthEventMarkers(day);
+            },
+          ),
+        ),
+        Container(
+          height: 350,
+          child: _buildEventList(visibleEvents), // ✅ Pass visibleEvents
+        ),
+      ],
+    );
+  } else if (_currentView == 'week') {
+    return Container(
+      height: 600,
+      child: _buildWeekView(),
+    );
+  } else if (_currentView == 'day') {
+    return Container(
+      height: 600,
+      child: _buildDayView(),
+    );
+  } else {
+    return Container(
+      height: 600,
+      child: _buildAllEventsList(visibleEvents), // ✅ Pass visibleEvents
+    );
   }
+}
+
 
   @override
 Widget build(BuildContext context) {
+  final visibleEvents = _filterEvents(); // Added
+
   return Scaffold(
     backgroundColor: Colors.grey[850],
     appBar: AppBar(
@@ -2032,20 +2079,19 @@ Widget build(BuildContext context) {
       title: Text('Calendar', style: TextStyle(color: Colors.white)),
       actions: [
         IconButton(
-          icon: _isRefreshing 
-            ? const SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                ),
-              )
-            : const Icon(Icons.refresh),
+          icon: _isRefreshing
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                  ),
+                )
+              : const Icon(Icons.refresh),
           onPressed: _isRefreshing ? null : _refreshEventsWithIndicator,
           tooltip: 'Refresh',
         ),
-        // Rest of your existing icons
         IconButton(
           icon: Icon(Icons.list, color: Colors.white),
           onPressed: () {
@@ -2076,31 +2122,63 @@ Widget build(BuildContext context) {
             setState(() {
               _currentView = 'day';
             });
-            },
-          ),
-        ],
-      ),
-      // ENHANCED: Wrapped RefreshIndicator with ScrollConfiguration and CustomScrollBehavior
-      body: ScrollConfiguration(
-        behavior: CustomScrollBehavior(),
-        child: RefreshIndicator(
-          onRefresh: _refreshEvents,
-          color: Colors.blue,
-          backgroundColor: Colors.white,
-          strokeWidth: 2.0,
-          displacement: 40.0,
-          child: SingleChildScrollView(
-            physics: AlwaysScrollableScrollPhysics(),
-            child: _buildBodyContent(),
+          },
+        ),
+      ],
+    ),
+    // Search bar + body wrapped in Column
+    body: ScrollConfiguration(
+      behavior: CustomScrollBehavior(),
+      child: RefreshIndicator(
+        onRefresh: _refreshEvents,
+        color: Colors.blue,
+        backgroundColor: Colors.white,
+        strokeWidth: 2.0,
+        displacement: 40.0,
+        child: SingleChildScrollView(
+          physics: AlwaysScrollableScrollPhysics(),
+          child: Column(
+            children: [
+              // Search bar
+              Padding(
+                padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
+                child: TextField(
+                  controller: _searchController,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: InputDecoration(
+                    hintText: 'Search events...',
+                    hintStyle: TextStyle(color: Colors.grey[400]),
+                    prefixIcon: Icon(Icons.search, color: Colors.grey[400]),
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8)),
+                    filled: true,
+                    fillColor: Colors.grey[800],
+                    suffixIcon: _searchQuery.isNotEmpty
+                        ? IconButton(
+                            icon: Icon(Icons.clear, color: Colors.grey[400]),
+                            onPressed: () {
+                              _searchController.clear();
+                              setState(() => _searchQuery = '');
+                            },
+                          )
+                        : null,
+                  ),
+                  onChanged: (value) => setState(() => _searchQuery = value),
+                ),
+              ),
+              // Existing body content
+              _buildBodyContent(),
+            ],
           ),
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        heroTag: "calendar_fab",
-        onPressed: _showAddEventDialog,
-        child: Icon(Icons.add),
-        backgroundColor: Colors.blue,
-      ),
-    );
-  }
+    ),
+    floatingActionButton: FloatingActionButton(
+      heroTag: "calendar_fab",
+      onPressed: _showAddEventDialog,
+      child: Icon(Icons.add),
+      backgroundColor: Colors.blue,
+    ),
+  );
+}
 }
