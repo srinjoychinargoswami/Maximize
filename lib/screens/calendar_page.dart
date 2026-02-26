@@ -61,6 +61,7 @@ final ScrollController _scrollController = ScrollController();
   void dispose() {
     _searchController.dispose();
     _scrollController.dispose();
+    super.dispose();
   }
 
 
