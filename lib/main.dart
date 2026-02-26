@@ -4,6 +4,7 @@ import 'package:flutter/gestures.dart';
 import 'package:intl/intl.dart';
 import 'package:maximize/models/database.dart';
 import 'package:maximize/screens/calendar_page.dart';
+import 'package:maximize/screens/about_page.dart';
 import 'package:maximize/screens/task_list_screen.dart';
 import 'package:maximize/screens/search_page.dart';
 import 'package:maximize/screens/reminder_page.dart';
@@ -335,6 +336,11 @@ class _MyHomePageState extends State<MyHomePage> {
         Navigator.pop(context);
         if (index < _screens.length) {
           _jumpTo(index);
+        } else if (index == 6) {
+          Navigator.push(
+            context, 
+            MaterialPageRoute(builder: (context) => AboutPage()),
+          );
         }
       },
     );
