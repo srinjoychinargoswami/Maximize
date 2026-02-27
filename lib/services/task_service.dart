@@ -245,6 +245,37 @@ class TaskService {
     }
   }
 
+// ADD insertSubtask RIGHT HERE
+Future<void> insertSubtask(SubtaskModel subtask) async {
+  try {
+    await _dbHelper.insertSubtask(subtask);
+    print('[TaskService] Subtask restored: ${subtask.title}');
+  } catch (e) {
+    print('Error inserting subtask: $e');
+    rethrow;
+  }
+}
+
+  // ADD insertTask RIGHT HERE
+Future<void> insertTask(TaskModel task) async {
+  try {
+    // Cancel any stale notification first
+    await _cancelTaskNotification(task.id);
+
+    // Re-insert into database
+    await _dbHelper.insertTask(task);
+
+    // Reschedule notification if reminder enabled + still in future
+    await _scheduleTaskNotification(task);
+
+    print('[TaskService] Task restored: ${task.title}');
+  } catch (e) {
+    print('Error inserting task: $e');
+    rethrow;
+  }
+}
+
+
   // Fetch a task by its ID from the database
   Future<TaskModel?> getTaskById(String id) async {
     try {

@@ -1135,80 +1135,138 @@ return matchesCategory && matchesPriority && matchesDueDate && matchesRecurrence
   }
 
   void _deleteTask(TaskModel task) {
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: const Text('Confirm Deletion'),
-          content: Text(
-            task.isRecurring 
-                ? 'Are you sure you want to delete this recurring task? This will delete all instances.'
-                : 'Are you sure you want to delete this task?'
+  showDialog(
+    context: context,
+    builder: (context) {
+      return AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Confirm Deletion'),
+        content: Text(
+          task.isRecurring
+              ? 'Are you sure you want to delete this recurring task? This will delete all instances.'
+              : 'Are you sure you want to delete this task?'
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                _taskService.deleteTask(task.id).then((_) {
-                  _loadTasks();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Task deleted successfully')),
-                  );
-                }).catchError((error) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Failed to delete task: $error')),
-                  );
-                });
-              },
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-              child: const Text('Delete', style: TextStyle(color: Colors.white)),
-            ),
-          ],
-        );
-      },
-    );
-  }
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.of(context).pop();
+
+              // ✅ Cache task + subtasks before deletion
+              final deletedTask = task;
+              final subtasks = await _taskService.getSubtasks(task.id);
+
+              try {
+                await _taskService.deleteTask(task.id);
+                await _loadTasks();
+
+                // ✅ Undo SnackBar
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      task.isRecurring
+                          ? 'Recurring task deleted'
+                          : 'Task deleted',
+                    ),
+                    action: SnackBarAction(
+                      label: 'UNDO',
+                      onPressed: () async {
+                        try {
+                          // Restore task
+                          await _taskService.insertTask(deletedTask);
+
+                          // Restore subtasks
+                          for (final subtask in subtasks) {
+                            await _taskService.insertSubtask(subtask);
+                          }
+
+                          await _loadTasks();
+                        } catch (e) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Failed to undo: $e')),
+                          );
+                        }
+                      },
+                    ),
+                  ),
+                );
+              } catch (error) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Failed to delete task: $error')),
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Delete', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      );
+    },
+  );
+}
+
 
   void _deleteSubtask(SubtaskModel subtask) {
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: const Text('Delete Subtask'),
-          content: Text('Are you sure you want to delete "${subtask.title}"?'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                _taskService.deleteSubtask(subtask.id).then((_) {
-                  _loadTasks();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Subtask deleted successfully')),
-                  );
-                }).catchError((error) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Failed to delete subtask: $error')),
-                  );
-                });
-              },
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-              child: const Text('Delete', style: TextStyle(color: Colors.white)),
-            ),
-          ],
-        );
-      },
-    );
-  }
+  showDialog(
+    context: context,
+    builder: (context) {
+      return AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Delete Subtask'),
+        content: Text('Are you sure you want to delete "${subtask.title}"?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.of(context).pop();
+
+              // ✅ Cache subtask before deletion
+              final deletedSubtask = subtask;
+
+              try {
+                await _taskService.deleteSubtask(subtask.id);
+                await _loadTasks();
+
+                // ✅ Undo SnackBar
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: const Text('Subtask deleted'),
+                    action: SnackBarAction(
+                      label: 'UNDO',
+                      onPressed: () async {
+                        try {
+                          await _taskService.insertSubtask(deletedSubtask);
+                          await _loadTasks();
+                        } catch (e) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Failed to undo: $e')),
+                          );
+                        }
+                      },
+                    ),
+                  ),
+                );
+              } catch (error) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Failed to delete subtask: $error')),
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Delete', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      );
+    },
+  );
+}
+
 
   // Pass taskService parameter
   void _editTask(TaskModel task) {
