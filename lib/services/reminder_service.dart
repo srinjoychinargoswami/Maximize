@@ -96,6 +96,26 @@ class ReminderService {
     }
   }
 
+  Future<void> insertReminder(ReminderModel reminder) async {
+  try {
+    // Cancel any stale notification first
+    await NotificationService.instance.cancelNotification(reminder.id);
+    
+    // Re-insert into database
+    await _database.insertReminder(reminder);
+    
+    // Reschedule notification if still in future
+    if (!reminder.completed && reminder.scheduledTime.isAfter(DateTime.now())) {
+      await NotificationService.instance.scheduleNotification(reminder);
+    }
+    
+    print('[ReminderService] Reminder restored: ${reminder.title}');
+  } catch (e) {
+    print('Error inserting reminder: $e');
+    rethrow;
+  }
+}
+
   Future<void> updateReminder(ReminderModel reminder) async {
     try {
       await _database.updateReminder(reminder);

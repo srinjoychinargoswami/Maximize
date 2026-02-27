@@ -966,58 +966,131 @@ void scrollToItem(String id) {
   }
 
   Future<void> _deleteSingleOccurrence(ReminderModel reminder) async {
-    ReminderModel? parentReminder = _reminders.firstWhere(
-      (r) => r.id == reminder.parentReminderId,
-      orElse: () => reminder,
-    );
-    
-    List<DateTime> exceptions = List.from(parentReminder.recurrenceExceptionDates ?? []);
-    exceptions.add(reminder.scheduledTime);
-    
-    ReminderModel updatedParent = parentReminder.copyWith(
-      recurrenceExceptionDates: exceptions,
-    );
-    
-    await _reminderService.updateReminder(updatedParent);
-    await _loadRemindersFromDatabase();
+  // Cache original state for undo
+  ReminderModel? parentReminder = _reminders.firstWhere(
+    (r) => r.id == reminder.parentReminderId,
+    orElse: () => reminder,
+  );
+  
+  final originalExceptions = List<DateTime>.from(parentReminder.recurrenceExceptionDates ?? []);
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Reminder occurrence deleted successfully!')),
-    );
-  }
+  List<DateTime> exceptions = List.from(originalExceptions);
+  exceptions.add(reminder.scheduledTime);
+  
+  ReminderModel updatedParent = parentReminder.copyWith(
+    recurrenceExceptionDates: exceptions,
+  );
+  
+  await _reminderService.updateReminder(updatedParent);
+  await _loadRemindersFromDatabase();
+
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: const Text('Reminder occurrence deleted'),
+      action: SnackBarAction(
+        label: 'UNDO',
+        onPressed: () async {
+          try {
+            // Restore original exceptions list (remove the added exception)
+            ReminderModel restoreParent = parentReminder.copyWith(
+              recurrenceExceptionDates: originalExceptions.isEmpty ? null : originalExceptions,
+            );
+            await _reminderService.updateReminder(restoreParent);
+            await _loadRemindersFromDatabase();
+          } catch (e) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Failed to undo: $e')),
+            );
+          }
+        },
+      ),
+    ),
+  );
+}
+
 
   Future<void> _deleteEntireSeries(ReminderModel reminder) async {
-    String parentId = reminder.parentReminderId ?? reminder.id;
+  try {
+    // Cache parent ID before deletion
+    final parentId = reminder.parentReminderId ?? reminder.id;
+    
+    // Get full parent for restoration
+    final parentReminder = _reminders.firstWhere(
+      (r) => r.id == parentId,
+      orElse: () => reminder,
+    );
+
     await _reminderService.deleteReminder(parentId);
     await _loadRemindersFromDatabase();
 
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Reminder series deleted successfully!')),
+      SnackBar(
+        content: const Text('Reminder series deleted'),
+        action: SnackBarAction(
+          label: 'UNDO',
+          onPressed: () async {
+            try {
+              // Restore full parent reminder
+              await _reminderService.insertReminder(parentReminder);
+              await _loadRemindersFromDatabase();
+            } catch (e) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Failed to undo series delete: $e')),
+              );
+            }
+          },
+        ),
+      ),
+    );
+  } catch (e) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Error deleting reminder series: $e')),
     );
   }
+}
+
 
   Future<void> _deleteSingleReminder(ReminderModel reminder) async {
-    if (!_isNotificationServiceReady) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Notification service is not ready')),
-      );
-      return;
-    }
-
-    try {
-      await _reminderService.deleteReminder(reminder.id);
-      await _loadRemindersFromDatabase();
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Reminder deleted successfully!')),
-      );
-    } catch (e) {
-      print('[ReminderPage] Error deleting reminder: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error deleting reminder: $e')),
-      );
-    }
+  if (!_isNotificationServiceReady) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Notification service is not ready')),
+    );
+    return;
   }
+
+  try {
+    // Cache reminder for undo
+    final deletedReminder = reminder;
+
+    await _reminderService.deleteReminder(reminder.id);
+    await _loadRemindersFromDatabase();
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text('Reminder deleted'),
+        action: SnackBarAction(
+          label: 'UNDO',
+          onPressed: () async {
+            try {
+              await _reminderService.insertReminder(deletedReminder);
+              await _loadRemindersFromDatabase();
+            } catch (e) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Failed to undo delete: $e')),
+              );
+            }
+          },
+        ),
+      ),
+    );
+  } catch (e) {
+    print('[ReminderPage] Error deleting reminder: $e');
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Error deleting reminder: $e')),
+    );
+  }
+}
+
 
   Future<void> _pickDateTime() async {
     final date = await showDatePicker(
