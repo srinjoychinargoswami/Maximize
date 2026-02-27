@@ -1103,61 +1103,129 @@ Future<void> _pickCustomEventReminderTime(
   }
 
   Future<void> _deleteSingleOccurrence(Event event) async {
-    try {
-      if (event.parentEventId != null) {
-        await widget.calendarService.addRecurrenceException(
-          event.parentEventId!, 
-          event.startDateTime
-        );
-      } else {
-        await widget.calendarService.deleteEvent(event.id);
-      }
-      
-      await _loadEvents();
-      
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Event occurrence deleted successfully!')),
-      );
-    } catch (e) {
-      print('Error deleting single occurrence: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error deleting event: $e')),
-      );
-    }
-  }
+  try {
+    // Cache original event for undo
+    final deletedEvent = event;
 
-  Future<void> _deleteEntireSeries(Event event) async {
-    try {
-      String parentId = event.parentEventId ?? event.id;
-      await widget.calendarService.deleteEvent(parentId, deleteSeries: true);
-      await _loadEvents();
-      
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Event series deleted successfully!')),
+    if (event.parentEventId != null) {
+      // Recurring instance: add exception
+      await widget.calendarService.addRecurrenceException(
+        event.parentEventId!,
+        event.startDateTime,
       );
-    } catch (e) {
-      print('Error deleting entire series: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error deleting event series: $e')),
-      );
+    } else {
+      // One-time event: delete directly
+      await widget.calendarService.deleteEvent(event.id);
     }
+
+    await _loadEvents();
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text('Event occurrence deleted'),
+        action: SnackBarAction(
+          label: 'UNDO',
+          onPressed: () async {
+            try {
+              if (deletedEvent.parentEventId != null) {
+                // Undo exception by removing it
+                await widget.calendarService.removeRecurrenceException(
+                  deletedEvent.parentEventId!,
+                  deletedEvent.startDateTime,
+                );
+              } else {
+                // Re-insert single event
+                await widget.calendarService.addEvent(deletedEvent);
+              }
+              await _loadEvents();
+            } catch (e) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Failed to undo delete: $e')),
+              );
+            }
+          },
+        ),
+      ),
+    );
+  } catch (e) {
+    print('Error deleting single occurrence: $e');
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Error deleting event: $e')),
+    );
   }
+}
+
+
+Future<void> _deleteEntireSeries(Event event) async {
+  try {
+    // Cache parent event for undo
+    final parentId = event.parentEventId ?? event.id;
+    final parentEvent = await widget.calendarService.getEventById(parentId); // Cache full event
+    
+    await widget.calendarService.deleteEvent(parentId, deleteSeries: true);
+    await _loadEvents();
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text('Event series deleted'),
+        action: SnackBarAction(
+          label: 'UNDO',
+          onPressed: () async {
+            try {
+              // Restore entire parent event
+              await widget.calendarService.addEvent(parentEvent!);
+              await _loadEvents();
+            } catch (e) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Failed to undo series delete: $e')),
+              );
+            }
+          },
+        ),
+      ),
+    );
+  } catch (e) {
+    print('Error deleting entire series: $e');
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Error deleting event series: $e')),
+    );
+  }
+}
 
   Future<void> _deleteSingleEvent(Event event) async {
-    try {
-      await widget.calendarService.deleteEvent(event.id);
-      await _loadEvents();
-      
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Event deleted successfully!')),
-      );
-    } catch (e) {
-      print('Error deleting event: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error deleting event: $e')),
-      );
-    }
+  try {
+    // Cache event for undo
+    final deletedEvent = event.copyWith(); // Or event.copyWith() if you have copy method
+
+    await widget.calendarService.deleteEvent(event.id);
+    await _loadEvents();
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text('Event deleted'),
+        action: SnackBarAction(
+          label: 'UNDO',
+          onPressed: () async {
+            try {
+              await widget.calendarService.addEvent(deletedEvent);
+              await _loadEvents();
+            } catch (e) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Failed to undo delete: $e')),
+              );
+            }
+          },
+        ),
+      ),
+    );
+  } catch (e) {
+    print('Error deleting event: $e');
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Error deleting event: $e')),
+    );
   }
+}
+
 
   // ENHANCED: Improved month view event markers (positioned below date, 3 max + counter)
   Widget _buildMonthEventMarkers(DateTime day) {

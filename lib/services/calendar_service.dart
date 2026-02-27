@@ -8,6 +8,40 @@ class CalendarService {
 
   CalendarService(this._database);
 
+// ✅ ADDED: removeRecurrenceException method
+  Future<void> removeRecurrenceException(String parentId, DateTime exceptionDate) async {
+    try {
+      print('Removing exception for parent: $parentId, date: $exceptionDate');
+      
+      final eventsData = await _database.getAllEvents();
+      final events = eventsData.map((e) => Event.fromEventData(e)).toList();
+      
+      final parentEvent = events.firstWhere(
+        (e) => e.id == parentId,
+        orElse: () => throw Exception('Parent event not found'),
+      );
+      
+      List<DateTime>? exceptions = List.from(parentEvent.recurrenceExceptionDates ?? []);
+      final exceptionStr = exceptionDate.toIso8601String();
+      
+      if (exceptions.remove(exceptionDate)) { // Remove by date comparison
+        final updatedEvent = parentEvent.copyWith(
+          recurrenceExceptionDates: exceptions.isEmpty ? null : exceptions,
+        );
+        
+        await _database.updateEvent(updatedEvent);
+        print('Successfully removed exception date');
+      } else {
+        print('Exception date not found');
+      }
+    } catch (e) {
+      print('Error removing recurrence exception: $e');
+      rethrow;
+    }
+  }
+
+
+
   // Fetch all events and expand recurring events
   Future<List<Event>> getEvents() async {
     try {
