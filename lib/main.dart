@@ -390,6 +390,96 @@ class _OverviewPageState extends State<OverviewPage> {
     );
   }
 
+  Widget _statsSection() {
+  return FutureBuilder<Map<String, int>>(
+    future: _loadStats(),
+    builder: (context, snapshot) {
+      final stats = snapshot.data ?? {
+        'totalCompleted': 0,
+        'thisWeek': 0,
+        'streak': 0,
+      };
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Row(
+          children: [
+            _statCard('Total Done', '${stats['totalCompleted']}', '✅', Colors.green),
+            const SizedBox(width: 8),
+            _statCard('This Week', '${stats['thisWeek']}', '📈', Colors.blue),
+            const SizedBox(width: 8),
+            _statCard('Streak', '${stats['streak']}d', '🔥', Colors.orange),
+          ],
+        ),
+      );
+    },
+  );
+}
+
+Widget _statCard(String label, String value, String emoji, Color color) {
+  return Expanded(
+    child: Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.15),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Column(
+        children: [
+          Text(emoji, style: const TextStyle(fontSize: 20)),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: TextStyle(
+              color: color,
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            style: const TextStyle(color: Colors.grey, fontSize: 11),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+  Future<Map<String, int>> _loadStats() async {
+  final now = DateTime.now();
+  final weekStart = now.subtract(Duration(days: now.weekday - 1));
+  final allTasks = await widget.database.getAllTasks();
+
+  final totalCompleted = allTasks.where((t) => t.completed).length;
+
+  final thisWeekCompleted = allTasks.where((t) =>
+    t.completed &&
+    t.completedAt != null &&
+    t.completedAt!.isAfter(weekStart.subtract(const Duration(days: 1)))
+  ).length;
+
+  int streak = 0;
+  DateTime checkDate = DateTime(now.year, now.month, now.day);
+  while (true) {
+    final hasCompleted = allTasks.any((t) =>
+      t.completed &&
+      t.completedAt != null &&
+      DateTime(t.completedAt!.year, t.completedAt!.month, t.completedAt!.day) == checkDate
+    );
+    if (!hasCompleted) break;
+    streak++;
+    checkDate = checkDate.subtract(const Duration(days: 1));
+  }
+
+  return {
+    'totalCompleted': totalCompleted,
+    'thisWeek': thisWeekCompleted,
+    'streak': streak,
+  };
+}
 
 
   @override
@@ -445,7 +535,7 @@ class _OverviewPageState extends State<OverviewPage> {
                   ],
                 ),
               ),
-              
+              _statsSection(),
               _sectionHeader('Today\'s Tasks'),
               _taskSection(today),
               _sectionHeader('Today\'s Events'),
