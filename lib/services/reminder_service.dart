@@ -7,10 +7,9 @@ import 'package:timezone/data/latest.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 import 'package:win_toast/win_toast.dart';
 
-// ==============================================================================
+
 // 1. ReminderService
 // Handles Database Operations & Business Logic
-// ==============================================================================
 
 class ReminderService {
   final AppDatabase _database;
@@ -231,10 +230,8 @@ class ReminderService {
   }
 }
 
-// ==============================================================================
 // 2. NotificationService
 // Handles Platform-Specific Notifications (Windows, Android, macOS)
-// ==============================================================================
 
 class NotificationService {
   NotificationService._internal();

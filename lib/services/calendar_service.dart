@@ -8,7 +8,7 @@ class CalendarService {
 
   CalendarService(this._database);
 
-// ✅ ADDED: removeRecurrenceException method
+// removeRecurrenceException method
   Future<void> removeRecurrenceException(String parentId, DateTime exceptionDate) async {
     try {
       print('Removing exception for parent: $parentId, date: $exceptionDate');
