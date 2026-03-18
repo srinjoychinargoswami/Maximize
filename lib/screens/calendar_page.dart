@@ -1459,8 +1459,8 @@ Future<void> _deleteEntireSeries(Event event) async {
   }
 
  // ENHANCED: Event list with database-backed checkboxes
-Widget _buildEventList(List<Event> visibleEvents) { // ✅ Added parameter
-  // ✅ Filter visibleEvents (already search-filtered) to selected day, then sort
+Widget _buildEventList(List<Event> visibleEvents) { // Added parameter
+  //Filter visibleEvents (already search-filtered) to selected day, then sort
   List<Event> selectedDayEvents = visibleEvents
       .where((e) => isSameDay(e.date, _selectedDay))
       .toList()
@@ -1471,7 +1471,7 @@ Widget _buildEventList(List<Event> visibleEvents) { // ✅ Added parameter
       padding: EdgeInsets.all(20),
       child: Text(
         _searchQuery.isNotEmpty
-            ? 'No matching events for ${DateFormat.yMMMd().format(_selectedDay)}' // ✅ Search-aware message
+            ? 'No matching events for ${DateFormat.yMMMd().format(_selectedDay)}' // Search-aware message
             : 'No events for ${DateFormat.yMMMd().format(_selectedDay)}',
         style: TextStyle(color: Colors.white70, fontSize: 16),
         textAlign: TextAlign.center,
@@ -1480,7 +1480,7 @@ Widget _buildEventList(List<Event> visibleEvents) { // ✅ Added parameter
   }
 
   return ListView.builder(
-    controller: _scrollController, // ✅ Added
+    controller: _scrollController, //  Added
     shrinkWrap: true,
     physics: AlwaysScrollableScrollPhysics(),
     itemCount: selectedDayEvents.length,
@@ -1566,8 +1566,8 @@ Widget _buildEventList(List<Event> visibleEvents) { // ✅ Added parameter
 }
 
  // ENHANCED: All events list with database-backed checkboxes
-Widget _buildAllEventsList(List<Event> visibleEvents) { // ✅ Added parameter
-  if (visibleEvents.isEmpty) { // ✅ was _expandedEvents
+Widget _buildAllEventsList(List<Event> visibleEvents) { //  Added parameter
+  if (visibleEvents.isEmpty) { // was _expandedEvents
     return Container(
       padding: EdgeInsets.all(20),
       child: Text(
@@ -1579,11 +1579,11 @@ Widget _buildAllEventsList(List<Event> visibleEvents) { // ✅ Added parameter
   }
 
   return ListView.builder(
-    controller: _scrollController, // ✅ Added
+    controller: _scrollController, //  Added
     physics: AlwaysScrollableScrollPhysics(),
-    itemCount: visibleEvents.length, // ✅ was _expandedEvents.length
+    itemCount: visibleEvents.length, //  was _expandedEvents.length
     itemBuilder: (context, index) {
-      Event event = visibleEvents[index]; // ✅ was _expandedEvents[index]
+      Event event = visibleEvents[index]; //  was _expandedEvents[index]
       bool isRecurringInstance = event.parentEventId != null;
 
       return Card(
@@ -2061,7 +2061,7 @@ Widget _buildAllEventsList(List<Event> visibleEvents) { // ✅ Added parameter
   }
 
  Widget _buildBodyContent() {
-  final visibleEvents = _filterEvents(); // ✅ Compute filtered list here
+  final visibleEvents = _filterEvents(); // Compute filtered list here
 
   if (_currentView == 'calendar') {
     return Column(
@@ -2114,7 +2114,7 @@ Widget _buildAllEventsList(List<Event> visibleEvents) { // ✅ Added parameter
         ),
         Container(
           height: 350,
-          child: _buildEventList(visibleEvents), // ✅ Pass visibleEvents
+          child: _buildEventList(visibleEvents), // Pass visibleEvents
         ),
       ],
     );
@@ -2131,7 +2131,7 @@ Widget _buildAllEventsList(List<Event> visibleEvents) { // ✅ Added parameter
   } else {
     return Container(
       height: 600,
-      child: _buildAllEventsList(visibleEvents), // ✅ Pass visibleEvents
+      child: _buildAllEventsList(visibleEvents), // Pass visibleEvents
     );
   }
 }

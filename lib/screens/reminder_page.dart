@@ -105,7 +105,7 @@ class ReminderPageState extends State<ReminderPage> {
       );
     }
   }
-// ✅ ADD _filterReminders() RIGHT HERE before build()
+// ADD _filterReminders() RIGHT HERE before build()
   List<ReminderModel> _filterReminders() {
     if (_searchQuery.isEmpty) return _expandedReminders;
     final q = _searchQuery.toLowerCase();
@@ -1120,7 +1120,7 @@ void scrollToItem(String id) {
 
  @override
 Widget build(BuildContext context) {
-  final visibleReminders = _filterReminders(); // ✅ Added
+  final visibleReminders = _filterReminders(); // Added
 
   return Scaffold(
     appBar: AppBar(
@@ -1238,11 +1238,11 @@ Widget build(BuildContext context) {
                 strokeWidth: 2.0,
                 displacement: 40.0,
                 child: ListView.builder(
-                  controller: _scrollController, // ✅ Added
+                  controller: _scrollController, // Added
                   physics: const AlwaysScrollableScrollPhysics(),
-                  itemCount: visibleReminders.length, // ✅ was _expandedReminders.length
+                  itemCount: visibleReminders.length, // was _expandedReminders.length
                   itemBuilder: (context, index) {
-                    final reminder = visibleReminders[index]; // ✅ was _expandedReminders[index]
+                    final reminder = visibleReminders[index]; //  was _expandedReminders[index]
                     bool isRecurringInstance =
                         reminder.parentReminderId != null;
 

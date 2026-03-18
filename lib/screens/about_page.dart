@@ -26,7 +26,7 @@ class AboutPage extends StatelessWidget {
                style: TextStyle(color: Colors.grey)),
           SizedBox(height: 24),
 
-          // Auto Flutter licenses ✅
+          // Auto Flutter licenses 
           ListTile(
             leading: Icon(Icons.description),
             title: Text('Licenses'),
