@@ -453,7 +453,7 @@ return matchesCategory && matchesPriority && matchesDueDate && matchesRecurrence
 
   Widget _buildTaskList(List<TaskModel> filteredTasks) {
   return ListView.builder(
-    controller: _scrollController, // ✅ ADD THIS LINE
+    controller: _scrollController, 
     physics: const AlwaysScrollableScrollPhysics(),
     padding: const EdgeInsets.all(16.0),
     itemCount: filteredTasks.length,
