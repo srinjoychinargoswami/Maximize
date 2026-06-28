@@ -1,16 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:maximize/services/api_service.dart';
 
-class SettingsPage extends StatefulWidget {
+class GitHubSyncPage extends StatefulWidget {
   final ApiService api; // Pass your ApiService instance
 
-  const SettingsPage({super.key, required this.api});
+  const GitHubSyncPage({super.key, required this.api});
 
   @override
-  State<SettingsPage> createState() => _SettingsPageState();
+  State<GitHubSyncPage> createState() => _GitHubSyncPageState();
 }
 
-class _SettingsPageState extends State<SettingsPage> {
+class _GitHubSyncPageState extends State<GitHubSyncPage> {
   final TextEditingController _tokenController = TextEditingController();
   final TextEditingController _usernameController = TextEditingController();
   final TextEditingController _repoController = TextEditingController();

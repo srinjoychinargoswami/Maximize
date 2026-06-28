@@ -9,6 +9,7 @@ import 'package:maximize/screens/task_list_screen.dart';
 import 'package:maximize/screens/search_page.dart';
 import 'package:maximize/screens/reminder_page.dart';
 import 'package:maximize/screens/notes_page.dart'; 
+import 'package:maximize/screens/github_sync_page.dart';
 import 'package:maximize/services/api_service.dart';
 import 'package:maximize/services/calendar_service.dart';
 import 'package:maximize/services/task_service.dart';
@@ -205,7 +206,7 @@ class _MyHomePageState extends State<MyHomePage> {
       CalendarPage(key: _calendarKey, calendarService: CalendarService(widget.database)),
       NotesPage(key: _notesKey, noteService: NoteService(widget.database)), 
       ReminderPage(key: _remindersKey, database: widget.database),
-      SettingsPage(api: widget.apiService),
+      GithubSyncPage(api: widget.apiService),
     ];
   }
 
@@ -957,22 +958,22 @@ Widget _statCard(String label, String value, String emoji, Color color) {
 
 
 // Settings page
-class SettingsPage extends StatefulWidget {
+class GithubSyncPage extends StatefulWidget {
   final ApiService api;
 
 
 
-  const SettingsPage({super.key, required this.api});
+  const GithubSyncPage({super.key, required this.api});
 
 
 
   @override
-  State<SettingsPage> createState() => _SettingsPageState();
+  State<GithubSyncPage> createState() => _GitHubSyncPageState();
 }
 
 
 
-class _SettingsPageState extends State<SettingsPage> {
+class _GitHubSyncPageState extends State<GithubSyncPage> {
   final TextEditingController _tokenController = TextEditingController();
   final TextEditingController _usernameController = TextEditingController();
   final TextEditingController _repoController = TextEditingController();
