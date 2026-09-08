@@ -2,15 +2,30 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/data/latest.dart' as tz_data;
+import 'package:firebase_core/firebase_core.dart';
+import 'package:maximize/firebase_options.dart';
 import 'package:maximize/models/database.dart';
 import 'package:maximize/screens/home_page.dart';
 import 'package:maximize/services/reminder_service.dart';
+import 'package:maximize/services/firebase_realtime_sync_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // Initialize timezone for notifications
   tz_data.initializeTimeZones();
+
+  // Initialize Firebase
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+    // Initialize Firebase Realtime Database sync service
+    await FirebaseRealtimeSyncService.instance.initialize();
+  } catch (e) {
+    print('[Firebase] Initialization error: $e');
+    // App continues even if Firebase fails to initialize
+  }
 
   // Initialize your NotificationService (singleton)
   await NotificationService.instance.initialize();

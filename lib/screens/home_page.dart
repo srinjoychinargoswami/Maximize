@@ -7,13 +7,18 @@ import 'package:maximize/screens/task_list_screen.dart';
 import 'package:maximize/screens/search_page.dart';
 import 'package:maximize/screens/reminder_page.dart';
 import 'package:maximize/screens/notes_page.dart';
+import 'package:maximize/screens/energy_page.dart';
+import 'package:maximize/screens/energy_insights_page.dart';
+import 'package:maximize/screens/settings_page.dart';
 import 'package:maximize/services/calendar_service.dart';
 import 'package:maximize/services/task_service.dart';
 import 'package:maximize/services/reminder_service.dart';
 import 'package:maximize/services/note_service.dart';
+import 'package:maximize/services/energy_service.dart';
 import 'package:maximize/models/task_model.dart';
 import 'package:maximize/models/event_model.dart';
 import 'package:maximize/models/reminder_model.dart';
+import 'package:maximize/models/energy_model.dart';
 import 'package:flutter/gestures.dart';
 
 /* HOME PAGE – Drawer, Bottom Nav, and IndexedStack */
@@ -34,7 +39,7 @@ class _MyHomePageState extends State<MyHomePage> {
   final GlobalKey<_OverviewPageState> _overviewKey = GlobalKey<_OverviewPageState>();
   final GlobalKey<TaskListScreenState> _tasksKey = GlobalKey<TaskListScreenState>();
   final GlobalKey<CalendarPageState> _calendarKey = GlobalKey<CalendarPageState>();
-  final GlobalKey<NotesPageState> _notesKey = GlobalKey<NotesPageState>(); 
+  final GlobalKey<NotesPageState> _notesKey = GlobalKey<NotesPageState>();
   final GlobalKey<ReminderPageState> _remindersKey = GlobalKey<ReminderPageState>();
 
   void _navigateToSearch() {
@@ -106,6 +111,7 @@ class _MyHomePageState extends State<MyHomePage> {
       CalendarPage(key: _calendarKey, calendarService: CalendarService(widget.database)),
       NotesPage(key: _notesKey, noteService: NoteService(widget.database)),
       ReminderPage(key: _remindersKey, database: widget.database),
+      EnergyInsightsPage(database: widget.database),
     ];
   }
 
@@ -133,6 +139,9 @@ class _MyHomePageState extends State<MyHomePage> {
           break;
         case 4: // Reminders
           (_remindersKey.currentState as dynamic)?._loadReminders();
+          break;
+        case 5: // Energy
+          // Energy page refresh is handled internally
           break;
       }
     } catch (e) {
@@ -181,7 +190,20 @@ class _MyHomePageState extends State<MyHomePage> {
             _drawerTile(title: 'Calendar', icon: Icons.calendar_today, index: 2),
             _drawerTile(title: 'Notes', icon: Icons.note, index: 3),
             _drawerTile(title: 'Reminders', icon: Icons.notifications, index: 4),
-            _drawerTile(title: 'About', icon: Icons.info, index: 5),
+            _drawerTile(title: 'Energy', icon: Icons.energy_savings_leaf, index: 5),
+            const Divider(),
+            ListTile(
+              leading: const Icon(Icons.settings),
+              title: const Text('Settings'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const SettingsPage()),
+                );
+              },
+            ),
+            _drawerTile(title: 'About', icon: Icons.info, index: 6),
           ],
         ),
       ),
@@ -203,6 +225,7 @@ class _MyHomePageState extends State<MyHomePage> {
           BottomNavigationBarItem(icon: Icon(Icons.calendar_today), label: 'Calendar'),
           BottomNavigationBarItem(icon: Icon(Icons.note), label: 'Notes'),
           BottomNavigationBarItem(icon: Icon(Icons.notifications), label: 'Reminders'),
+          BottomNavigationBarItem(icon: Icon(Icons.energy_savings_leaf), label: 'Energy'),
         ],
       ),
     );
@@ -217,7 +240,7 @@ class _MyHomePageState extends State<MyHomePage> {
         Navigator.pop(context);
         if (index < _screens.length) {
           _jumpTo(index);
-        } else if (index == 5) {
+        } else if (index == 6) {
           Navigator.push(
             context,
             MaterialPageRoute(builder: (context) => AboutPage()),
@@ -241,6 +264,7 @@ class _OverviewPageState extends State<OverviewPage> {
   late final TaskService _taskService;
   late final CalendarService _calendarService;
   late final ReminderService _reminderService;
+  late final EnergyService _energyService;
 
   @override
   void initState() {
@@ -248,6 +272,7 @@ class _OverviewPageState extends State<OverviewPage> {
     _taskService = TaskService(widget.database);
     _calendarService = CalendarService(widget.database);
     _reminderService = ReminderService(widget.database);
+    _energyService = EnergyService(widget.database);
   }
 
   // UPDATED: Made public so parent can call it
@@ -404,6 +429,10 @@ class _OverviewPageState extends State<OverviewPage> {
                 ),
               ),
               _statsSection(),
+              _EnergyStatusWidget(
+                database: widget.database,
+                energyService: _energyService,
+              ),
               _sectionHeader('Today\'s Tasks'),
               _taskSection(today),
               _sectionHeader('Today\'s Events'),
@@ -781,6 +810,254 @@ class _OverviewPageState extends State<OverviewPage> {
         SnackBar(content: Text('Failed to update reminder: $error')),
       );
     }
+  }
+}
+
+/* ENERGY STATUS WIDGET */
+
+class _EnergyStatusWidget extends StatefulWidget {
+  final AppDatabase database;
+  final EnergyService energyService;
+
+  const _EnergyStatusWidget({
+    required this.database,
+    required this.energyService,
+  });
+
+  @override
+  State<_EnergyStatusWidget> createState() => _EnergyStatusWidgetState();
+}
+
+class _EnergyStatusWidgetState extends State<_EnergyStatusWidget> {
+  EnergyEntryModel? _todaysEntry;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadTodaysEntry();
+  }
+
+  Future<void> _loadTodaysEntry() async {
+    try {
+      final entry = await widget.energyService.getTodaysEntry();
+      if (mounted) {
+        setState(() {
+          _todaysEntry = entry;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  Future<void> _openEnergyPage() async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => EnergyPage(database: widget.database),
+      ),
+    );
+
+    // Refresh on return
+    if (result == true || mounted) {
+      await _loadTodaysEntry();
+    }
+  }
+
+  String _getEnergyEmoji(int level) {
+    if (level <= 3) return '🔴';
+    if (level <= 6) return '🟡';
+    return '🟢';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Card(
+        color: Colors.grey[800],
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Energy Status',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                  ElevatedButton.icon(
+                    onPressed: _openEnergyPage,
+                    icon: const Icon(Icons.add, size: 18),
+                    label: Text(_todaysEntry != null ? 'Update' : 'Log'),
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      backgroundColor: Colors.blue[600],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              if (_isLoading)
+                const SizedBox(
+                  height: 60,
+                  child: Center(child: CircularProgressIndicator()),
+                )
+              else if (_todaysEntry != null)
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Energy Level Display
+                    Row(
+                      children: [
+                        Text(
+                          _getEnergyEmoji(_todaysEntry!.energyLevel),
+                          style: const TextStyle(fontSize: 28),
+                        ),
+                        const SizedBox(width: 12),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Energy: ${_todaysEntry!.energyLevel}/10',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white,
+                              ),
+                            ),
+                            Text(
+                              'Logged at ${DateFormat('h:mm a').format(_todaysEntry!.timestamp)}',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey[400],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Quick Stats
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[700],
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Column(
+                        children: [
+                          _statRow('Mood', _todaysEntry!.moodTags.first),
+                          const SizedBox(height: 8),
+                          _statRow('Location', _todaysEntry!.location),
+                          const SizedBox(height: 8),
+                          _statRow('Context', _todaysEntry!.privacyContext),
+                        ],
+                      ),
+                    ),
+
+                    // Notes if present
+                    if (_todaysEntry!.notes != null &&
+                        _todaysEntry!.notes!.isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.blue[900]?.withOpacity(0.3),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: Colors.blue[700]!.withOpacity(0.5),
+                          ),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Notes',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: Colors.grey[400],
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              _todaysEntry!.notes!,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey[300],
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ],
+                )
+              else
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Not logged yet today',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey[400],
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Tap the button above to log your energy level',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey[500],
+                      ),
+                    ),
+                  ],
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _statRow(String label, String value) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            color: Colors.grey[400],
+          ),
+        ),
+        Text(
+          value,
+          style: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: Colors.white,
+          ),
+        ),
+      ],
+    );
   }
 }
 

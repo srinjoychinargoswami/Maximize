@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
 import 'package:maximize/models/task_model.dart';
 import 'package:maximize/services/task_service.dart';
+import 'package:maximize/services/firebase_realtime_sync_service.dart';
 import 'package:maximize/screens/add_task_page.dart';
 import 'package:maximize/utils/task_utils.dart';
 import 'package:maximize/models/database.dart';
@@ -62,6 +63,18 @@ class TaskListScreenState extends State<TaskListScreen> with TickerProviderState
       CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
     );
     _loadTasks();
+
+    // Listen for real-time task changes from Firebase
+    if (FirebaseRealtimeSyncService.instance.isInitialized) {
+      FirebaseRealtimeSyncService.instance.listenToTasks((tasks) {
+        if (mounted) {
+          setState(() {
+            _tasks = tasks;
+            _updateFilterOptions();
+          });
+        }
+      });
+    }
   }
 
   @override

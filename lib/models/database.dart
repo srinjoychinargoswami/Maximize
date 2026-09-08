@@ -152,19 +152,37 @@ class Notes extends Table {
   DateTimeColumn get createdAt => dateTime()();
   DateTimeColumn get updatedAt => dateTime()();
   BoolColumn get isPinned => boolean().withDefault(const Constant(false))();
-  
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+// Energy Entries Table - Track daily energy levels and moods
+@DataClassName('EnergyEntry')
+class EnergyEntries extends Table {
+  TextColumn get id => text().clientDefault(() => const Uuid().v4())();
+  DateTimeColumn get timestamp => dateTime()(); // When the entry was logged
+  IntColumn get energyLevel => integer()(); // 1-10 scale (validated in app)
+  TextColumn get moodTags => text()(); // Comma-separated: "Focused,Energetic,Distracted,Drained,Stressed"
+  TextColumn get privacyContext => text()(); // "Alone", "Coworking", "Office", "Public", "Home"
+  TextColumn get location => text()(); // "Home", "Coffee Shop", "Office", "Other"
+  TextColumn get notes => text().nullable()(); // Free text notes
+  DateTimeColumn get createdAt => dateTime()();
+  DateTimeColumn get updatedAt => dateTime()();
+  TextColumn get userId => text().nullable()(); // For Firebase sync
+
   @override
   Set<Column> get primaryKey => {id};
 }
 
 // Drift Database Class
-@DriftDatabase(tables: [Tasks, Subtasks, Events, Classes, Reminders, Notes]) // ✅ ADDED Notes
+@DriftDatabase(tables: [Tasks, Subtasks, Events, Classes, Reminders, Notes, EnergyEntries]) // ✅ ADDED EnergyEntries
 class AppDatabase extends _$AppDatabase {
   AppDatabase._() : super(_openConnection());
   static final AppDatabase instance = AppDatabase._();
 
   @override
-  int get schemaVersion => 10; // Incremented from 9 to 10 for notes table
+  int get schemaVersion => 11; // Incremented from 10 to 11 for energy entries table
 
   // Migrations with reminder fields
   @override
@@ -404,6 +422,10 @@ class AppDatabase extends _$AppDatabase {
       // Migration for notes table
       if (from < 10 && to >= 10) {
         await m.createTable(notes);
+      }
+      // Migration for energy entries table
+      if (from < 11 && to >= 11) {
+        await m.createTable(energyEntries);
       }
     },
   );
@@ -1137,6 +1159,124 @@ class AppDatabase extends _$AppDatabase {
     } catch (e) {
       print('Error deleting note: $e');
       throw DatabaseException('Error deleting note: $e');
+    }
+  }
+
+  // Energy Entry CRUD Methods
+  Future<void> insertEnergyEntry(EnergyEntry entry) async {
+    try {
+      final companion = EnergyEntriesCompanion(
+        id: Value(entry.id),
+        timestamp: Value(entry.timestamp),
+        energyLevel: Value(entry.energyLevel),
+        moodTags: Value(entry.moodTags),
+        privacyContext: Value(entry.privacyContext),
+        location: Value(entry.location),
+        notes: entry.notes != null ? Value(entry.notes) : const Value.absent(),
+        createdAt: Value(entry.createdAt),
+        updatedAt: Value(entry.updatedAt),
+        userId: entry.userId != null ? Value(entry.userId) : const Value.absent(),
+      );
+      await into(energyEntries).insert(companion);
+    } catch (e) {
+      print('Error inserting energy entry: $e');
+      throw DatabaseException('Error inserting energy entry: $e');
+    }
+  }
+
+  Future<void> updateEnergyEntry(EnergyEntry entry) async {
+    try {
+      final companion = EnergyEntriesCompanion(
+        id: Value(entry.id),
+        timestamp: Value(entry.timestamp),
+        energyLevel: Value(entry.energyLevel),
+        moodTags: Value(entry.moodTags),
+        privacyContext: Value(entry.privacyContext),
+        location: Value(entry.location),
+        notes: entry.notes != null ? Value(entry.notes) : const Value.absent(),
+        createdAt: Value(entry.createdAt),
+        updatedAt: Value(entry.updatedAt),
+        userId: entry.userId != null ? Value(entry.userId) : const Value.absent(),
+      );
+      await (update(energyEntries)..where((tbl) => tbl.id.equals(entry.id))).write(companion);
+    } catch (e) {
+      print('Error updating energy entry: $e');
+      throw DatabaseException('Error updating energy entry: $e');
+    }
+  }
+
+  Future<void> deleteEnergyEntry(String id) async {
+    try {
+      await (delete(energyEntries)..where((tbl) => tbl.id.equals(id))).go();
+    } catch (e) {
+      print('Error deleting energy entry: $e');
+      throw DatabaseException('Error deleting energy entry: $e');
+    }
+  }
+
+  Future<EnergyEntry?> getEnergyEntry(String id) async {
+    try {
+      final result = await (select(energyEntries)..where((tbl) => tbl.id.equals(id))).getSingleOrNull();
+      return result;
+    } catch (e) {
+      print('Error fetching energy entry: $e');
+      throw DatabaseException('Error fetching energy entry: $e');
+    }
+  }
+
+  Future<EnergyEntry?> getTodaysEntry() async {
+    try {
+      final today = DateTime.now();
+      final startOfDay = DateTime(today.year, today.month, today.day);
+      final endOfDay = DateTime(today.year, today.month, today.day, 23, 59, 59);
+
+      final result = await (select(energyEntries)
+            ..where((tbl) => tbl.timestamp.isBetweenValues(startOfDay, endOfDay))
+            ..orderBy([(t) => OrderingTerm(expression: t.timestamp, mode: OrderingMode.desc)]))
+          .getSingleOrNull();
+      return result;
+    } catch (e) {
+      print('Error fetching today\'s energy entry: $e');
+      throw DatabaseException('Error fetching today\'s energy entry: $e');
+    }
+  }
+
+  Future<List<EnergyEntry>> getEntriesPast30Days() async {
+    try {
+      final thirtyDaysAgo = DateTime.now().subtract(const Duration(days: 30));
+      final result = await (select(energyEntries)
+            ..where((tbl) => tbl.timestamp.isBiggerThanValue(thirtyDaysAgo))
+            ..orderBy([(t) => OrderingTerm(expression: t.timestamp, mode: OrderingMode.desc)]))
+          .get();
+      return result;
+    } catch (e) {
+      print('Error fetching entries from past 30 days: $e');
+      throw DatabaseException('Error fetching entries from past 30 days: $e');
+    }
+  }
+
+  Future<List<EnergyEntry>> getEntriesByDate(DateTime date) async {
+    try {
+      final startOfDay = DateTime(date.year, date.month, date.day);
+      final endOfDay = DateTime(date.year, date.month, date.day, 23, 59, 59);
+
+      final result = await (select(energyEntries)
+            ..where((tbl) => tbl.timestamp.isBetweenValues(startOfDay, endOfDay))
+            ..orderBy([(t) => OrderingTerm(expression: t.timestamp, mode: OrderingMode.desc)]))
+          .get();
+      return result;
+    } catch (e) {
+      print('Error fetching entries for date: $e');
+      throw DatabaseException('Error fetching entries for date: $e');
+    }
+  }
+
+  Future<List<EnergyEntry>> getAllEnergyEntries() async {
+    try {
+      return await (select(energyEntries)..orderBy([(t) => OrderingTerm(expression: t.timestamp, mode: OrderingMode.desc)])).get();
+    } catch (e) {
+      print('Error fetching all energy entries: $e');
+      throw DatabaseException('Error fetching all energy entries: $e');
     }
   }
 }

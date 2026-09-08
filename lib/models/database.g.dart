@@ -3845,6 +3845,515 @@ class NotesCompanion extends UpdateCompanion<Note> {
   }
 }
 
+class $EnergyEntriesTable extends EnergyEntries
+    with TableInfo<$EnergyEntriesTable, EnergyEntry> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $EnergyEntriesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+      'id', aliasedName, false,
+      type: DriftSqlType.string,
+      requiredDuringInsert: false,
+      clientDefault: () => const Uuid().v4());
+  static const VerificationMeta _timestampMeta =
+      const VerificationMeta('timestamp');
+  @override
+  late final GeneratedColumn<DateTime> timestamp = GeneratedColumn<DateTime>(
+      'timestamp', aliasedName, false,
+      type: DriftSqlType.dateTime, requiredDuringInsert: true);
+  static const VerificationMeta _energyLevelMeta =
+      const VerificationMeta('energyLevel');
+  @override
+  late final GeneratedColumn<int> energyLevel = GeneratedColumn<int>(
+      'energy_level', aliasedName, false,
+      type: DriftSqlType.int, requiredDuringInsert: true);
+  static const VerificationMeta _moodTagsMeta =
+      const VerificationMeta('moodTags');
+  @override
+  late final GeneratedColumn<String> moodTags = GeneratedColumn<String>(
+      'mood_tags', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _privacyContextMeta =
+      const VerificationMeta('privacyContext');
+  @override
+  late final GeneratedColumn<String> privacyContext = GeneratedColumn<String>(
+      'privacy_context', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _locationMeta =
+      const VerificationMeta('location');
+  @override
+  late final GeneratedColumn<String> location = GeneratedColumn<String>(
+      'location', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _notesMeta = const VerificationMeta('notes');
+  @override
+  late final GeneratedColumn<String> notes = GeneratedColumn<String>(
+      'notes', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _createdAtMeta =
+      const VerificationMeta('createdAt');
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+      'created_at', aliasedName, false,
+      type: DriftSqlType.dateTime, requiredDuringInsert: true);
+  static const VerificationMeta _updatedAtMeta =
+      const VerificationMeta('updatedAt');
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+      'updated_at', aliasedName, false,
+      type: DriftSqlType.dateTime, requiredDuringInsert: true);
+  static const VerificationMeta _userIdMeta = const VerificationMeta('userId');
+  @override
+  late final GeneratedColumn<String> userId = GeneratedColumn<String>(
+      'user_id', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  @override
+  List<GeneratedColumn> get $columns => [
+        id,
+        timestamp,
+        energyLevel,
+        moodTags,
+        privacyContext,
+        location,
+        notes,
+        createdAt,
+        updatedAt,
+        userId
+      ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'energy_entries';
+  @override
+  VerificationContext validateIntegrity(Insertable<EnergyEntry> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('timestamp')) {
+      context.handle(_timestampMeta,
+          timestamp.isAcceptableOrUnknown(data['timestamp']!, _timestampMeta));
+    } else if (isInserting) {
+      context.missing(_timestampMeta);
+    }
+    if (data.containsKey('energy_level')) {
+      context.handle(
+          _energyLevelMeta,
+          energyLevel.isAcceptableOrUnknown(
+              data['energy_level']!, _energyLevelMeta));
+    } else if (isInserting) {
+      context.missing(_energyLevelMeta);
+    }
+    if (data.containsKey('mood_tags')) {
+      context.handle(_moodTagsMeta,
+          moodTags.isAcceptableOrUnknown(data['mood_tags']!, _moodTagsMeta));
+    } else if (isInserting) {
+      context.missing(_moodTagsMeta);
+    }
+    if (data.containsKey('privacy_context')) {
+      context.handle(
+          _privacyContextMeta,
+          privacyContext.isAcceptableOrUnknown(
+              data['privacy_context']!, _privacyContextMeta));
+    } else if (isInserting) {
+      context.missing(_privacyContextMeta);
+    }
+    if (data.containsKey('location')) {
+      context.handle(_locationMeta,
+          location.isAcceptableOrUnknown(data['location']!, _locationMeta));
+    } else if (isInserting) {
+      context.missing(_locationMeta);
+    }
+    if (data.containsKey('notes')) {
+      context.handle(
+          _notesMeta, notes.isAcceptableOrUnknown(data['notes']!, _notesMeta));
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(_createdAtMeta,
+          createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta));
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(_updatedAtMeta,
+          updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta));
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    if (data.containsKey('user_id')) {
+      context.handle(_userIdMeta,
+          userId.isAcceptableOrUnknown(data['user_id']!, _userIdMeta));
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  EnergyEntry map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return EnergyEntry(
+      id: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}id'])!,
+      timestamp: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}timestamp'])!,
+      energyLevel: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}energy_level'])!,
+      moodTags: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}mood_tags'])!,
+      privacyContext: attachedDatabase.typeMapping.read(
+          DriftSqlType.string, data['${effectivePrefix}privacy_context'])!,
+      location: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}location'])!,
+      notes: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}notes']),
+      createdAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}created_at'])!,
+      updatedAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}updated_at'])!,
+      userId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}user_id']),
+    );
+  }
+
+  @override
+  $EnergyEntriesTable createAlias(String alias) {
+    return $EnergyEntriesTable(attachedDatabase, alias);
+  }
+}
+
+class EnergyEntry extends DataClass implements Insertable<EnergyEntry> {
+  final String id;
+  final DateTime timestamp;
+  final int energyLevel;
+  final String moodTags;
+  final String privacyContext;
+  final String location;
+  final String? notes;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  final String? userId;
+  const EnergyEntry(
+      {required this.id,
+      required this.timestamp,
+      required this.energyLevel,
+      required this.moodTags,
+      required this.privacyContext,
+      required this.location,
+      this.notes,
+      required this.createdAt,
+      required this.updatedAt,
+      this.userId});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['timestamp'] = Variable<DateTime>(timestamp);
+    map['energy_level'] = Variable<int>(energyLevel);
+    map['mood_tags'] = Variable<String>(moodTags);
+    map['privacy_context'] = Variable<String>(privacyContext);
+    map['location'] = Variable<String>(location);
+    if (!nullToAbsent || notes != null) {
+      map['notes'] = Variable<String>(notes);
+    }
+    map['created_at'] = Variable<DateTime>(createdAt);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    if (!nullToAbsent || userId != null) {
+      map['user_id'] = Variable<String>(userId);
+    }
+    return map;
+  }
+
+  EnergyEntriesCompanion toCompanion(bool nullToAbsent) {
+    return EnergyEntriesCompanion(
+      id: Value(id),
+      timestamp: Value(timestamp),
+      energyLevel: Value(energyLevel),
+      moodTags: Value(moodTags),
+      privacyContext: Value(privacyContext),
+      location: Value(location),
+      notes:
+          notes == null && nullToAbsent ? const Value.absent() : Value(notes),
+      createdAt: Value(createdAt),
+      updatedAt: Value(updatedAt),
+      userId:
+          userId == null && nullToAbsent ? const Value.absent() : Value(userId),
+    );
+  }
+
+  factory EnergyEntry.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return EnergyEntry(
+      id: serializer.fromJson<String>(json['id']),
+      timestamp: serializer.fromJson<DateTime>(json['timestamp']),
+      energyLevel: serializer.fromJson<int>(json['energyLevel']),
+      moodTags: serializer.fromJson<String>(json['moodTags']),
+      privacyContext: serializer.fromJson<String>(json['privacyContext']),
+      location: serializer.fromJson<String>(json['location']),
+      notes: serializer.fromJson<String?>(json['notes']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+      userId: serializer.fromJson<String?>(json['userId']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'timestamp': serializer.toJson<DateTime>(timestamp),
+      'energyLevel': serializer.toJson<int>(energyLevel),
+      'moodTags': serializer.toJson<String>(moodTags),
+      'privacyContext': serializer.toJson<String>(privacyContext),
+      'location': serializer.toJson<String>(location),
+      'notes': serializer.toJson<String?>(notes),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+      'userId': serializer.toJson<String?>(userId),
+    };
+  }
+
+  EnergyEntry copyWith(
+          {String? id,
+          DateTime? timestamp,
+          int? energyLevel,
+          String? moodTags,
+          String? privacyContext,
+          String? location,
+          Value<String?> notes = const Value.absent(),
+          DateTime? createdAt,
+          DateTime? updatedAt,
+          Value<String?> userId = const Value.absent()}) =>
+      EnergyEntry(
+        id: id ?? this.id,
+        timestamp: timestamp ?? this.timestamp,
+        energyLevel: energyLevel ?? this.energyLevel,
+        moodTags: moodTags ?? this.moodTags,
+        privacyContext: privacyContext ?? this.privacyContext,
+        location: location ?? this.location,
+        notes: notes.present ? notes.value : this.notes,
+        createdAt: createdAt ?? this.createdAt,
+        updatedAt: updatedAt ?? this.updatedAt,
+        userId: userId.present ? userId.value : this.userId,
+      );
+  EnergyEntry copyWithCompanion(EnergyEntriesCompanion data) {
+    return EnergyEntry(
+      id: data.id.present ? data.id.value : this.id,
+      timestamp: data.timestamp.present ? data.timestamp.value : this.timestamp,
+      energyLevel:
+          data.energyLevel.present ? data.energyLevel.value : this.energyLevel,
+      moodTags: data.moodTags.present ? data.moodTags.value : this.moodTags,
+      privacyContext: data.privacyContext.present
+          ? data.privacyContext.value
+          : this.privacyContext,
+      location: data.location.present ? data.location.value : this.location,
+      notes: data.notes.present ? data.notes.value : this.notes,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      userId: data.userId.present ? data.userId.value : this.userId,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('EnergyEntry(')
+          ..write('id: $id, ')
+          ..write('timestamp: $timestamp, ')
+          ..write('energyLevel: $energyLevel, ')
+          ..write('moodTags: $moodTags, ')
+          ..write('privacyContext: $privacyContext, ')
+          ..write('location: $location, ')
+          ..write('notes: $notes, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('userId: $userId')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, timestamp, energyLevel, moodTags,
+      privacyContext, location, notes, createdAt, updatedAt, userId);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is EnergyEntry &&
+          other.id == this.id &&
+          other.timestamp == this.timestamp &&
+          other.energyLevel == this.energyLevel &&
+          other.moodTags == this.moodTags &&
+          other.privacyContext == this.privacyContext &&
+          other.location == this.location &&
+          other.notes == this.notes &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt &&
+          other.userId == this.userId);
+}
+
+class EnergyEntriesCompanion extends UpdateCompanion<EnergyEntry> {
+  final Value<String> id;
+  final Value<DateTime> timestamp;
+  final Value<int> energyLevel;
+  final Value<String> moodTags;
+  final Value<String> privacyContext;
+  final Value<String> location;
+  final Value<String?> notes;
+  final Value<DateTime> createdAt;
+  final Value<DateTime> updatedAt;
+  final Value<String?> userId;
+  final Value<int> rowid;
+  const EnergyEntriesCompanion({
+    this.id = const Value.absent(),
+    this.timestamp = const Value.absent(),
+    this.energyLevel = const Value.absent(),
+    this.moodTags = const Value.absent(),
+    this.privacyContext = const Value.absent(),
+    this.location = const Value.absent(),
+    this.notes = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.userId = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  EnergyEntriesCompanion.insert({
+    this.id = const Value.absent(),
+    required DateTime timestamp,
+    required int energyLevel,
+    required String moodTags,
+    required String privacyContext,
+    required String location,
+    this.notes = const Value.absent(),
+    required DateTime createdAt,
+    required DateTime updatedAt,
+    this.userId = const Value.absent(),
+    this.rowid = const Value.absent(),
+  })  : timestamp = Value(timestamp),
+        energyLevel = Value(energyLevel),
+        moodTags = Value(moodTags),
+        privacyContext = Value(privacyContext),
+        location = Value(location),
+        createdAt = Value(createdAt),
+        updatedAt = Value(updatedAt);
+  static Insertable<EnergyEntry> custom({
+    Expression<String>? id,
+    Expression<DateTime>? timestamp,
+    Expression<int>? energyLevel,
+    Expression<String>? moodTags,
+    Expression<String>? privacyContext,
+    Expression<String>? location,
+    Expression<String>? notes,
+    Expression<DateTime>? createdAt,
+    Expression<DateTime>? updatedAt,
+    Expression<String>? userId,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (timestamp != null) 'timestamp': timestamp,
+      if (energyLevel != null) 'energy_level': energyLevel,
+      if (moodTags != null) 'mood_tags': moodTags,
+      if (privacyContext != null) 'privacy_context': privacyContext,
+      if (location != null) 'location': location,
+      if (notes != null) 'notes': notes,
+      if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (userId != null) 'user_id': userId,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  EnergyEntriesCompanion copyWith(
+      {Value<String>? id,
+      Value<DateTime>? timestamp,
+      Value<int>? energyLevel,
+      Value<String>? moodTags,
+      Value<String>? privacyContext,
+      Value<String>? location,
+      Value<String?>? notes,
+      Value<DateTime>? createdAt,
+      Value<DateTime>? updatedAt,
+      Value<String?>? userId,
+      Value<int>? rowid}) {
+    return EnergyEntriesCompanion(
+      id: id ?? this.id,
+      timestamp: timestamp ?? this.timestamp,
+      energyLevel: energyLevel ?? this.energyLevel,
+      moodTags: moodTags ?? this.moodTags,
+      privacyContext: privacyContext ?? this.privacyContext,
+      location: location ?? this.location,
+      notes: notes ?? this.notes,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      userId: userId ?? this.userId,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (timestamp.present) {
+      map['timestamp'] = Variable<DateTime>(timestamp.value);
+    }
+    if (energyLevel.present) {
+      map['energy_level'] = Variable<int>(energyLevel.value);
+    }
+    if (moodTags.present) {
+      map['mood_tags'] = Variable<String>(moodTags.value);
+    }
+    if (privacyContext.present) {
+      map['privacy_context'] = Variable<String>(privacyContext.value);
+    }
+    if (location.present) {
+      map['location'] = Variable<String>(location.value);
+    }
+    if (notes.present) {
+      map['notes'] = Variable<String>(notes.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (userId.present) {
+      map['user_id'] = Variable<String>(userId.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('EnergyEntriesCompanion(')
+          ..write('id: $id, ')
+          ..write('timestamp: $timestamp, ')
+          ..write('energyLevel: $energyLevel, ')
+          ..write('moodTags: $moodTags, ')
+          ..write('privacyContext: $privacyContext, ')
+          ..write('location: $location, ')
+          ..write('notes: $notes, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('userId: $userId, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -3854,12 +4363,13 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $ClassesTable classes = $ClassesTable(this);
   late final $RemindersTable reminders = $RemindersTable(this);
   late final $NotesTable notes = $NotesTable(this);
+  late final $EnergyEntriesTable energyEntries = $EnergyEntriesTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
   @override
   List<DatabaseSchemaEntity> get allSchemaEntities =>
-      [tasks, subtasks, events, classes, reminders, notes];
+      [tasks, subtasks, events, classes, reminders, notes, energyEntries];
 }
 
 typedef $$TasksTableCreateCompanionBuilder = TasksCompanion Function({
@@ -3928,7 +4438,7 @@ final class $$TasksTableReferences
 
   $$SubtasksTableProcessedTableManager get subtasksRefs {
     final manager = $$SubtasksTableTableManager($_db, $_db.subtasks)
-        .filter((f) => f.taskId.id($_item.id));
+        .filter((f) => f.taskId.id.sqlEquals($_itemColumn<String>('id')!));
 
     final cache = $_typedResult.readTableOrNull(_subtasksRefsTable($_db));
     return ProcessedTableManager(
@@ -4382,7 +4892,8 @@ class $$TasksTableTableManager extends RootTableManager<
               getPrefetchedDataCallback: (items) async {
                 return [
                   if (subtasksRefs)
-                    await $_getPrefetchedData(
+                    await $_getPrefetchedData<TaskData, $TasksTable,
+                            SubtaskData>(
                         currentTable: table,
                         referencedTable:
                             $$TasksTableReferences._subtasksRefsTable(db),
@@ -4436,8 +4947,10 @@ final class $$SubtasksTableReferences
       .createAlias($_aliasNameGenerator(db.subtasks.taskId, db.tasks.id));
 
   $$TasksTableProcessedTableManager get taskId {
+    final $_column = $_itemColumn<String>('task_id')!;
+
     final manager = $$TasksTableTableManager($_db, $_db.tasks)
-        .filter((f) => f.id($_item.taskId));
+        .filter((f) => f.id.sqlEquals($_column));
     final item = $_typedResult.readTableOrNull(_taskIdTable($_db));
     if (item == null) return manager;
     return ProcessedTableManager(
@@ -5748,6 +6261,256 @@ typedef $$NotesTableProcessedTableManager = ProcessedTableManager<
     (Note, BaseReferences<_$AppDatabase, $NotesTable, Note>),
     Note,
     PrefetchHooks Function()>;
+typedef $$EnergyEntriesTableCreateCompanionBuilder = EnergyEntriesCompanion
+    Function({
+  Value<String> id,
+  required DateTime timestamp,
+  required int energyLevel,
+  required String moodTags,
+  required String privacyContext,
+  required String location,
+  Value<String?> notes,
+  required DateTime createdAt,
+  required DateTime updatedAt,
+  Value<String?> userId,
+  Value<int> rowid,
+});
+typedef $$EnergyEntriesTableUpdateCompanionBuilder = EnergyEntriesCompanion
+    Function({
+  Value<String> id,
+  Value<DateTime> timestamp,
+  Value<int> energyLevel,
+  Value<String> moodTags,
+  Value<String> privacyContext,
+  Value<String> location,
+  Value<String?> notes,
+  Value<DateTime> createdAt,
+  Value<DateTime> updatedAt,
+  Value<String?> userId,
+  Value<int> rowid,
+});
+
+class $$EnergyEntriesTableFilterComposer
+    extends Composer<_$AppDatabase, $EnergyEntriesTable> {
+  $$EnergyEntriesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get timestamp => $composableBuilder(
+      column: $table.timestamp, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get energyLevel => $composableBuilder(
+      column: $table.energyLevel, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get moodTags => $composableBuilder(
+      column: $table.moodTags, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get privacyContext => $composableBuilder(
+      column: $table.privacyContext,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get location => $composableBuilder(
+      column: $table.location, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get notes => $composableBuilder(
+      column: $table.notes, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+      column: $table.createdAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+      column: $table.updatedAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get userId => $composableBuilder(
+      column: $table.userId, builder: (column) => ColumnFilters(column));
+}
+
+class $$EnergyEntriesTableOrderingComposer
+    extends Composer<_$AppDatabase, $EnergyEntriesTable> {
+  $$EnergyEntriesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get timestamp => $composableBuilder(
+      column: $table.timestamp, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get energyLevel => $composableBuilder(
+      column: $table.energyLevel, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get moodTags => $composableBuilder(
+      column: $table.moodTags, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get privacyContext => $composableBuilder(
+      column: $table.privacyContext,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get location => $composableBuilder(
+      column: $table.location, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get notes => $composableBuilder(
+      column: $table.notes, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+      column: $table.createdAt, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+      column: $table.updatedAt, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get userId => $composableBuilder(
+      column: $table.userId, builder: (column) => ColumnOrderings(column));
+}
+
+class $$EnergyEntriesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $EnergyEntriesTable> {
+  $$EnergyEntriesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get timestamp =>
+      $composableBuilder(column: $table.timestamp, builder: (column) => column);
+
+  GeneratedColumn<int> get energyLevel => $composableBuilder(
+      column: $table.energyLevel, builder: (column) => column);
+
+  GeneratedColumn<String> get moodTags =>
+      $composableBuilder(column: $table.moodTags, builder: (column) => column);
+
+  GeneratedColumn<String> get privacyContext => $composableBuilder(
+      column: $table.privacyContext, builder: (column) => column);
+
+  GeneratedColumn<String> get location =>
+      $composableBuilder(column: $table.location, builder: (column) => column);
+
+  GeneratedColumn<String> get notes =>
+      $composableBuilder(column: $table.notes, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<String> get userId =>
+      $composableBuilder(column: $table.userId, builder: (column) => column);
+}
+
+class $$EnergyEntriesTableTableManager extends RootTableManager<
+    _$AppDatabase,
+    $EnergyEntriesTable,
+    EnergyEntry,
+    $$EnergyEntriesTableFilterComposer,
+    $$EnergyEntriesTableOrderingComposer,
+    $$EnergyEntriesTableAnnotationComposer,
+    $$EnergyEntriesTableCreateCompanionBuilder,
+    $$EnergyEntriesTableUpdateCompanionBuilder,
+    (
+      EnergyEntry,
+      BaseReferences<_$AppDatabase, $EnergyEntriesTable, EnergyEntry>
+    ),
+    EnergyEntry,
+    PrefetchHooks Function()> {
+  $$EnergyEntriesTableTableManager(_$AppDatabase db, $EnergyEntriesTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$EnergyEntriesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$EnergyEntriesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$EnergyEntriesTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<String> id = const Value.absent(),
+            Value<DateTime> timestamp = const Value.absent(),
+            Value<int> energyLevel = const Value.absent(),
+            Value<String> moodTags = const Value.absent(),
+            Value<String> privacyContext = const Value.absent(),
+            Value<String> location = const Value.absent(),
+            Value<String?> notes = const Value.absent(),
+            Value<DateTime> createdAt = const Value.absent(),
+            Value<DateTime> updatedAt = const Value.absent(),
+            Value<String?> userId = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              EnergyEntriesCompanion(
+            id: id,
+            timestamp: timestamp,
+            energyLevel: energyLevel,
+            moodTags: moodTags,
+            privacyContext: privacyContext,
+            location: location,
+            notes: notes,
+            createdAt: createdAt,
+            updatedAt: updatedAt,
+            userId: userId,
+            rowid: rowid,
+          ),
+          createCompanionCallback: ({
+            Value<String> id = const Value.absent(),
+            required DateTime timestamp,
+            required int energyLevel,
+            required String moodTags,
+            required String privacyContext,
+            required String location,
+            Value<String?> notes = const Value.absent(),
+            required DateTime createdAt,
+            required DateTime updatedAt,
+            Value<String?> userId = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              EnergyEntriesCompanion.insert(
+            id: id,
+            timestamp: timestamp,
+            energyLevel: energyLevel,
+            moodTags: moodTags,
+            privacyContext: privacyContext,
+            location: location,
+            notes: notes,
+            createdAt: createdAt,
+            updatedAt: updatedAt,
+            userId: userId,
+            rowid: rowid,
+          ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ));
+}
+
+typedef $$EnergyEntriesTableProcessedTableManager = ProcessedTableManager<
+    _$AppDatabase,
+    $EnergyEntriesTable,
+    EnergyEntry,
+    $$EnergyEntriesTableFilterComposer,
+    $$EnergyEntriesTableOrderingComposer,
+    $$EnergyEntriesTableAnnotationComposer,
+    $$EnergyEntriesTableCreateCompanionBuilder,
+    $$EnergyEntriesTableUpdateCompanionBuilder,
+    (
+      EnergyEntry,
+      BaseReferences<_$AppDatabase, $EnergyEntriesTable, EnergyEntry>
+    ),
+    EnergyEntry,
+    PrefetchHooks Function()>;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -5764,4 +6527,6 @@ class $AppDatabaseManager {
       $$RemindersTableTableManager(_db, _db.reminders);
   $$NotesTableTableManager get notes =>
       $$NotesTableTableManager(_db, _db.notes);
+  $$EnergyEntriesTableTableManager get energyEntries =>
+      $$EnergyEntriesTableTableManager(_db, _db.energyEntries);
 }
