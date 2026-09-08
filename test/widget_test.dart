@@ -1,18 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:maximize/main.dart'; 
+import 'package:maximize/main.dart';
 import 'package:maximize/models/database.dart';
-import 'package:maximize/services/api_service.dart'; // Import database.dart
-
 
 void main() {
   testWidgets('Counter increments smoke test', (WidgetTester tester) async {
     // Create a mock database instance
     final database = AppDatabase.instance;
-    final apiService = ApiService(db:database); 
-    
+
     // Build the app and trigger a frame.
-    await tester.pumpWidget(MyApp(database: database, apiService: apiService));
+    await tester.pumpWidget(MyApp(database: database));
 
     // Verify that our counter starts at 0.
     expect(find.text('0'), findsOneWidget);

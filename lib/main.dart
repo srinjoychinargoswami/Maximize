@@ -3,10 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/data/latest.dart' as tz_data;
 import 'package:maximize/models/database.dart';
-import 'package:maximize/services/api_service.dart';
 import 'package:maximize/screens/home_page.dart';
 import 'package:maximize/services/reminder_service.dart';
-// or wherever NotificationService is defined
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -26,16 +25,14 @@ void main() async {
 
   // Initialize Drift database
   final database = AppDatabase.instance;
-  final apiService = ApiService(db: database);
 
   // Start the app
-  runApp(MyApp(database: database, apiService: apiService));
+  runApp(MyApp(database: database));
 }
 
 class MyApp extends StatelessWidget {
   final AppDatabase database;
-  final ApiService apiService;
-  const MyApp({super.key, required this.database, required this.apiService});
+  const MyApp({super.key, required this.database});
 
   @override
   Widget build(BuildContext context) {
@@ -54,7 +51,7 @@ class MyApp extends StatelessWidget {
           bodyMedium: TextStyle(color: Colors.grey, fontSize: 14),
         ),
       ),
-      home: MyHomePage(database: database, apiService: apiService),
+      home: MyHomePage(database: database),
     );
   }
 }

@@ -1,7 +1,5 @@
-// lib/screens/about_page.dart
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart'; 
-import 'dart:async'; 
 
 
 
@@ -20,9 +18,9 @@ class AboutPage extends StatelessWidget {
             child: Text('M', style: TextStyle(fontSize: 40, color: Colors.white)),
           ),
           SizedBox(height: 16),
-          Text('Maximize v1.0.0', 
+          Text('Maximize v1.0.0',
                style: Theme.of(context).textTheme.headlineSmall),
-          Text('Tasks • Calendar • Reminders • Sync', 
+          Text('Tasks • Calendar • Reminders',
                style: TextStyle(color: Colors.grey)),
           SizedBox(height: 24),
 
@@ -46,7 +44,7 @@ class AboutPage extends StatelessWidget {
           ListTile(
             leading: Icon(Icons.privacy_tip),
             title: Text('Privacy Policy'),
-            subtitle: Text('No tracking. GitHub sync optional.'),
+            subtitle: Text('No tracking. All data stored locally.'),
             onTap: () => launchUrl(Uri.parse('https://your-github-repo/privacy.md')),
           ),
 

@@ -5,11 +5,8 @@ import 'package:drift/native.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
 import 'dart:io';
-import 'dart:convert';
 import 'package:uuid/uuid.dart';
-import 'package:http/http.dart' as http;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:maximize/utils/encryption_helper.dart';
 
 // Import models
 import 'package:maximize/models/task_model.dart';
@@ -165,14 +162,6 @@ class Notes extends Table {
 class AppDatabase extends _$AppDatabase {
   AppDatabase._() : super(_openConnection());
   static final AppDatabase instance = AppDatabase._();
-
-  // GitHub Sync Constants
-  static const String githubUsername = 'your-github-username'; // 🔁 Replace with your GitHub username
-  static const String repoName = 'productivity-sync';
-  static const String fileName = 'sync_data.json.enc';
-  static const String tokenKey = 'github_token';
-
-  final FlutterSecureStorage _secureStorage = const FlutterSecureStorage();
 
   @override
   int get schemaVersion => 10; // Incremented from 9 to 10 for notes table
@@ -621,97 +610,6 @@ class AppDatabase extends _$AppDatabase {
     } catch (e) {
       print('Error importing data from JSON: $e');
       throw DatabaseException('Error importing data from JSON: $e');
-    }
-  }
-
-  // ADDED: Upload encrypted data to GitHub
-  Future<void> syncToGitHub() async {
-    try {
-      final token = await _secureStorage.read(key: tokenKey);
-      if (token == null) throw Exception("GitHub token not set in secure storage.");
-
-      final data = await getAllDataAsJson();
-      final encrypted = EncryptionHelper.encrypt(jsonEncode(data));
-      final base64Content = base64Encode(utf8.encode(encrypted));
-
-      final url = Uri.parse('https://api.github.com/repos/$githubUsername/$repoName/contents/$fileName');
-      final getResp = await http.get(url, headers: {'Authorization': 'Bearer $token'});
-
-      String? sha;
-      if (getResp.statusCode == 200) {
-        final existingFile = jsonDecode(getResp.body);
-        sha = existingFile['sha'];
-      }
-
-      final body = {
-        "message": "Sync data ${DateTime.now().toIso8601String()}",
-        "content": base64Content,
-        if (sha != null) "sha": sha,
-      };
-
-      final putResp = await http.put(
-        url,
-        headers: {
-          'Authorization': 'Bearer $token',
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode(body),
-      );
-
-      if (putResp.statusCode != 201 && putResp.statusCode != 200) {
-        throw Exception("Failed to upload sync file to GitHub");
-      }
-    } catch (e) {
-      print('Error syncing to GitHub: $e');
-      throw DatabaseException('Error syncing to GitHub: $e');
-    }
-  }
-
-  // ADDED: Download + decrypt data from GitHub with robust Base64 handling
-  Future<void> syncFromGitHub() async {
-    try {
-      final token = await _secureStorage.read(key: tokenKey);
-      if (token == null) throw Exception("GitHub token not set in secure storage.");
-
-      final url = Uri.parse('https://api.github.com/repos/$githubUsername/$repoName/contents/$fileName');
-      final response = await http.get(url, headers: {'Authorization': 'Bearer $token'});
-
-      if (response.statusCode != 200) throw Exception("Failed to download sync file from GitHub");
-
-      final jsonResponse = jsonDecode(response.body);
-      
-      // FIXED: Ultra-robust Base64 cleaning to resolve extension byte errors
-      String base64Content = jsonResponse['content'];
-      
-      // Remove all possible whitespace and control characters
-      base64Content = base64Content
-          .replaceAll(RegExp(r'\s'), '')           // Remove all whitespace
-          .replaceAll(RegExp(r'[^\w+/=]'), '')     // Keep only valid Base64 characters
-          .trim();                                  // Final trim
-      
-      // Validate Base64 length (must be multiple of 4)
-      while (base64Content.length % 4 != 0) {
-        base64Content += '=';
-      }
-      
-      final encrypted = utf8.decode(base64Decode(base64Content));
-      final decrypted = EncryptionHelper.decrypt(encrypted);
-      final data = jsonDecode(decrypted);
-
-      await insertAllFromJson(data);
-    } catch (e) {
-      print('Error syncing from GitHub: $e');
-      throw DatabaseException('Error syncing from GitHub: $e');
-    }
-  }
-
-  // ADDED: Save GitHub token securely
-  Future<void> saveGitHubToken(String token) async {
-    try {
-      await _secureStorage.write(key: tokenKey, value: token);
-    } catch (e) {
-      print('Error saving GitHub token: $e');
-      throw DatabaseException('Error saving GitHub token: $e');
     }
   }
 

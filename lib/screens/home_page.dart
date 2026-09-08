@@ -7,8 +7,6 @@ import 'package:maximize/screens/task_list_screen.dart';
 import 'package:maximize/screens/search_page.dart';
 import 'package:maximize/screens/reminder_page.dart';
 import 'package:maximize/screens/notes_page.dart';
-import 'package:maximize/screens/github_sync_page.dart';
-import 'package:maximize/services/api_service.dart';
 import 'package:maximize/services/calendar_service.dart';
 import 'package:maximize/services/task_service.dart';
 import 'package:maximize/services/reminder_service.dart';
@@ -22,8 +20,7 @@ import 'package:flutter/gestures.dart';
 
 class MyHomePage extends StatefulWidget {
   final AppDatabase database;
-  final ApiService apiService;
-  const MyHomePage({super.key, required this.database, required this.apiService});
+  const MyHomePage({super.key, required this.database});
 
   @override
   State<MyHomePage> createState() => _MyHomePageState();
@@ -107,9 +104,8 @@ class _MyHomePageState extends State<MyHomePage> {
       OverviewPage(key: _overviewKey, database: widget.database),
       TaskListScreen(key: _tasksKey, database: widget.database),
       CalendarPage(key: _calendarKey, calendarService: CalendarService(widget.database)),
-      NotesPage(key: _notesKey, noteService: NoteService(widget.database)), 
+      NotesPage(key: _notesKey, noteService: NoteService(widget.database)),
       ReminderPage(key: _remindersKey, database: widget.database),
-      GitHubSyncPage(api: widget.apiService),
     ];
   }
 
@@ -133,13 +129,10 @@ class _MyHomePageState extends State<MyHomePage> {
           (_calendarKey.currentState as dynamic)?._loadEvents();
           break;
         case 3: // Notes
-          (_notesKey.currentState as dynamic)?._loadNotes(); 
+          (_notesKey.currentState as dynamic)?._loadNotes();
           break;
         case 4: // Reminders
           (_remindersKey.currentState as dynamic)?._loadReminders();
-          break;
-        case 5: // Sync
-          // No refresh needed for sync
           break;
       }
     } catch (e) {
@@ -188,8 +181,7 @@ class _MyHomePageState extends State<MyHomePage> {
             _drawerTile(title: 'Calendar', icon: Icons.calendar_today, index: 2),
             _drawerTile(title: 'Notes', icon: Icons.note, index: 3),
             _drawerTile(title: 'Reminders', icon: Icons.notifications, index: 4),
-            _drawerTile(title: 'Syncing', icon: Icons.sync, index: 5),
-            _drawerTile(title: 'About', icon: Icons.info, index: 6),
+            _drawerTile(title: 'About', icon: Icons.info, index: 5),
           ],
         ),
       ),
@@ -211,7 +203,6 @@ class _MyHomePageState extends State<MyHomePage> {
           BottomNavigationBarItem(icon: Icon(Icons.calendar_today), label: 'Calendar'),
           BottomNavigationBarItem(icon: Icon(Icons.note), label: 'Notes'),
           BottomNavigationBarItem(icon: Icon(Icons.notifications), label: 'Reminders'),
-          BottomNavigationBarItem(icon: Icon(Icons.sync), label: 'Syncing'),
         ],
       ),
     );
@@ -226,9 +217,9 @@ class _MyHomePageState extends State<MyHomePage> {
         Navigator.pop(context);
         if (index < _screens.length) {
           _jumpTo(index);
-        } else if (index == 6) {
+        } else if (index == 5) {
           Navigator.push(
-            context, 
+            context,
             MaterialPageRoute(builder: (context) => AboutPage()),
           );
         }
