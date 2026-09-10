@@ -1,12 +1,21 @@
+import "package:provider/provider.dart";
 import 'package:flutter/material.dart';
+import "package:provider/provider.dart";
 import 'package:flutter/gestures.dart';
+import "package:provider/provider.dart";
 import 'package:maximize/models/task_model.dart';
+import "package:provider/provider.dart";
 import 'package:maximize/models/subtask_model.dart';
+import "package:provider/provider.dart";
 import 'package:maximize/services/task_service.dart';
+import "package:provider/provider.dart";
 import 'package:maximize/services/firebase_realtime_sync_service.dart';
+import "package:provider/provider.dart";
 import 'package:maximize/screens/add_task_page.dart';
+import "package:provider/provider.dart";
 import 'package:maximize/utils/task_utils.dart';
-import 'package:maximize/database/app_database_adapter.dart';
+import "package:provider/provider.dart";
+import 'package:maximize/database/app_database.dart';
 import 'package:intl/intl.dart';
 
 // CustomScrollBehavior to fix RefreshIndicator on Windows desktop
@@ -55,7 +64,7 @@ class TaskListScreenState extends State<TaskListScreen> with TickerProviderState
   @override
   void initState() {
     super.initState();
-    _taskService = TaskService();
+    _taskService = context.read<TaskService>();
     _animationController = AnimationController(
       duration: const Duration(milliseconds: 300),
       vsync: this,
@@ -1134,12 +1143,11 @@ return matchesCategory && matchesPriority && matchesDueDate && matchesRecurrence
     );
   }
 
-  // UPDATED: Pass taskService parameter
   void _addTask() {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => AddTaskPage(taskService: _taskService), //  ADD taskService
+        builder: (context) => const AddTaskPage(),
       ),
     ).then((value) {
       if (value != null) {
@@ -1289,7 +1297,6 @@ return matchesCategory && matchesPriority && matchesDueDate && matchesRecurrence
       MaterialPageRoute(
         builder: (context) => AddTaskPage(
           task: task,
-          taskService: _taskService, // ADD taskService
         ),
       ),
     ).then((value) {

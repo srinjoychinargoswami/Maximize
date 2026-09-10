@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:provider/provider.dart';
 import 'package:maximize/config/app_config.dart';
 import 'package:maximize/providers/theme_notifier.dart';
 import 'package:maximize/services/completion_log_service.dart';
+import 'package:maximize/services/database_encryption_service.dart';
+import 'package:maximize/screens/privacy_policy_screen.dart';
+import 'package:maximize/screens/terms_conditions_screen.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -266,7 +270,7 @@ class _SettingsPageState extends State<SettingsPage> {
           TextButton(
             onPressed: () async {
               try {
-                await CompletionLogService().clearAllCompletionLogs();
+                await context.read<CompletionLogService>().clearAllCompletionLogs();
                 if (mounted) {
                   Navigator.pop(ctx);
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -381,7 +385,92 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
             const SizedBox(height: 24),
 
-            // SECTION 3: Data & Privacy
+            // SECTION 3: Storage & Encryption
+            _buildSectionHeader('Storage & Encryption'),
+            Card(
+              color: Colors.grey[800],
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Platform info
+                    ListTile(
+                      title: const Text('Platform'),
+                      subtitle: Text(DatabaseEncryptionService.instance.getPlatformType()),
+                      leading: const Icon(Icons.storage),
+                      contentPadding: EdgeInsets.zero,
+                    ),
+
+                    const SizedBox(height: 12),
+
+                    // Storage quota info
+                    if (kIsWeb)
+                      ListTile(
+                        title: const Text('Storage Quota'),
+                        subtitle: const Text('IndexedDB: 500MB - 1GB'),
+                        leading: const Icon(Icons.cloud),
+                        contentPadding: EdgeInsets.zero,
+                      )
+                    else
+                      ListTile(
+                        title: const Text('Storage'),
+                        subtitle: const Text('Native SQLite Filesystem'),
+                        leading: const Icon(Icons.storage),
+                        contentPadding: EdgeInsets.zero,
+                      ),
+
+                    const SizedBox(height: 12),
+
+                    // Encryption info
+                    ListTile(
+                      title: const Text('Encryption'),
+                      subtitle: const Text('AES-256 (Firebase sync only)'),
+                      leading: const Icon(Icons.lock),
+                      contentPadding: EdgeInsets.zero,
+                    ),
+
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+
+            // SECTION 4: Privacy & Legal
+            _buildSectionHeader('Privacy & Legal'),
+            Card(
+              color: Colors.grey[800],
+              child: Column(
+                children: [
+                  ListTile(
+                    title: const Text('Privacy Policy'),
+                    trailing: const Icon(Icons.arrow_forward),
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (context) => const PrivacyPolicyScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                  const Divider(height: 0),
+                  ListTile(
+                    title: const Text('Terms & Conditions'),
+                    trailing: const Icon(Icons.arrow_forward),
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (context) => const TermsConditionsScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+
+            // SECTION 5: Data & Privacy
             _buildSectionHeader('Data & Privacy'),
             Card(
               color: Colors.grey[800],
@@ -429,7 +518,7 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
             const SizedBox(height: 24),
 
-            // SECTION 4: About
+            // SECTION 6: About
             _buildSectionHeader('About'),
             Card(
               color: Colors.grey[800],

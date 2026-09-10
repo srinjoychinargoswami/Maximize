@@ -19,10 +19,13 @@ class ReminderModel {
   final bool isRecurring;
   final ReminderRecurrencePattern? recurrencePattern;
   String? recurrenceRule; // RRULE format for complex patterns
+  final int? recurrenceInterval; // Interval for recurrence (every X days/weeks/months)
+  final List<int>? daysOfWeek; // Days of week for weekly recurrence
   final String? parentReminderId; // For linking recurring instances
   final List<DateTime>? recurrenceExceptionDates; // Dates to skip
   final DateTime? recurrenceEndDate; // When recurrence stops
   final int? recurrenceCount; // Number of occurrences
+  final int? maxOccurrences; // Maximum number of occurrences
 
   ReminderModel({
     String? id,
@@ -37,10 +40,13 @@ class ReminderModel {
     this.isRecurring = false,
     this.recurrencePattern,
     this.recurrenceRule,
+    this.recurrenceInterval,
+    this.daysOfWeek,
     this.parentReminderId,
     this.recurrenceExceptionDates,
     this.recurrenceEndDate,
     this.recurrenceCount,
+    this.maxOccurrences,
   })  : id = id ?? const Uuid().v4(),
         notificationId = notificationId ?? ((DateTime.now().millisecondsSinceEpoch % 2147483647).toString()) {
     // Initialize timestamps
@@ -62,6 +68,7 @@ class ReminderModel {
       updatedAt: data.updatedAt, // ADDED: Map update timestamp
       isRecurring: data.isRecurring ?? false,
       recurrenceRule: data.recurrenceRule,
+      recurrenceInterval: data.recurrenceInterval,
       parentReminderId: data.parentReminderId,
       recurrenceExceptionDates: data.recurrenceExceptionDates,
       recurrenceEndDate: data.recurrenceEndDate,
@@ -79,10 +86,13 @@ class ReminderModel {
         'completedAt': completedAt?.toIso8601String(), // ADDED: Include completion timestamp
         'isRecurring': isRecurring,
         'recurrenceRule': recurrenceRule,
+        'recurrenceInterval': recurrenceInterval,
+        'daysOfWeek': daysOfWeek?.join(','),
         'parentReminderId': parentReminderId,
         'recurrenceExceptionDates': recurrenceExceptionDates?.map((d) => d.toIso8601String()).join(','),
         'recurrenceEndDate': recurrenceEndDate?.toIso8601String(),
         'recurrenceCount': recurrenceCount,
+        'maxOccurrences': maxOccurrences,
       };
 
   factory ReminderModel.fromMap(Map<String, dynamic> map) {
@@ -98,17 +108,22 @@ class ReminderModel {
           : null,
       isRecurring: map['isRecurring'] ?? false,
       recurrenceRule: map['recurrenceRule'],
+      recurrenceInterval: map['recurrenceInterval'],
+      daysOfWeek: map['daysOfWeek'] != null
+          ? map['daysOfWeek'].split(',').map<int>((s) => int.parse(s.trim())).toList()
+          : null,
       parentReminderId: map['parentReminderId'],
-      recurrenceExceptionDates: map['recurrenceExceptionDates'] != null 
+      recurrenceExceptionDates: map['recurrenceExceptionDates'] != null
           ? map['recurrenceExceptionDates'].split(',')
               .where((d) => d.isNotEmpty)
               .map<DateTime>((d) => DateTime.parse(d))
               .toList()
           : null,
-      recurrenceEndDate: map['recurrenceEndDate'] != null 
+      recurrenceEndDate: map['recurrenceEndDate'] != null
           ? DateTime.parse(map['recurrenceEndDate'])
           : null,
       recurrenceCount: map['recurrenceCount'],
+      maxOccurrences: map['maxOccurrences'],
     );
   }
 

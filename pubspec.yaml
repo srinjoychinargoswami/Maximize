@@ -12,9 +12,9 @@ dependencies:
     sdk: flutter
   intl: ^0.19.0
   table_calendar: ^3.0.0
-  isar: ^3.1.0
-  isar_flutter_libs: ^3.1.0
-  path_provider: ^2.0.15
+  drift: ^2.16.0
+  drift_flutter: ^0.2.8
+  sqlite3_flutter_libs: ^0.5.8
   path: ^1.8.3
   json_annotation: ^4.9.0  # Check for the latest version
   json_serializable: ^6.8.0
@@ -50,9 +50,10 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
 
-  # Isar code generation dependencies
-  build_runner: ^2.4.0  # Required for code generation
-  isar_generator: ^3.1.0  # Required for Isar code generation
+  # Drift code generation dependencies
+  drift_dev: ^2.16.0
+  build_runner: ^2.4.0
+  source_gen: ^4.1.0
 
   # The "flutter_lints" package below contains a set of recommended lints to
   # encourage good coding practices. The lint set provided by the package is

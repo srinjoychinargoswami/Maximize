@@ -1,15 +1,7 @@
 import 'package:maximize/models/task_model.dart';
 import 'package:maximize/models/database.dart';
-import 'package:maximize/database/converters/task_converter.dart';
-import 'package:maximize/database/models/isar_models.dart';
 
-TaskModel convertIsarTaskToModel(IsarTask isarTask) {
-  return TaskConverter.toTaskModel(isarTask);
-}
-
-IsarTask convertTaskModelToIsar(TaskModel taskModel) {
-  return TaskConverter.fromTaskModel(taskModel);
-}
+// Conversion utilities for TaskModel
 
 TaskData convertTaskModelToData(TaskModel taskModel) {
   return TaskData(
@@ -38,4 +30,8 @@ TaskData convertTaskModelToData(TaskModel taskModel) {
     reminderTime: taskModel.reminderTime,
     reminderPreset: taskModel.reminderPreset,
   );
+}
+
+TaskModel convertDataToTaskModel(TaskData data) {
+  return TaskModel.fromData(data);
 }

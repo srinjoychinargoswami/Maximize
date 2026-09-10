@@ -1,16 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:maximize/database/app_database_adapter.dart';
 import 'package:maximize/models/subtask_model.dart';
 import 'package:maximize/utils/task_utils.dart';
 import 'package:uuid/uuid.dart';
 import 'package:maximize/models/task_model.dart';
 import 'package:maximize/services/task_service.dart';
+import 'package:provider/provider.dart';
 
 class AddTaskPage extends StatefulWidget {
   final TaskModel? task;
-  final TaskService? taskService;
-  const AddTaskPage({super.key, this.task, this.taskService});
+  const AddTaskPage({super.key, this.task});
 
   @override
   _AddTaskPageState createState() => _AddTaskPageState();
@@ -93,9 +92,9 @@ class _AddTaskPageState extends State<AddTaskPage> {
 
   Future<void> _loadExistingSubtasks() async {
     try {
-      final database = AppDatabase.instance;
-      final existingSubtasks = await database.getAllSubtasks(widget.task!.id);
-      
+      final taskService = Provider.of<TaskService>(context, listen: false);
+      final existingSubtasks = await taskService.getSubtasks(widget.task!.id);
+
       final subtaskModels = existingSubtasks.map((subtaskData) {
         return SubtaskModel(
           id: subtaskData.id,
@@ -813,57 +812,50 @@ class _AddTaskPageState extends State<AddTaskPage> {
 
               if (widget.task != null) {
                 // Update existing task with proper notification handling
-                if (widget.taskService != null) {
-                  // Use TaskService (handles notifications automatically)
-                  await widget.taskService!.updateTask(taskModel);
-                } else {
-                  // Fallback to direct database call
-                  await AppDatabase.instance.updateTask(taskModel);
-                }
-                
+                final taskService = Provider.of<TaskService>(context, listen: false);
+                // Use TaskService (handles notifications automatically)
+                await taskService.updateTask(taskModel);
+
                 // Delete existing subtasks before inserting new ones
-                final existingSubtasks = await AppDatabase.instance.getAllSubtasks(taskModel.id);
+                final existingSubtasks = await taskService.getSubtasks(taskModel.id);
                 for (var existingSubtask in existingSubtasks) {
-                  await AppDatabase.instance.deleteSubtask(existingSubtask.id);
+                  await taskService.deleteSubtask(existingSubtask.id);
                 }
               } else {
                 // Create new task with proper notification handling
-                if (widget.taskService != null) {
-                  // Use TaskService (handles notifications automatically)
-                  await widget.taskService!.addTask(
-                    title: taskModel.title,
-                    description: taskModel.description ?? '',
-                    dueDate: taskModel.dueDate,
-                    completed: taskModel.completed,
-                    category: taskModel.category ?? '',
-                    priority: taskModel.priority,
-                    pageId: taskModel.pageId != null ? int.tryParse(taskModel.pageId!) : null,
-                    completedAt: taskModel.completedAt,
-                    subtasks: taskModel.subtasks,
-                    isRecurring: taskModel.isRecurring ?? false,
-                    recurrenceRule: taskModel.recurrenceRule,
-                    recurrenceInterval: taskModel.recurrenceInterval,
-                    daysOfWeek: taskModel.daysOfWeek,
-                    recurrenceEndDate: taskModel.recurrenceEndDate,
-                    parentTaskId: taskModel.parentTaskId,
-                    maxOccurrences: taskModel.maxOccurrences,
-                    skipWeekends: taskModel.skipWeekends ?? false,
-                    dayOfMonth: taskModel.dayOfMonth,
-                    weekOfMonth: taskModel.weekOfMonth,
-                    reminderEnabled: taskModel.reminderEnabled ?? false,
-                    reminderTime: taskModel.reminderTime,
-                    reminderPreset: taskModel.reminderPreset,
-                  );
-                } else {
-                  // Fallback to direct database call
-                  await AppDatabase.instance.insertTask(taskModel);
-                }
+                final taskService = Provider.of<TaskService>(context, listen: false);
+                // Use TaskService (handles notifications automatically)
+                await taskService.addTask(
+                  title: taskModel.title,
+                  description: taskModel.description ?? '',
+                  dueDate: taskModel.dueDate,
+                  completed: taskModel.completed,
+                  category: taskModel.category ?? '',
+                  priority: taskModel.priority,
+                  pageId: taskModel.pageId != null ? int.tryParse(taskModel.pageId!) : null,
+                  completedAt: taskModel.completedAt,
+                  subtasks: taskModel.subtasks,
+                  isRecurring: taskModel.isRecurring ?? false,
+                  recurrenceRule: taskModel.recurrenceRule,
+                  recurrenceInterval: taskModel.recurrenceInterval,
+                  daysOfWeek: taskModel.daysOfWeek,
+                  recurrenceEndDate: taskModel.recurrenceEndDate,
+                  parentTaskId: taskModel.parentTaskId,
+                  maxOccurrences: taskModel.maxOccurrences,
+                  skipWeekends: taskModel.skipWeekends ?? false,
+                  dayOfMonth: taskModel.dayOfMonth,
+                  weekOfMonth: taskModel.weekOfMonth,
+                  reminderEnabled: taskModel.reminderEnabled ?? false,
+                  reminderTime: taskModel.reminderTime,
+                  reminderPreset: taskModel.reminderPreset,
+                );
               }
 
               // Save all subtasks
+              final taskService = Provider.of<TaskService>(context, listen: false);
               for (var subtask in _subtasks) {
                 final updatedSubtask = subtask.copyWith(taskId: taskModel.id);
-                await AppDatabase.instance.insertSubtask(updatedSubtask);
+                await taskService.insertSubtask(updatedSubtask);
               }
 
               if (mounted) {

@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:fl_chart/fl_chart.dart';
-import 'package:maximize/database/app_database_adapter.dart';
 import 'package:maximize/services/energy_analytics_service.dart';
+import 'package:maximize/database/app_database.dart';
 
 class EnergyInsightsPage extends StatefulWidget {
   final AppDatabase database;
@@ -29,7 +30,7 @@ class _EnergyInsightsPageState extends State<EnergyInsightsPage> {
   @override
   void initState() {
     super.initState();
-    _analyticsService = EnergyAnalyticsService();
+    _analyticsService = context.read<EnergyAnalyticsService>();
     _loadAnalytics();
   }
 

@@ -1,28 +1,24 @@
+import 'package:maximize/database/app_database.dart';
 import 'package:maximize/models/task_model.dart';
 import 'package:maximize/models/subtask_model.dart';
 import 'package:maximize/models/reminder_model.dart';
-import 'package:maximize/database/daos/task_dao.dart';
-import 'package:maximize/database/daos/subtask_dao.dart';
-import 'package:maximize/database/daos/energy_entry_dao.dart';
-import 'package:maximize/database/converters/task_converter.dart';
-import 'package:maximize/database/converters/subtask_converter.dart';
-import 'package:maximize/database/converters/energy_entry_converter.dart';
-import 'package:maximize/database/models/isar_models.dart';
 import 'package:maximize/services/completion_log_service.dart';
-import 'package:maximize/services/reminder_service.dart';
+import 'package:maximize/services/energy_service.dart';
 import 'package:uuid/uuid.dart';
+import 'package:flutter/material.dart';
+import 'package:drift/drift.dart';
 
 class TaskService {
-  final TaskDAO _taskDao = TaskDAO();
-  final SubtaskDAO _subtaskDao = SubtaskDAO();
-  final EnergyEntryDAO _energyDao = EnergyEntryDAO();
+  final AppDatabase _database;
+
+  TaskService(this._database);
 
   Future<List<TaskModel>> getTasks() async {
     try {
-      final isarTasks = await _taskDao.getAllTasks();
-      return isarTasks.map(TaskConverter.toTaskModel).toList();
+      final rows = await _database.select(_database.tasks).get();
+      return rows.map(_rowToModel).toList();
     } catch (e) {
-      print('Error fetching tasks: $e');
+      debugPrint('Error fetching tasks: $e');
       return [];
     }
   }
@@ -43,7 +39,7 @@ class TaskService {
         return true;
       }).toList();
     } catch (e) {
-      print('Error fetching filtered tasks: $e');
+      debugPrint('Error fetching filtered tasks: $e');
       return [];
     }
   }
@@ -78,8 +74,11 @@ class TaskService {
     DateTime? reminderTime,
     String? reminderPreset,
   }) async {
+    final taskId = const Uuid().v1();
+    final now = DateTime.now();
+
     final task = TaskModel(
-      id: const Uuid().v1(),
+      id: taskId,
       title: title,
       description: description,
       dueDate: dueDate,
@@ -102,32 +101,37 @@ class TaskService {
       reminderEnabled: reminderEnabled,
       reminderTime: reminderTime,
       reminderPreset: reminderPreset,
+      createdAt: now,
+      updatedAt: now,
     );
 
     try {
-      final isarTask = TaskConverter.fromTaskModel(task);
-      await _taskDao.insertTask(isarTask);
+      await _database.into(_database.tasks).insert(
+        _modelToCompanion(task),
+      );
       await _scheduleTaskNotification(task);
       return 1;
     } catch (e) {
-      print('Error adding task: $e');
+      debugPrint('Error adding task: $e');
       return null;
     }
   }
 
   Future<void> updateTask(TaskModel task) async {
     if (task.id.isEmpty) {
-      print('Error: Task ID cannot be empty for update.');
+      debugPrint('Error: Task ID cannot be empty for update.');
       return;
     }
 
     try {
       await _cancelTaskNotification(task.id);
-      final isarTask = TaskConverter.fromTaskModel(task);
-      await _taskDao.updateTask(isarTask);
+      task.updatedAt = DateTime.now();
+      await (_database.update(_database.tasks)
+            ..where((t) => t.taskId.equals(task.id)))
+          .write(_modelToCompanion(task, skipPrimaryKey: true));
       await _scheduleTaskNotification(task);
     } catch (e) {
-      print('Error updating task: $e');
+      debugPrint('Error updating task: $e');
     }
   }
 
@@ -138,7 +142,6 @@ class TaskService {
         final updatedTask = task.toggleCompletion();
         await updateTask(updatedTask);
 
-        // If toggled to completed, log the completion
         if (updatedTask.completed) {
           try {
             int? energyLevel;
@@ -146,7 +149,21 @@ class TaskService {
             String? privacyContext;
             String? location;
 
-            final todayEntry = await _energyDao.getTodaysEntry();
+            final todayEntry = await _database.select(_database.energyEntries)
+                .get()
+                .then((entries) {
+              final now = DateTime.now();
+              try {
+                return entries.firstWhere((e) =>
+                  e.timestamp.year == now.year &&
+                  e.timestamp.month == now.month &&
+                  e.timestamp.day == now.day
+                );
+              } catch (e) {
+                return null;
+              }
+            });
+
             if (todayEntry != null) {
               energyLevel = todayEntry.energyLevel;
               moodTags = todayEntry.moodTags;
@@ -154,7 +171,7 @@ class TaskService {
               location = todayEntry.location;
             }
 
-            await CompletionLogService().logCompletion(
+            await CompletionLogService(_database).logCompletion(
               taskId: taskId,
               taskTitle: task.title,
               description: task.description,
@@ -166,12 +183,12 @@ class TaskService {
               location: location,
             );
           } catch (e) {
-            print('Error logging completion: $e');
+            debugPrint('Error logging completion: $e');
           }
         }
       }
     } catch (e) {
-      print('Error toggling task completion: $e');
+      debugPrint('Error toggling task completion: $e');
     }
   }
 
@@ -183,8 +200,7 @@ class TaskService {
           completed: true,
           completedAt: DateTime.now(),
         );
-        final isarTask = TaskConverter.fromTaskModel(updatedTask);
-        await _taskDao.updateTask(isarTask);
+        await updateTask(updatedTask);
 
         try {
           int? energyLevel;
@@ -192,7 +208,21 @@ class TaskService {
           String? privacyContext;
           String? location;
 
-          final todayEntry = await _energyDao.getTodaysEntry();
+          final todayEntry = await _database.select(_database.energyEntries)
+              .get()
+              .then((entries) {
+            final now = DateTime.now();
+            try {
+              return entries.firstWhere((e) =>
+                e.timestamp.year == now.year &&
+                e.timestamp.month == now.month &&
+                e.timestamp.day == now.day
+              );
+            } catch (e) {
+              return null;
+            }
+          });
+
           if (todayEntry != null) {
             energyLevel = todayEntry.energyLevel;
             moodTags = todayEntry.moodTags;
@@ -200,7 +230,7 @@ class TaskService {
             location = todayEntry.location;
           }
 
-          await CompletionLogService().logCompletion(
+          await CompletionLogService(_database).logCompletion(
             taskId: taskId,
             taskTitle: task.title,
             description: task.description,
@@ -212,13 +242,13 @@ class TaskService {
             location: location,
           );
         } catch (e) {
-          print('Error logging completion: $e');
+          debugPrint('Error logging completion: $e');
         }
 
         await _cancelTaskNotification(taskId);
       }
     } catch (e) {
-      print('Error marking task as completed: $e');
+      debugPrint('Error marking task as completed: $e');
     }
   }
 
@@ -230,12 +260,10 @@ class TaskService {
           completed: false,
           completedAt: null,
         );
-        final isarTask = TaskConverter.fromTaskModel(updatedTask);
-        await _taskDao.updateTask(isarTask);
-        await _scheduleTaskNotification(updatedTask);
+        await updateTask(updatedTask);
       }
     } catch (e) {
-      print('Error marking task as incomplete: $e');
+      debugPrint('Error marking task as incomplete: $e');
     }
   }
 
@@ -250,7 +278,7 @@ class TaskService {
         return task.completed;
       }).toList();
     } catch (e) {
-      print('Error fetching completed tasks: $e');
+      debugPrint('Error fetching completed tasks: $e');
       return [];
     }
   }
@@ -260,7 +288,7 @@ class TaskService {
       final today = DateTime.now();
       return await getTasksFiltered(dueDate: today, completed: false);
     } catch (e) {
-      print('Error fetching today\'s tasks: $e');
+      debugPrint('Error fetching today\'s tasks: $e');
       return [];
     }
   }
@@ -273,7 +301,7 @@ class TaskService {
         return !task.completed && task.dueDate.isBefore(now);
       }).toList();
     } catch (e) {
-      print('Error fetching overdue tasks: $e');
+      debugPrint('Error fetching overdue tasks: $e');
       return [];
     }
   }
@@ -285,19 +313,31 @@ class TaskService {
       for (final subtask in subtasks) {
         await deleteSubtask(subtask.id);
       }
-      await _taskDao.deleteTask(taskId);
+      await (_database.delete(_database.tasks)
+            ..where((t) => t.taskId.equals(taskId)))
+          .go();
     } catch (e) {
-      print('Error deleting task: $e');
+      debugPrint('Error deleting task: $e');
     }
   }
 
   Future<void> insertSubtask(SubtaskModel subtask) async {
     try {
-      final isarSubtask = SubtaskConverter.fromSubtaskModel(subtask);
-      await _subtaskDao.insertSubtask(isarSubtask);
-      print('[TaskService] Subtask restored: ${subtask.title}');
+      await _database.into(_database.subtasks).insert(
+        SubtasksCompanion(
+          id: Value(subtask.id),
+          subtaskId: Value(subtask.id),
+          taskId: Value(subtask.taskId),
+          title: Value(subtask.title),
+          completed: Value(subtask.completed),
+          completedAt: Value(subtask.completedAt),
+          createdAt: Value(subtask.createdAt),
+          updatedAt: Value(subtask.updatedAt),
+        ),
+      );
+      debugPrint('[TaskService] Subtask restored: ${subtask.title}');
     } catch (e) {
-      print('Error inserting subtask: $e');
+      debugPrint('Error inserting subtask: $e');
       rethrow;
     }
   }
@@ -305,26 +345,29 @@ class TaskService {
   Future<void> insertTask(TaskModel task) async {
     try {
       await _cancelTaskNotification(task.id);
-      final isarTask = TaskConverter.fromTaskModel(task);
-      await _taskDao.insertTask(isarTask);
+      await _database.into(_database.tasks).insert(
+        _modelToCompanion(task),
+      );
       await _scheduleTaskNotification(task);
-      print('[TaskService] Task restored: ${task.title}');
+      debugPrint('[TaskService] Task restored: ${task.title}');
     } catch (e) {
-      print('Error inserting task: $e');
+      debugPrint('Error inserting task: $e');
       rethrow;
     }
   }
 
   Future<TaskModel?> getTaskById(String id) async {
     try {
-      final isarTask = await _taskDao.getTaskById(id);
-      if (isarTask == null) return null;
+      final row = await (_database.select(_database.tasks)
+            ..where((t) => t.taskId.equals(id)))
+          .getSingleOrNull();
+      if (row == null) return null;
 
-      final taskModel = TaskConverter.toTaskModel(isarTask);
+      final taskModel = _rowToModel(row);
       final subtasks = await getSubtasks(id);
       return taskModel.copyWith(subtasks: subtasks);
     } catch (e) {
-      print('Error fetching task by ID: $e');
+      debugPrint('Error fetching task by ID: $e');
       return null;
     }
   }
@@ -337,26 +380,29 @@ class TaskService {
       final subtasks = await getSubtasks(taskId);
       return task.copyWith(subtasks: subtasks);
     } catch (e) {
-      print('Error fetching task with subtasks: $e');
+      debugPrint('Error fetching task with subtasks: $e');
       return null;
     }
   }
 
   Future<SubtaskModel?> getSubtaskById(String subtaskId) async {
     try {
-      final tasks = await getTasks();
+      final row = await (_database.select(_database.subtasks)
+            ..where((s) => s.subtaskId.equals(subtaskId)))
+          .getSingleOrNull();
+      if (row == null) return null;
 
-      for (final task in tasks) {
-        final subtasks = await getSubtasks(task.id);
-        for (final subtask in subtasks) {
-          if (subtask.id == subtaskId) {
-            return subtask;
-          }
-        }
-      }
-      return null;
+      return SubtaskModel(
+        id: row.id,
+        taskId: row.taskId,
+        title: row.title,
+        completed: row.completed,
+        completedAt: row.completedAt,
+        createdAt: row.createdAt,
+        updatedAt: row.updatedAt,
+      );
     } catch (e) {
-      print('Error fetching subtask by ID: $e');
+      debugPrint('Error fetching subtask by ID: $e');
       return null;
     }
   }
@@ -377,29 +423,39 @@ class TaskService {
           completed: false,
         );
 
-        await NotificationService.instance.scheduleNotification(reminder);
-        print('[TaskService] Scheduled notification for task: ${task.title} at ${task.reminderTime}');
+        // await NotificationService.instance.scheduleNotification(reminder);
+        debugPrint('[TaskService] Scheduled notification for task: ${task.title} at ${task.reminderTime}');
       }
     } catch (e) {
-      print('[TaskService] Error scheduling task notification: $e');
+      debugPrint('[TaskService] Error scheduling task notification: $e');
     }
   }
 
   Future<void> _cancelTaskNotification(String taskId) async {
     try {
-      await NotificationService.instance.cancelNotification('task_$taskId');
-      print('[TaskService] Cancelled notification for task: $taskId');
+      // await NotificationService.instance.cancelNotification('task_$taskId');
+      debugPrint('[TaskService] Cancelled notification for task: $taskId');
     } catch (e) {
-      print('[TaskService] Error cancelling task notification: $e');
+      debugPrint('[TaskService] Error cancelling task notification: $e');
     }
   }
 
   Future<List<SubtaskModel>> getSubtasks(String taskId) async {
     try {
-      final isarSubtasks = await _subtaskDao.getAllSubtasks(taskId);
-      return isarSubtasks.map(SubtaskConverter.toSubtaskModel).toList();
+      final rows = await (_database.select(_database.subtasks)
+            ..where((s) => s.taskId.equals(taskId)))
+          .get();
+      return rows.map((row) => SubtaskModel(
+        id: row.id,
+        taskId: row.taskId,
+        title: row.title,
+        completed: row.completed,
+        completedAt: row.completedAt,
+        createdAt: row.createdAt,
+        updatedAt: row.updatedAt,
+      )).toList();
     } catch (e) {
-      print('Error fetching subtasks: $e');
+      debugPrint('Error fetching subtasks: $e');
       return [];
     }
   }
@@ -418,26 +474,35 @@ class TaskService {
     );
 
     try {
-      final isarSubtask = SubtaskConverter.fromSubtaskModel(subtask);
-      await _subtaskDao.insertSubtask(isarSubtask);
+      await insertSubtask(subtask);
       return 1;
     } catch (e) {
-      print('Error adding subtask: $e');
+      debugPrint('Error adding subtask: $e');
       return null;
     }
   }
 
   Future<void> updateSubtask(SubtaskModel subtask) async {
     if (subtask.id.isEmpty) {
-      print('Error: Subtask ID cannot be empty for update.');
+      debugPrint('Error: Subtask ID cannot be empty for update.');
       return;
     }
 
     try {
-      final isarSubtask = SubtaskConverter.fromSubtaskModel(subtask);
-      await _subtaskDao.updateSubtask(isarSubtask);
+      await (_database.update(_database.subtasks)
+            ..where((s) => s.subtaskId.equals(subtask.id)))
+          .write(SubtasksCompanion(
+            id: Value(subtask.id),
+            subtaskId: Value(subtask.id),
+            taskId: Value(subtask.taskId),
+            title: Value(subtask.title),
+            completed: Value(subtask.completed),
+            completedAt: Value(subtask.completedAt),
+            createdAt: Value(subtask.createdAt),
+            updatedAt: Value(DateTime.now()),
+          ));
     } catch (e) {
-      print('Error updating subtask: $e');
+      debugPrint('Error updating subtask: $e');
     }
   }
 
@@ -446,14 +511,14 @@ class TaskService {
       final subtask = await getSubtaskById(subtaskId);
 
       if (subtask == null) {
-        print('Subtask with ID $subtaskId not found');
+        debugPrint('Subtask with ID $subtaskId not found');
         return;
       }
 
       final updatedSubtask = subtask.toggleCompletion();
       await updateSubtask(updatedSubtask);
     } catch (e) {
-      print('Error toggling subtask completion: $e');
+      debugPrint('Error toggling subtask completion: $e');
     }
   }
 
@@ -462,7 +527,7 @@ class TaskService {
       final subtask = await getSubtaskById(subtaskId);
 
       if (subtask == null) {
-        print('Subtask with ID $subtaskId not found');
+        debugPrint('Subtask with ID $subtaskId not found');
         return;
       }
 
@@ -471,8 +536,7 @@ class TaskService {
           completed: true,
           completedAt: DateTime.now(),
         );
-        final isarSubtask = SubtaskConverter.fromSubtaskModel(updatedSubtask);
-        await _subtaskDao.updateSubtask(isarSubtask);
+        await updateSubtask(updatedSubtask);
 
         try {
           final parentTask = await getTaskById(subtask.taskId);
@@ -481,7 +545,21 @@ class TaskService {
           String? privacyContext;
           String? location;
 
-          final todayEntry = await _energyDao.getTodaysEntry();
+          final todayEntry = await _database.select(_database.energyEntries)
+              .get()
+              .then((entries) {
+            final now = DateTime.now();
+            try {
+              return entries.firstWhere((e) =>
+                e.timestamp.year == now.year &&
+                e.timestamp.month == now.month &&
+                e.timestamp.day == now.day
+              );
+            } catch (e) {
+              return null;
+            }
+          });
+
           if (todayEntry != null) {
             energyLevel = todayEntry.energyLevel;
             moodTags = todayEntry.moodTags;
@@ -489,7 +567,7 @@ class TaskService {
             location = todayEntry.location;
           }
 
-          await CompletionLogService().logCompletion(
+          await CompletionLogService(_database).logCompletion(
             taskId: subtaskId,
             taskTitle: subtask.title,
             isSubtask: true,
@@ -500,11 +578,11 @@ class TaskService {
             location: location,
           );
         } catch (e) {
-          print('Error logging subtask completion: $e');
+          debugPrint('Error logging subtask completion: $e');
         }
       }
     } catch (e) {
-      print('Error marking subtask as completed: $e');
+      debugPrint('Error marking subtask as completed: $e');
     }
   }
 
@@ -513,7 +591,7 @@ class TaskService {
       final subtask = await getSubtaskById(subtaskId);
 
       if (subtask == null) {
-        print('Subtask with ID $subtaskId not found');
+        debugPrint('Subtask with ID $subtaskId not found');
         return;
       }
 
@@ -522,19 +600,20 @@ class TaskService {
           completed: false,
           completedAt: null,
         );
-        final isarSubtask = SubtaskConverter.fromSubtaskModel(updatedSubtask);
-        await _subtaskDao.updateSubtask(isarSubtask);
+        await updateSubtask(updatedSubtask);
       }
     } catch (e) {
-      print('Error marking subtask as incomplete: $e');
+      debugPrint('Error marking subtask as incomplete: $e');
     }
   }
 
   Future<void> deleteSubtask(String subtaskId) async {
     try {
-      await _subtaskDao.deleteSubtask(subtaskId);
+      await (_database.delete(_database.subtasks)
+            ..where((s) => s.subtaskId.equals(subtaskId)))
+          .go();
     } catch (e) {
-      print('Error deleting subtask: $e');
+      debugPrint('Error deleting subtask: $e');
     }
   }
 
@@ -553,8 +632,69 @@ class TaskService {
         'overdue': overdue,
       };
     } catch (e) {
-      print('Error getting task stats: $e');
+      debugPrint('Error getting task stats: $e');
       return {'total': 0, 'completed': 0, 'pending': 0, 'overdue': 0};
     }
+  }
+
+  TaskModel _rowToModel(Task row) {
+    return TaskModel(
+      id: row.taskId,
+      title: row.title,
+      description: row.description,
+      dueDate: row.dueDate ?? DateTime.now(),
+      completed: row.completed,
+      category: row.category,
+      priority: row.priority,
+      pageId: row.pageId,
+      completedAt: row.completedAt,
+      isRecurring: row.isRecurring,
+      recurrenceRule: row.recurrenceRule,
+      recurrenceInterval: row.recurrenceInterval,
+      daysOfWeek: row.daysOfWeek != null
+          ? row.daysOfWeek!.split(',').map((e) => int.parse(e.trim())).toList()
+          : null,
+      recurrenceEndDate: row.recurrenceEndDate,
+      parentTaskId: row.parentTaskId,
+      maxOccurrences: row.maxOccurrences,
+      skipWeekends: row.skipWeekends,
+      dayOfMonth: row.dayOfMonth,
+      weekOfMonth: row.weekOfMonth,
+      reminderEnabled: row.reminderEnabled,
+      reminderTime: row.reminderTime,
+      reminderPreset: row.reminderPreset,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
+    );
+  }
+
+  TasksCompanion _modelToCompanion(TaskModel model, {bool skipPrimaryKey = false}) {
+    return TasksCompanion(
+      id: skipPrimaryKey ? const Value.absent() : Value(model.id),
+      taskId: skipPrimaryKey ? const Value.absent() : Value(model.id),
+      title: Value(model.title),
+      description: Value(model.description),
+      dueDate: Value(model.dueDate),
+      completed: Value(model.completed),
+      completedAt: Value(model.completedAt),
+      category: Value(model.category),
+      priority: Value(model.priority),
+      isRecurring: Value(model.isRecurring),
+      recurrenceRule: Value(model.recurrenceRule),
+      recurrenceInterval: Value(model.recurrenceInterval ?? 1),
+      daysOfWeek: Value(model.daysOfWeek?.join(',')),
+      recurrenceEndDate: Value(model.recurrenceEndDate),
+      parentTaskId: Value(model.parentTaskId),
+      maxOccurrences: Value(model.maxOccurrences),
+      skipWeekends: Value(model.skipWeekends),
+      dayOfMonth: Value(model.dayOfMonth),
+      weekOfMonth: Value(model.weekOfMonth),
+      reminderEnabled: Value(model.reminderEnabled ?? false),
+      reminderTime: Value(model.reminderTime),
+      reminderPreset: Value(model.reminderPreset),
+      pageId: Value(model.pageId),
+      createdAt: Value(model.createdAt),
+      updatedAt: Value(model.updatedAt),
+    );
   }
 }

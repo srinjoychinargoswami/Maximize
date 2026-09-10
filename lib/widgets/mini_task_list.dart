@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:maximize/services/task_service.dart';
 import 'package:maximize/models/task_model.dart';
 import 'package:maximize/widgets/task_widget.dart';
+import 'package:provider/provider.dart';
 
 class MiniTaskList extends StatefulWidget {
   const MiniTaskList({super.key});
@@ -12,20 +13,21 @@ class MiniTaskList extends StatefulWidget {
 
 class _MiniTaskListState extends State<MiniTaskList> {
   List<TaskModel> _tasks = [];
-  late final TaskService _taskService;
 
   @override
   void initState() {
     super.initState();
-    _taskService = TaskService();
     _loadTasks();
   }
 
   Future<void> _loadTasks() async {
-    final tasks = await _taskService.getTasks();
-    setState(() {
-      _tasks = tasks.take(5).toList();
-    });
+    final taskService = Provider.of<TaskService>(context, listen: false);
+    final tasks = await taskService.getTasks();
+    if (mounted) {
+      setState(() {
+        _tasks = tasks.take(5).toList();
+      });
+    }
   }
 
   @override

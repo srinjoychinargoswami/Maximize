@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:maximize/database/app_database_adapter.dart';
+import 'package:provider/provider.dart';
 import 'package:maximize/models/task_model.dart';
-import 'package:maximize/models/event_model.dart';
+import 'package:maximize/models/event_model.dart' as event_model;
 import 'package:maximize/models/note_model.dart';
 import 'package:maximize/models/reminder_model.dart';
+import 'package:maximize/services/task_service.dart';
+import 'package:maximize/services/event_service.dart';
+import 'package:maximize/services/note_service.dart';
+import 'package:maximize/services/reminder_service.dart';
 
 class SearchPage extends StatefulWidget {
-  final AppDatabase database;
-  const SearchPage({Key? key, required this.database}) : super(key: key);
+  const SearchPage({Key? key}) : super(key: key);
 
   @override
   SearchPageState createState() => SearchPageState();
@@ -18,7 +21,7 @@ class SearchPageState extends State<SearchPage> {
   String query = '';
   bool isSearching = false;
   List<TaskModel> matchedTasks = [];
-  List<Event> matchedEvents = [];
+  List<event_model.Event> matchedEvents = [];
   List<NoteModel> matchedNotes = [];
   List<ReminderModel> matchedReminders = [];
 
@@ -36,15 +39,20 @@ class SearchPageState extends State<SearchPage> {
     setState(() => isSearching = true);
 
     try {
+      final taskService = Provider.of<TaskService>(context, listen: false);
+      final eventService = Provider.of<EventService>(context, listen: false);
+      final reminderService = Provider.of<ReminderService>(context, listen: false);
+      final noteService = Provider.of<NoteService>(context, listen: false);
+
       final futures = await Future.wait([
-        widget.database.getAllTasks(),
-        widget.database.getAllEvents(),
-        widget.database.getAllReminders(),
-        widget.database.getAllNotes(),
+        taskService.getTasks(),
+        eventService.getAllEvents(),
+        reminderService.getReminders(),
+        noteService.getNotes(),
       ]);
 
       final tasks = futures[0] as List<TaskModel>;
-      final events = futures[1] as List<Event>;
+      final events = futures[1] as List<event_model.Event>;
       final reminders = futures[2] as List<ReminderModel>;
       final notes = futures[3] as List<NoteModel>;
 
@@ -199,7 +207,7 @@ class SearchPageState extends State<SearchPage> {
     );
   }
 
-  Widget _buildEventTile(Event event) {
+  Widget _buildEventTile(event_model.Event event) {
     return ListTile(
       leading: CircleAvatar(backgroundColor: Colors.green, child: Icon(Icons.event, color: Colors.white)),
       title: Text(event.title),
@@ -207,10 +215,9 @@ class SearchPageState extends State<SearchPage> {
                      '${DateFormat('h:mm a').format(event.startDateTime)}'),
       onTap: () {
         Navigator.pop(context, {
-          'type': 'event', 
+          'type': 'event',
           'id': event.id,
           'title': event.title,
-
         });
       }
     );

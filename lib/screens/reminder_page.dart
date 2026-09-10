@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:flutter/gestures.dart';
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:maximize/models/reminder_model.dart';
-import 'package:maximize/database/app_database_adapter.dart';
 import 'package:maximize/services/reminder_service.dart';
+import 'package:maximize/services/notification_service.dart';
 import 'package:maximize/services/firebase_realtime_sync_service.dart';
+import 'package:maximize/database/app_database.dart';
 
 // CustomScrollBehavior to fix RefreshIndicator on Windows desktop
 class CustomScrollBehavior extends ScrollBehavior {
@@ -46,7 +48,7 @@ class ReminderPageState extends State<ReminderPage> {
     super.initState();
     tz.initializeTimeZones();
     _notificationService = NotificationService.instance;
-    _reminderService = ReminderService();
+    _reminderService = context.read<ReminderService>();
     _initializeNotificationService();
     _loadRemindersFromDatabase();
 

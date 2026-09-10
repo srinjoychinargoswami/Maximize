@@ -14,14 +14,16 @@ import 'package:maximize/services/task_service.dart';
 import 'package:maximize/services/reminder_service.dart';
 import 'package:maximize/services/note_service.dart';
 import 'package:maximize/services/energy_service.dart';
+import 'package:maximize/services/completion_log_service.dart';
 import 'package:maximize/services/metrics_service.dart';
+import 'package:maximize/database/app_database.dart' as db;
 import 'package:maximize/models/task_model.dart';
 import 'package:maximize/models/subtask_model.dart';
-import 'package:maximize/models/event_model.dart';
+import 'package:maximize/models/event_model.dart' as event_model;
 import 'package:maximize/models/reminder_model.dart';
 import 'package:maximize/models/energy_model.dart';
-import 'package:maximize/database/app_database_adapter.dart';
 import 'package:flutter/gestures.dart';
+import 'package:provider/provider.dart';
 
 /* HOME PAGE – Drawer, Bottom Nav, and IndexedStack */
 
@@ -43,14 +45,11 @@ class _MyHomePageState extends State<MyHomePage> {
   final GlobalKey<NotesPageState> _notesKey = GlobalKey<NotesPageState>();
   final GlobalKey<ReminderPageState> _remindersKey = GlobalKey<ReminderPageState>();
 
-  late final CalendarService _calendarService;
-  late final NoteService _noteService;
-
   void _navigateToSearch() {
   Navigator.push(
     context,
     MaterialPageRoute(
-      builder: (context) => SearchPage(database: AppDatabase.instance),
+      builder: (context) => const SearchPage(),
     ),
   ).then((result) {
     if (result == null || result is! Map<String, dynamic>) return;
@@ -108,16 +107,17 @@ class _MyHomePageState extends State<MyHomePage> {
   @override
   void initState() {
     super.initState();
-    _calendarService = CalendarService();
-    _noteService = NoteService();
-    // Initialize screens with keys
+    // Initialize screens with keys - services are provided via Provider
+    final database = context.read<db.AppDatabase>();
+    final calendarService = context.read<CalendarService>();
+    final noteService = context.read<NoteService>();
     _screens = [
       OverviewPage(key: _overviewKey),
-      TaskListScreen(key: _tasksKey, database: AppDatabase.instance),
-      CalendarPage(key: _calendarKey, calendarService: _calendarService),
-      NotesPage(key: _notesKey, noteService: _noteService),
-      ReminderPage(key: _remindersKey, database: AppDatabase.instance),
-      EnergyInsightsPage(database: AppDatabase.instance),
+      TaskListScreen(key: _tasksKey, database: database),
+      CalendarPage(key: _calendarKey, calendarService: calendarService),
+      NotesPage(key: _notesKey, noteService: noteService),
+      ReminderPage(key: _remindersKey, database: database),
+      EnergyInsightsPage(database: database),
     ];
   }
 
@@ -274,10 +274,10 @@ class _OverviewPageState extends State<OverviewPage> {
   @override
   void initState() {
     super.initState();
-    _taskService = TaskService();
-    _calendarService = CalendarService();
-    _reminderService = ReminderService();
-    _energyService = EnergyService();
+    _taskService = context.read<TaskService>();
+    _calendarService = context.read<CalendarService>();
+    _reminderService = context.read<ReminderService>();
+    _energyService = context.read<EnergyService>();
   }
 
   // UPDATED: Made public so parent can call it
@@ -291,7 +291,7 @@ class _OverviewPageState extends State<OverviewPage> {
   }
 
   Widget _statsSection() {
-    final metricsService = MetricsService();
+    final metricsService = context.read<MetricsService>();
 
     return SingleChildScrollView(
       scrollDirection: Axis.vertical,
@@ -643,7 +643,7 @@ class _OverviewPageState extends State<OverviewPage> {
   SizedBox _eventSection(DateTime today) {
     return SizedBox(
       height: 200,
-      child: FutureBuilder<List<Event>>(
+      child: FutureBuilder<List<event_model.Event>>(
         future: _calendarService.getTodaysEvents(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
@@ -924,10 +924,11 @@ class _EnergyStatusWidgetState extends State<_EnergyStatusWidget> {
   }
 
   Future<void> _openEnergyPage() async {
+    final database = context.read<db.AppDatabase>();
     final result = await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => EnergyPage(database: AppDatabase.instance),
+        builder: (context) => EnergyPage(database: database),
       ),
     );
 

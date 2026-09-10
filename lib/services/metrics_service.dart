@@ -1,18 +1,15 @@
-import 'package:maximize/database/daos/task_dao.dart';
-import 'package:maximize/database/converters/task_converter.dart';
+import 'package:maximize/database/app_database.dart';
 import 'package:maximize/services/completion_log_service.dart';
 
 class MetricsService {
-  static final MetricsService _instance = MetricsService._();
-  factory MetricsService() => _instance;
-  MetricsService._();
+  final AppDatabase _database;
+  final CompletionLogService _completionLog;
 
-  final _taskDao = TaskDAO();
-  final completionLog = CompletionLogService();
+  MetricsService(this._database, this._completionLog);
 
   Future<int> getTotalDone() async {
     try {
-      final logs = await completionLog.getAllCompletions();
+      final logs = await _completionLog.getAllCompletions();
       return logs.length;
     } catch (e) {
       print('Error fetching total done: $e');
@@ -22,7 +19,7 @@ class MetricsService {
 
   Future<int> getThisWeekDone() async {
     try {
-      final logs = await completionLog.getThisWeekCompletions();
+      final logs = await _completionLog.getThisWeekCompletions();
       return logs.length;
     } catch (e) {
       print('Error fetching this week done: $e');
@@ -32,7 +29,7 @@ class MetricsService {
 
   Future<int> getStreak() async {
     try {
-      final logs = await completionLog.getAllCompletions();
+      final logs = await _completionLog.getAllCompletions();
       if (logs.isEmpty) return 0;
 
       logs.sort((a, b) => b.completedAt.compareTo(a.completedAt));
@@ -62,7 +59,7 @@ class MetricsService {
 
   Future<int> getTotalTasks() async {
     try {
-      final tasks = await _taskDao.getAllTasks();
+      final tasks = await _database.select(_database.tasks).get();
       return tasks.length;
     } catch (e) {
       print('Error fetching total tasks: $e');
@@ -72,7 +69,7 @@ class MetricsService {
 
   Future<int> getCompletedTasks() async {
     try {
-      final tasks = await _taskDao.getAllTasks();
+      final tasks = await _database.select(_database.tasks).get();
       return tasks.where((t) => t.completed).length;
     } catch (e) {
       print('Error fetching completed tasks: $e');
@@ -82,7 +79,7 @@ class MetricsService {
 
   Future<int> getUncompletedTasks() async {
     try {
-      final tasks = await _taskDao.getAllTasks();
+      final tasks = await _database.select(_database.tasks).get();
       return tasks.where((t) => !t.completed).length;
     } catch (e) {
       print('Error fetching uncompleted tasks: $e');
@@ -92,7 +89,7 @@ class MetricsService {
 
   Future<String> getPeakCompletionWindow() async {
     try {
-      final hourCounts = await completionLog.getCompletionsByHour();
+      final hourCounts = await _completionLog.getCompletionsByHour();
 
       int maxCount = 0;
       int peakHour = 0;
@@ -114,7 +111,7 @@ class MetricsService {
 
   Future<double> getAverageEnergyAtCompletion() async {
     try {
-      final logs = await completionLog.getAllCompletions();
+      final logs = await _completionLog.getAllCompletions();
       final withEnergy = logs.where((l) => l.energyLevel != null).toList();
 
       if (withEnergy.isEmpty) return 0;

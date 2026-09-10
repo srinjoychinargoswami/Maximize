@@ -1,14 +1,13 @@
+import 'package:maximize/database/app_database.dart';
+import 'package:maximize/models/completion_log_model.dart';
 import 'package:uuid/uuid.dart';
-import 'package:maximize/database/daos/completion_log_dao.dart';
-import 'package:maximize/database/converters/completion_log_converter.dart';
-import 'package:maximize/models/database.dart';
+import 'package:flutter/material.dart';
+import 'package:drift/drift.dart';
 
 class CompletionLogService {
-  static final CompletionLogService _instance = CompletionLogService._();
-  factory CompletionLogService() => _instance;
-  CompletionLogService._();
+  final AppDatabase _database;
 
-  final _dao = CompletionLogDAO();
+  CompletionLogService(this._database);
 
   Future<void> logCompletion({
     required String taskId,
@@ -23,60 +22,64 @@ class CompletionLogService {
     String? privacyContext,
     String? location,
   }) async {
-    try {
-      final now = DateTime.now();
-      final logData = CompletionLogData(
-        id: const Uuid().v1(),
-        taskId: taskId,
-        taskTitle: taskTitle,
-        description: description,
-        category: category,
-        priority: priority,
-        isSubtask: isSubtask,
-        parentTaskTitle: parentTaskTitle,
-        completedAt: now,
-        energyLevel: energyLevel,
-        moodTags: moodTags,
-        privacyContext: privacyContext,
-        location: location,
-        createdAt: now,
-        updatedAt: now,
-      );
+    final logId = const Uuid().v4();
+    final now = DateTime.now();
 
-      final isarLog = CompletionLogConverter.fromCompletionLogData(logData);
-      await _dao.insertCompletionLog(isarLog);
+    try {
+      await _database.into(_database.completionLogs).insert(
+        CompletionLogsCompanion(
+          id: Value(logId),
+          logId: Value(logId),
+          taskId: Value(taskId),
+          taskTitle: Value(taskTitle),
+          description: Value(description),
+          category: Value(category),
+          priority: Value(priority),
+          completedAt: Value(now),
+          isSubtask: Value(isSubtask),
+          parentTaskTitle: Value(parentTaskTitle),
+          energyLevel: Value(energyLevel),
+          moodTags: Value(moodTags),
+          privacyContext: Value(privacyContext),
+          location: Value(location),
+          createdAt: Value(now),
+        ),
+      );
     } catch (e) {
-      print('Error logging completion: $e');
-      rethrow;
+      debugPrint('Error logging completion: $e');
     }
   }
 
-  Future<List<CompletionLogData>> getAllCompletions() async {
+  Future<List<CompletionLogModel>> getAllCompletions() async {
     try {
-      final logs = await _dao.getAllCompletionLogs();
-      return logs.map((l) => CompletionLogConverter.toCompletionLogData(l)).toList();
+      final rows = await _database.select(_database.completionLogs).get();
+      return rows.map(_rowToModel).toList();
     } catch (e) {
-      print('Error fetching all completions: $e');
+      debugPrint('Error fetching all completions: $e');
       return [];
     }
   }
 
-  Future<List<CompletionLogData>> getThisWeekCompletions() async {
+  Future<List<CompletionLogModel>> getThisWeekCompletions() async {
     try {
-      final logs = await _dao.getCompletionLogsThisWeek();
-      return logs.map((l) => CompletionLogConverter.toCompletionLogData(l)).toList();
+      final now = DateTime.now();
+      final weekAgo = now.subtract(const Duration(days: 7));
+      final rows = await _database.select(_database.completionLogs).get();
+      return rows
+          .where((r) => r.completedAt.isAfter(weekAgo) && r.completedAt.isBefore(now))
+          .map(_rowToModel)
+          .toList();
     } catch (e) {
-      print('Error fetching this week completions: $e');
+      debugPrint('Error fetching this week completions: $e');
       return [];
     }
   }
 
   Future<void> clearAllCompletionLogs() async {
     try {
-      await _dao.deleteAllCompletionLogs();
+      await _database.delete(_database.completionLogs).go();
     } catch (e) {
-      print('Error clearing completion logs: $e');
-      rethrow;
+      debugPrint('Error clearing completion logs: $e');
     }
   }
 
@@ -95,8 +98,28 @@ class CompletionLogService {
 
       return hourCounts;
     } catch (e) {
-      print('Error calculating completions by hour: $e');
+      debugPrint('Error calculating completions by hour: $e');
       return {};
     }
+  }
+
+  CompletionLogModel _rowToModel(CompletionLog row) {
+    return CompletionLogModel(
+      id: row.id,
+      logId: row.logId,
+      taskId: row.taskId,
+      taskTitle: row.taskTitle,
+      description: row.description,
+      category: row.category,
+      priority: row.priority,
+      completedAt: row.completedAt,
+      isSubtask: row.isSubtask,
+      parentTaskTitle: row.parentTaskTitle,
+      energyLevel: row.energyLevel,
+      moodTags: row.moodTags,
+      privacyContext: row.privacyContext,
+      location: row.location,
+      createdAt: row.createdAt,
+    );
   }
 }

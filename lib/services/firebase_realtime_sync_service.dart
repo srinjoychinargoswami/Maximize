@@ -6,8 +6,9 @@ import 'package:maximize/models/reminder_model.dart';
 import 'package:maximize/models/note_model.dart';
 import 'package:maximize/models/energy_entry.dart';
 import 'package:maximize/config/app_config.dart';
-import 'package:maximize/services/reminder_service.dart' show NotificationService;
+import 'package:maximize/services/notification_service.dart';
 import 'package:maximize/services/encryption_service.dart';
+import 'package:maximize/services/database_encryption_service.dart';
 
 class FirebaseRealtimeSyncService {
   static final FirebaseRealtimeSyncService _instance =
@@ -65,6 +66,7 @@ class FirebaseRealtimeSyncService {
 
       if (AppConfig.debugLogging) {
         print('[Firebase] Initialized with user: $_currentUserId');
+        print('[Firebase] Platform: ${DatabaseEncryptionService.instance.getPlatformType()}');
       }
     } catch (e) {
       if (AppConfig.debugLogging) {
@@ -80,9 +82,17 @@ class FirebaseRealtimeSyncService {
       final taskJson = task.toJson();
       final encryptedPayload = await EncryptionService.instance.encryptPayload(taskJson);
 
-      await _tasksRef.child(task.id).set(encryptedPayload);
+      // Add platform info to sync metadata
+      final platformType = DatabaseEncryptionService.instance.getPlatformType();
+      final syncPayload = {
+        ...encryptedPayload,
+        'platform': platformType,
+        'syncTimestamp': DateTime.now().toIso8601String(),
+      };
+
+      await _tasksRef.child(task.id).set(syncPayload);
       if (AppConfig.debugLogging) {
-        print('[Firebase] Task synced (encrypted): ${task.id}');
+        print('[Firebase] Task synced (encrypted) from $platformType: ${task.id}');
       }
     } catch (e) {
       if (AppConfig.debugLogging) {
@@ -98,9 +108,17 @@ class FirebaseRealtimeSyncService {
       final eventMap = event.toMap();
       final encryptedPayload = await EncryptionService.instance.encryptPayload(eventMap);
 
-      await _eventsRef.child(event.id).set(encryptedPayload);
+      // Add platform info to sync metadata
+      final platformType = DatabaseEncryptionService.instance.getPlatformType();
+      final syncPayload = {
+        ...encryptedPayload,
+        'platform': platformType,
+        'syncTimestamp': DateTime.now().toIso8601String(),
+      };
+
+      await _eventsRef.child(event.id).set(syncPayload);
       if (AppConfig.debugLogging) {
-        print('[Firebase] Event synced (encrypted): ${event.id}');
+        print('[Firebase] Event synced (encrypted) from $platformType: ${event.id}');
       }
     } catch (e) {
       if (AppConfig.debugLogging) {
@@ -116,9 +134,17 @@ class FirebaseRealtimeSyncService {
       final reminderMap = reminder.toMap();
       final encryptedPayload = await EncryptionService.instance.encryptPayload(reminderMap);
 
-      await _remindersRef.child(reminder.id).set(encryptedPayload);
+      // Add platform info to sync metadata
+      final platformType = DatabaseEncryptionService.instance.getPlatformType();
+      final syncPayload = {
+        ...encryptedPayload,
+        'platform': platformType,
+        'syncTimestamp': DateTime.now().toIso8601String(),
+      };
+
+      await _remindersRef.child(reminder.id).set(syncPayload);
       if (AppConfig.debugLogging) {
-        print('[Firebase] Reminder synced (encrypted): ${reminder.id}');
+        print('[Firebase] Reminder synced (encrypted) from $platformType: ${reminder.id}');
       }
     } catch (e) {
       if (AppConfig.debugLogging) {
@@ -143,9 +169,17 @@ class FirebaseRealtimeSyncService {
       };
       final encryptedPayload = await EncryptionService.instance.encryptPayload(noteData);
 
-      await _notesRef.child(note.id).set(encryptedPayload);
+      // Add platform info to sync metadata
+      final platformType = DatabaseEncryptionService.instance.getPlatformType();
+      final syncPayload = {
+        ...encryptedPayload,
+        'platform': platformType,
+        'syncTimestamp': DateTime.now().toIso8601String(),
+      };
+
+      await _notesRef.child(note.id).set(syncPayload);
       if (AppConfig.debugLogging) {
-        print('[Firebase] Note synced (encrypted): ${note.id}');
+        print('[Firebase] Note synced (encrypted) from $platformType: ${note.id}');
       }
     } catch (e) {
       if (AppConfig.debugLogging) {
@@ -471,9 +505,17 @@ class FirebaseRealtimeSyncService {
       final entryJson = entry.toJson();
       final encryptedPayload = await EncryptionService.instance.encryptPayload(entryJson);
 
-      await _energyEntriesRef.child(entry.id).set(encryptedPayload);
+      // Add platform info to sync metadata
+      final platformType = DatabaseEncryptionService.instance.getPlatformType();
+      final syncPayload = {
+        ...encryptedPayload,
+        'platform': platformType,
+        'syncTimestamp': DateTime.now().toIso8601String(),
+      };
+
+      await _energyEntriesRef.child(entry.id).set(syncPayload);
       if (AppConfig.debugLogging) {
-        print('[Firebase] Energy entry synced (encrypted): ${entry.id}');
+        print('[Firebase] Energy entry synced (encrypted) from $platformType: ${entry.id}');
       }
     } catch (e) {
       if (AppConfig.debugLogging) {
