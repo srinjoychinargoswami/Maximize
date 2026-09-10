@@ -2,9 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/data/latest.dart' as tz_data;
-import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
-import 'package:maximize/firebase_options.dart';
 import 'package:maximize/database/app_database.dart';
 import 'package:maximize/screens/home_page.dart';
 import 'package:maximize/services/task_service.dart';
@@ -14,13 +12,11 @@ import 'package:maximize/services/reminder_service.dart';
 import 'package:maximize/services/note_service.dart';
 import 'package:maximize/services/energy_service.dart';
 import 'package:maximize/services/completion_log_service.dart';
-import 'package:maximize/services/firebase_realtime_sync_service.dart';
 import 'package:maximize/services/encryption_service.dart';
 import 'package:maximize/services/metrics_service.dart';
 import 'package:maximize/services/energy_analytics_service.dart';
 import 'package:maximize/config/theme_config.dart';
 import 'package:maximize/providers/theme_notifier.dart';
-import 'package:maximize/services/database_encryption_service.dart';
 import 'package:flutter/foundation.dart';
 
 void main() async {
@@ -33,31 +29,12 @@ void main() async {
   final database = AppDatabase();
   debugPrint('[Main] Drift database initialized');
 
-  // Log encryption/storage platform info
-  DatabaseEncryptionService.instance.logStorageInfo();
-
-  // CRITICAL: Initialize encryption service SECOND
-  // Must be done before Firebase listeners start decrypting data
+  // Initialize encryption service
   try {
     await EncryptionService.instance.initialize();
     debugPrint('[Main] Encryption service initialized');
   } catch (e) {
     debugPrint('[Main] Encryption initialization error: $e');
-    // App continues even if encryption setup fails
-  }
-
-     // Initialize Firebase (only on native platforms)
-  if (!kIsWeb) {
-    try {
-      await Firebase.initializeApp(
-        options: DefaultFirebaseOptions.currentPlatform,
-      );
-      // Initialize Firebase Realtime Database sync service
-      await FirebaseRealtimeSyncService.instance.initialize();
-    } catch (e) {
-      debugPrint('[Firebase] Initialization error: $e');
-      // App continues even if Firebase fails to initialize
-    }
   }
 
   // TODO: Initialize notification service once it's been properly migrated

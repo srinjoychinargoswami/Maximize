@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 import 'package:maximize/models/energy_model.dart';
 import 'package:maximize/models/energy_entry.dart';
 import 'package:maximize/services/energy_service.dart';
-import 'package:maximize/services/firebase_realtime_sync_service.dart';
 import 'package:maximize/database/app_database.dart' hide EnergyEntry;
 import 'package:intl/intl.dart';
 
@@ -120,20 +119,6 @@ class _EnergyPageState extends State<EnergyPage> with TickerProviderStateMixin {
           notes: _notes,
         );
 
-        // Sync updated entry to Firebase
-        final energyEntry = EnergyEntry(
-          id: updated.id,
-          timestamp: updated.timestamp,
-          energyLevel: updated.energyLevel,
-          moodTags: updated.moodTags,
-          privacyContext: updated.privacyContext,
-          location: updated.location,
-          notes: updated.notes,
-          createdAt: updated.createdAt,
-          updatedAt: updated.updatedAt,
-        );
-        await FirebaseRealtimeSyncService.instance.syncEnergyEntry(energyEntry);
-
         if (mounted) {
           setState(() => _isLoading = false);
           ScaffoldMessenger.of(context).showSnackBar(
@@ -156,23 +141,6 @@ class _EnergyPageState extends State<EnergyPage> with TickerProviderStateMixin {
         if (mounted) {
           // Reload today's entry to populate _todaysEntry
           await _loadTodaysEntry();
-
-          // Sync new entry to Firebase
-          if (_todaysEntry != null) {
-            final energyEntry = EnergyEntry(
-              id: _todaysEntry!.id,
-              timestamp: _todaysEntry!.timestamp,
-              energyLevel: _todaysEntry!.energyLevel,
-              moodTags: _todaysEntry!.moodTags,
-              privacyContext: _todaysEntry!.privacyContext,
-              location: _todaysEntry!.location,
-              notes: _todaysEntry!.notes,
-              createdAt: _todaysEntry!.createdAt,
-              updatedAt: _todaysEntry!.updatedAt,
-            );
-            await FirebaseRealtimeSyncService.instance.syncEnergyEntry(energyEntry);
-          }
-
           setState(() => _isLoading = false);
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -224,9 +192,6 @@ class _EnergyPageState extends State<EnergyPage> with TickerProviderStateMixin {
       final entryId = _todaysEntry!.id;
 
       await _energyService.deleteEnergyEntry(entryId);
-
-      // Sync deletion to Firebase
-      await FirebaseRealtimeSyncService.instance.deleteEnergyEntry(entryId);
 
       if (mounted) {
         setState(() {

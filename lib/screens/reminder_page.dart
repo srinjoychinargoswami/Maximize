@@ -5,7 +5,6 @@ import 'package:timezone/data/latest.dart' as tz;
 import 'package:maximize/models/reminder_model.dart';
 import 'package:maximize/services/reminder_service.dart';
 import 'package:maximize/services/notification_service.dart';
-import 'package:maximize/services/firebase_realtime_sync_service.dart';
 import 'package:maximize/database/app_database.dart';
 
 // CustomScrollBehavior to fix RefreshIndicator on Windows desktop
@@ -51,36 +50,6 @@ class ReminderPageState extends State<ReminderPage> {
     _reminderService = context.read<ReminderService>();
     _initializeNotificationService();
     _loadRemindersFromDatabase();
-
-    // CRITICAL FIX: Listen to Firebase for synced reminders from other devices
-    _setupFirebaseReminderListener();
-  }
-
-  Future<void> _setupFirebaseReminderListener() async {
-    try {
-      final firebaseService = FirebaseRealtimeSyncService.instance;
-
-      // Wait briefly for Firebase to initialize if needed
-      if (!firebaseService.isInitialized) {
-        await Future.delayed(const Duration(milliseconds: 500));
-      }
-
-      // Listen for real-time reminder updates from Firebase
-      if (firebaseService.isInitialized) {
-        firebaseService.listenToReminders((syncedReminders) {
-          // Update local list with synced reminders
-          if (mounted) {
-            setState(() {
-              _reminders = syncedReminders;
-              _expandedReminders = _expandRecurringReminders(_reminders);
-            });
-            print('[ReminderPage] Synced ${syncedReminders.length} reminders from Firebase');
-          }
-        });
-      }
-    } catch (e) {
-      print('[ReminderPage] Error setting up Firebase listener: $e');
-    }
   }
 
   @override

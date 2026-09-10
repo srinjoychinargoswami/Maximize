@@ -9,7 +9,6 @@ import 'package:maximize/models/subtask_model.dart';
 import "package:provider/provider.dart";
 import 'package:maximize/services/task_service.dart';
 import "package:provider/provider.dart";
-import 'package:maximize/services/firebase_realtime_sync_service.dart';
 import "package:provider/provider.dart";
 import 'package:maximize/screens/add_task_page.dart';
 import "package:provider/provider.dart";
@@ -73,18 +72,6 @@ class TaskListScreenState extends State<TaskListScreen> with TickerProviderState
       CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
     );
     _loadTasks();
-
-    // Listen for real-time task changes from Firebase
-    if (FirebaseRealtimeSyncService.instance.isInitialized) {
-      FirebaseRealtimeSyncService.instance.listenToTasks((tasks) {
-        if (mounted) {
-          setState(() {
-            _tasks = tasks;
-            _updateFilterOptions();
-          });
-        }
-      });
-    }
   }
 
   @override

@@ -7,6 +7,7 @@ import 'package:maximize/config/app_config.dart';
 import 'package:maximize/providers/theme_notifier.dart';
 import 'package:maximize/services/completion_log_service.dart';
 import 'package:maximize/services/database_encryption_service.dart';
+import 'package:maximize/services/github_sync_service.dart';
 import 'package:maximize/screens/privacy_policy_screen.dart';
 import 'package:maximize/screens/terms_conditions_screen.dart';
 
@@ -295,6 +296,60 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
+  Future<void> _syncWithGitHub() async {
+    final githubService = GitHubSyncService();
+
+    try {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Syncing with GitHub...')),
+      );
+
+      await githubService.syncAllData();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('GitHub sync complete')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Sync failed: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _logoutGitHub() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Disconnect GitHub?'),
+        content: const Text('Your local data will remain.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Disconnect'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      final githubService = GitHubSyncService();
+      await githubService.logout();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Disconnected from GitHub')),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
@@ -385,8 +440,8 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
             const SizedBox(height: 24),
 
-            // SECTION 3: Storage & Encryption
-            _buildSectionHeader('Storage & Encryption'),
+            // SECTION 3: Storage
+            _buildSectionHeader('Storage'),
             Card(
               color: Colors.grey[800],
               child: Padding(
@@ -394,49 +449,58 @@ class _SettingsPageState extends State<SettingsPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Platform info
                     ListTile(
-                      title: const Text('Platform'),
-                      subtitle: Text(DatabaseEncryptionService.instance.getPlatformType()),
+                      title: const Text('Database'),
+                      subtitle: kIsWeb
+                          ? const Text('IndexedDB (Browser)')
+                          : const Text('SQLite (Device)'),
                       leading: const Icon(Icons.storage),
                       contentPadding: EdgeInsets.zero,
                     ),
-
-                    const SizedBox(height: 12),
-
-                    // Storage quota info
-                    if (kIsWeb)
-                      ListTile(
-                        title: const Text('Storage Quota'),
-                        subtitle: const Text('IndexedDB: 500MB - 1GB'),
-                        leading: const Icon(Icons.cloud),
-                        contentPadding: EdgeInsets.zero,
-                      )
-                    else
-                      ListTile(
-                        title: const Text('Storage'),
-                        subtitle: const Text('Native SQLite Filesystem'),
-                        leading: const Icon(Icons.storage),
-                        contentPadding: EdgeInsets.zero,
-                      ),
-
-                    const SizedBox(height: 12),
-
-                    // Encryption info
-                    ListTile(
-                      title: const Text('Encryption'),
-                      subtitle: const Text('AES-256 (Firebase sync only)'),
-                      leading: const Icon(Icons.lock),
-                      contentPadding: EdgeInsets.zero,
-                    ),
-
                   ],
                 ),
               ),
             ),
             const SizedBox(height: 24),
 
-            // SECTION 4: Privacy & Legal
+            // SECTION 4: GitHub Sync
+            _buildSectionHeader('GitHub Sync'),
+            Card(
+              color: Colors.grey[800],
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Sync your data with GitHub',
+                      style: TextStyle(fontSize: 14),
+                    ),
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: _syncWithGitHub,
+                        icon: const Icon(Icons.cloud_upload),
+                        label: const Text('Sync Now'),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: _logoutGitHub,
+                        icon: const Icon(Icons.logout),
+                        label: const Text('Disconnect GitHub'),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+
+            // SECTION 5: Privacy & Legal
             _buildSectionHeader('Privacy & Legal'),
             Card(
               color: Colors.grey[800],
