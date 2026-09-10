@@ -1,29 +1,34 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:maximize/models/database.dart';
 import 'package:maximize/screens/calendar_page.dart';
 import 'package:maximize/screens/about_page.dart';
 import 'package:maximize/screens/task_list_screen.dart';
 import 'package:maximize/screens/search_page.dart';
 import 'package:maximize/screens/reminder_page.dart';
 import 'package:maximize/screens/notes_page.dart';
-import 'package:maximize/screens/github_sync_page.dart';
-import 'package:maximize/services/api_service.dart';
+import 'package:maximize/screens/energy_page.dart';
+import 'package:maximize/screens/energy_insights_page.dart';
+import 'package:maximize/screens/settings_page.dart';
 import 'package:maximize/services/calendar_service.dart';
 import 'package:maximize/services/task_service.dart';
 import 'package:maximize/services/reminder_service.dart';
 import 'package:maximize/services/note_service.dart';
+import 'package:maximize/services/energy_service.dart';
+import 'package:maximize/services/completion_log_service.dart';
+import 'package:maximize/services/metrics_service.dart';
+import 'package:maximize/database/app_database.dart' as db;
 import 'package:maximize/models/task_model.dart';
-import 'package:maximize/models/event_model.dart';
+import 'package:maximize/models/subtask_model.dart';
+import 'package:maximize/models/event_model.dart' as event_model;
 import 'package:maximize/models/reminder_model.dart';
+import 'package:maximize/models/energy_model.dart';
 import 'package:flutter/gestures.dart';
+import 'package:provider/provider.dart';
 
 /* HOME PAGE – Drawer, Bottom Nav, and IndexedStack */
 
 class MyHomePage extends StatefulWidget {
-  final AppDatabase database;
-  final ApiService apiService;
-  const MyHomePage({super.key, required this.database, required this.apiService});
+  const MyHomePage({super.key});
 
   @override
   State<MyHomePage> createState() => _MyHomePageState();
@@ -32,19 +37,19 @@ class MyHomePage extends StatefulWidget {
 class _MyHomePageState extends State<MyHomePage> {
   final _scaffoldKey = GlobalKey<ScaffoldState>();
   int _currentIndex = 0;
-  
+
   // ADDED: Keys to access refresh methods in child pages
   final GlobalKey<_OverviewPageState> _overviewKey = GlobalKey<_OverviewPageState>();
   final GlobalKey<TaskListScreenState> _tasksKey = GlobalKey<TaskListScreenState>();
   final GlobalKey<CalendarPageState> _calendarKey = GlobalKey<CalendarPageState>();
-  final GlobalKey<NotesPageState> _notesKey = GlobalKey<NotesPageState>(); 
+  final GlobalKey<NotesPageState> _notesKey = GlobalKey<NotesPageState>();
   final GlobalKey<ReminderPageState> _remindersKey = GlobalKey<ReminderPageState>();
 
   void _navigateToSearch() {
   Navigator.push(
     context,
     MaterialPageRoute(
-      builder: (context) => SearchPage(database: widget.database),
+      builder: (context) => const SearchPage(),
     ),
   ).then((result) {
     if (result == null || result is! Map<String, dynamic>) return;
@@ -102,14 +107,17 @@ class _MyHomePageState extends State<MyHomePage> {
   @override
   void initState() {
     super.initState();
-    // Initialize screens with keys
+    // Initialize screens with keys - services are provided via Provider
+    final database = context.read<db.AppDatabase>();
+    final calendarService = context.read<CalendarService>();
+    final noteService = context.read<NoteService>();
     _screens = [
-      OverviewPage(key: _overviewKey, database: widget.database),
-      TaskListScreen(key: _tasksKey, database: widget.database),
-      CalendarPage(key: _calendarKey, calendarService: CalendarService(widget.database)),
-      NotesPage(key: _notesKey, noteService: NoteService(widget.database)), 
-      ReminderPage(key: _remindersKey, database: widget.database),
-      GitHubSyncPage(api: widget.apiService),
+      OverviewPage(key: _overviewKey),
+      TaskListScreen(key: _tasksKey, database: database),
+      CalendarPage(key: _calendarKey, calendarService: calendarService),
+      NotesPage(key: _notesKey, noteService: noteService),
+      ReminderPage(key: _remindersKey, database: database),
+      EnergyInsightsPage(database: database),
     ];
   }
 
@@ -133,13 +141,13 @@ class _MyHomePageState extends State<MyHomePage> {
           (_calendarKey.currentState as dynamic)?._loadEvents();
           break;
         case 3: // Notes
-          (_notesKey.currentState as dynamic)?._loadNotes(); 
+          (_notesKey.currentState as dynamic)?._loadNotes();
           break;
         case 4: // Reminders
           (_remindersKey.currentState as dynamic)?._loadReminders();
           break;
-        case 5: // Sync
-          // No refresh needed for sync
+        case 5: // Energy
+          // Energy page refresh is handled internally
           break;
       }
     } catch (e) {
@@ -188,7 +196,19 @@ class _MyHomePageState extends State<MyHomePage> {
             _drawerTile(title: 'Calendar', icon: Icons.calendar_today, index: 2),
             _drawerTile(title: 'Notes', icon: Icons.note, index: 3),
             _drawerTile(title: 'Reminders', icon: Icons.notifications, index: 4),
-            _drawerTile(title: 'Syncing', icon: Icons.sync, index: 5),
+            _drawerTile(title: 'Energy', icon: Icons.energy_savings_leaf, index: 5),
+            const Divider(),
+            ListTile(
+              leading: const Icon(Icons.settings),
+              title: const Text('Settings'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const SettingsPage()),
+                );
+              },
+            ),
             _drawerTile(title: 'About', icon: Icons.info, index: 6),
           ],
         ),
@@ -211,7 +231,7 @@ class _MyHomePageState extends State<MyHomePage> {
           BottomNavigationBarItem(icon: Icon(Icons.calendar_today), label: 'Calendar'),
           BottomNavigationBarItem(icon: Icon(Icons.note), label: 'Notes'),
           BottomNavigationBarItem(icon: Icon(Icons.notifications), label: 'Reminders'),
-          BottomNavigationBarItem(icon: Icon(Icons.sync), label: 'Syncing'),
+          BottomNavigationBarItem(icon: Icon(Icons.energy_savings_leaf), label: 'Energy'),
         ],
       ),
     );
@@ -228,7 +248,7 @@ class _MyHomePageState extends State<MyHomePage> {
           _jumpTo(index);
         } else if (index == 6) {
           Navigator.push(
-            context, 
+            context,
             MaterialPageRoute(builder: (context) => AboutPage()),
           );
         }
@@ -240,8 +260,7 @@ class _MyHomePageState extends State<MyHomePage> {
 /* OVERVIEW PAGE */
 
 class OverviewPage extends StatefulWidget {
-  final AppDatabase database;
-  const OverviewPage({super.key, required this.database});
+  const OverviewPage({super.key});
   @override
   State<OverviewPage> createState() => _OverviewPageState();
 }
@@ -250,115 +269,190 @@ class _OverviewPageState extends State<OverviewPage> {
   late final TaskService _taskService;
   late final CalendarService _calendarService;
   late final ReminderService _reminderService;
+  late final EnergyService _energyService;
 
   @override
   void initState() {
     super.initState();
-    _taskService = TaskService(widget.database);
-    _calendarService = CalendarService(widget.database);
-    _reminderService = ReminderService(widget.database);
+    _taskService = context.read<TaskService>();
+    _calendarService = context.read<CalendarService>();
+    _reminderService = context.read<ReminderService>();
+    _energyService = context.read<EnergyService>();
   }
 
   // UPDATED: Made public so parent can call it
   Future<void> _refreshData() async {
-    setState(() {}); // This triggers all FutureBuilders to rebuild
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Overview refreshed!'),
-        duration: Duration(seconds: 1),
-      ),
-    );
+    setState(() {}); // This triggers all FutureBuilders to rebuild with fresh futures
+    // Add a small delay to ensure database is updated
+    await Future.delayed(const Duration(milliseconds: 300));
+    if (mounted) {
+      setState(() {});
+    }
   }
 
   Widget _statsSection() {
-    return FutureBuilder<Map<String, int>>(
-      future: _loadStats(),
-      builder: (context, snapshot) {
-        final stats = snapshot.data ?? {
-          'totalCompleted': 0,
-          'thisWeek': 0,
-          'streak': 0,
-        };
-        return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          child: Row(
-            children: [
-              _statCard('Total Done', '${stats['totalCompleted']}', '✅', Colors.green),
-              const SizedBox(width: 8),
-              _statCard('This Week', '${stats['thisWeek']}', '📈', Colors.blue),
-              const SizedBox(width: 8),
-              _statCard('Streak', '${stats['streak']}d', '🔥', Colors.orange),
-            ],
-          ),
-        );
-      },
-    );
-  }
+    final metricsService = context.read<MetricsService>();
 
-  Widget _statCard(String label, String value, String emoji, Color color) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: color.withOpacity(0.15),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: color.withOpacity(0.3)),
-        ),
-        child: Column(
-          children: [
-            Text(emoji, style: const TextStyle(fontSize: 20)),
-            const SizedBox(height: 4),
-            Text(
-              value,
-              style: TextStyle(
-                color: color,
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
+    return SingleChildScrollView(
+      scrollDirection: Axis.vertical,
+      child: Column(
+        children: [
+          // Top row: Total Done, This Week, Streak
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Row(
+              children: [
+                Expanded(
+                  child: FutureBuilder<int>(
+                    future: metricsService.getTotalDone(),
+                    builder: (context, snapshot) {
+                      return _metricCard('Total Done', snapshot.data?.toString() ?? '0', Icons.check_circle, Colors.green);
+                    },
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: FutureBuilder<int>(
+                    future: metricsService.getThisWeekDone(),
+                    builder: (context, snapshot) {
+                      return _metricCard('This Week', snapshot.data?.toString() ?? '0', Icons.calendar_today, Colors.blue);
+                    },
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: FutureBuilder<int>(
+                    future: metricsService.getStreak(),
+                    builder: (context, snapshot) {
+                      return _metricCard('Streak', snapshot.data?.toString() ?? '0', Icons.local_fire_department, Colors.orange);
+                    },
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 2),
-            Text(
-              label,
-              style: const TextStyle(color: Colors.grey, fontSize: 11),
-              textAlign: TextAlign.center,
+          ),
+
+          // Task Status Breakdown Card
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: FutureBuilder<int>(
+              future: metricsService.getTotalTasks(),
+              builder: (context, snapshot1) {
+                int total = snapshot1.data ?? 0;
+
+                return FutureBuilder<int>(
+                  future: metricsService.getCompletedTasks(),
+                  builder: (context, snapshot2) {
+                    int completed = snapshot2.data ?? 0;
+                    int uncompleted = total - completed;
+                    double completedPercent = total == 0 ? 0 : (completed / total) * 100;
+                    double uncompletedPercent = total == 0 ? 0 : (uncompleted / total) * 100;
+
+                    return Card(
+                      color: Colors.grey[800],
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text("Task Status", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+                            const SizedBox(height: 16),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceAround,
+                              children: [
+                                Column(
+                                  children: [
+                                    Text("$completed/$total", style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.green)),
+                                    Text("${completedPercent.toStringAsFixed(1)}%", style: TextStyle(fontSize: 12, color: Colors.grey[400])),
+                                    Text("Completed", style: TextStyle(fontSize: 10, color: Colors.grey[500])),
+                                  ],
+                                ),
+                                Column(
+                                  children: [
+                                    Text("$uncompleted/$total", style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.red)),
+                                    Text("${uncompletedPercent.toStringAsFixed(1)}%", style: TextStyle(fontSize: 12, color: Colors.grey[400])),
+                                    Text("Uncompleted", style: TextStyle(fontSize: 10, color: Colors.grey[500])),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                );
+              },
             ),
-          ],
-        ),
+          ),
+
+          // Peak Completion Hint Card
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: FutureBuilder<String>(
+              future: metricsService.getPeakCompletionWindow(),
+              builder: (context, snapshot) {
+                final peakWindow = snapshot.data;
+                if (peakWindow == null || peakWindow.isEmpty) {
+                  return const SizedBox.shrink();
+                }
+
+                return Card(
+                  color: Colors.amber.withOpacity(0.1),
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.lightbulb, color: Colors.amber),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            "💡 Peak completions: $peakWindow",
+                            style: const TextStyle(fontSize: 14, color: Colors.white),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  Future<Map<String, int>> _loadStats() async {
-    final now = DateTime.now();
-    final weekStart = now.subtract(Duration(days: now.weekday - 1));
-    final allTasks = await widget.database.getAllTasks();
-
-    final totalCompleted = allTasks.where((t) => t.completed).length;
-
-    final thisWeekCompleted = allTasks.where((t) =>
-      t.completed &&
-      t.completedAt != null &&
-      t.completedAt!.isAfter(weekStart.subtract(const Duration(days: 1)))
-    ).length;
-
-    int streak = 0;
-    DateTime checkDate = DateTime(now.year, now.month, now.day);
-    while (true) {
-      final hasCompleted = allTasks.any((t) =>
-        t.completed &&
-        t.completedAt != null &&
-        DateTime(t.completedAt!.year, t.completedAt!.month, t.completedAt!.day) == checkDate
-      );
-      if (!hasCompleted) break;
-      streak++;
-      checkDate = checkDate.subtract(const Duration(days: 1));
-    }
-
-    return {
-      'totalCompleted': totalCompleted,
-      'thisWeek': thisWeekCompleted,
-      'streak': streak,
-    };
+  Widget _metricCard(String label, String value, IconData icon, Color color) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.15),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, color: color, size: 24),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: TextStyle(
+              color: color,
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            style: const TextStyle(color: Colors.grey, fontSize: 11),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -413,6 +507,9 @@ class _OverviewPageState extends State<OverviewPage> {
                 ),
               ),
               _statsSection(),
+              _EnergyStatusWidget(
+                energyService: _energyService,
+              ),
               _sectionHeader('Today\'s Tasks'),
               _taskSection(today),
               _sectionHeader('Today\'s Events'),
@@ -546,7 +643,7 @@ class _OverviewPageState extends State<OverviewPage> {
   SizedBox _eventSection(DateTime today) {
     return SizedBox(
       height: 200,
-      child: FutureBuilder<List<Event>>(
+      child: FutureBuilder<List<event_model.Event>>(
         future: _calendarService.getTodaysEvents(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
@@ -728,7 +825,8 @@ class _OverviewPageState extends State<OverviewPage> {
       } else {
         await _taskService.markTaskIncomplete(taskId);
       }
-      setState(() {});
+      // Refresh the entire page to update tasks and metrics
+      await _refreshData();
     } catch (error) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Failed to update task: $error')),
@@ -741,20 +839,13 @@ class _OverviewPageState extends State<OverviewPage> {
       if (isCompleted == true) {
         await _taskService.markSubtaskCompleted(subtaskId);
       } else {
-        final subtasks = await widget.database.getAllSubtasks('');
-        final subtaskData = subtasks.firstWhere((s) => s.id == subtaskId);
-        final subtask = SubtaskModel(
-          id: subtaskData.id,
-          taskId: subtaskData.taskId,
-          title: subtaskData.title,
-          completed: subtaskData.completed,
-          completedAt: subtaskData.completedAt,
-        );
-        
+        final subtask = await _taskService.getSubtaskById(subtaskId);
+        if (subtask == null) return;
         final updatedSubtask = subtask.copyWith(completed: false, completedAt: null);
         await _taskService.updateSubtask(updatedSubtask);
       }
-      setState(() {});
+      // Refresh the entire page to update tasks and metrics
+      await _refreshData();
     } catch (error) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Failed to update subtask: $error')),
@@ -790,6 +881,253 @@ class _OverviewPageState extends State<OverviewPage> {
         SnackBar(content: Text('Failed to update reminder: $error')),
       );
     }
+  }
+}
+
+/* ENERGY STATUS WIDGET */
+
+class _EnergyStatusWidget extends StatefulWidget {
+  final EnergyService energyService;
+
+  const _EnergyStatusWidget({
+    required this.energyService,
+  });
+
+  @override
+  State<_EnergyStatusWidget> createState() => _EnergyStatusWidgetState();
+}
+
+class _EnergyStatusWidgetState extends State<_EnergyStatusWidget> {
+  EnergyEntryModel? _todaysEntry;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadTodaysEntry();
+  }
+
+  Future<void> _loadTodaysEntry() async {
+    try {
+      final entry = await widget.energyService.getTodaysEntry();
+      if (mounted) {
+        setState(() {
+          _todaysEntry = entry;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  Future<void> _openEnergyPage() async {
+    final database = context.read<db.AppDatabase>();
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => EnergyPage(database: database),
+      ),
+    );
+
+    // Refresh on return
+    if (result == true || mounted) {
+      await _loadTodaysEntry();
+    }
+  }
+
+  String _getEnergyEmoji(int level) {
+    if (level <= 3) return '🔴';
+    if (level <= 6) return '🟡';
+    return '🟢';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Card(
+        color: Colors.grey[800],
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Energy Status',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                  ElevatedButton.icon(
+                    onPressed: _openEnergyPage,
+                    icon: const Icon(Icons.add, size: 18),
+                    label: Text(_todaysEntry != null ? 'Update' : 'Log'),
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      backgroundColor: Colors.blue[600],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              if (_isLoading)
+                const SizedBox(
+                  height: 60,
+                  child: Center(child: CircularProgressIndicator()),
+                )
+              else if (_todaysEntry != null)
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Energy Level Display
+                    Row(
+                      children: [
+                        Text(
+                          _getEnergyEmoji(_todaysEntry!.energyLevel),
+                          style: const TextStyle(fontSize: 28),
+                        ),
+                        const SizedBox(width: 12),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Energy: ${_todaysEntry!.energyLevel}/10',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white,
+                              ),
+                            ),
+                            Text(
+                              'Logged at ${DateFormat('h:mm a').format(_todaysEntry!.timestamp)}',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey[400],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Quick Stats
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[700],
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Column(
+                        children: [
+                          _statRow('Mood', _todaysEntry!.moodTags.first),
+                          const SizedBox(height: 8),
+                          _statRow('Location', _todaysEntry!.location),
+                          const SizedBox(height: 8),
+                          _statRow('Context', _todaysEntry!.privacyContext),
+                        ],
+                      ),
+                    ),
+
+                    // Notes if present
+                    if (_todaysEntry!.notes != null &&
+                        _todaysEntry!.notes!.isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.blue[900]?.withOpacity(0.3),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: Colors.blue[700]!.withOpacity(0.5),
+                          ),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Notes',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: Colors.grey[400],
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              _todaysEntry!.notes!,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey[300],
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ],
+                )
+              else
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Not logged yet today',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey[400],
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Tap the button above to log your energy level',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey[500],
+                      ),
+                    ),
+                  ],
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _statRow(String label, String value) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            color: Colors.grey[400],
+          ),
+        ),
+        Text(
+          value,
+          style: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: Colors.white,
+          ),
+        ),
+      ],
+    );
   }
 }
 

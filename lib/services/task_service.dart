@@ -1,26 +1,28 @@
+import 'package:maximize/database/app_database.dart';
 import 'package:maximize/models/task_model.dart';
-import 'package:maximize/models/database.dart';
+import 'package:maximize/models/subtask_model.dart';
+import 'package:maximize/models/reminder_model.dart';
+import 'package:maximize/services/completion_log_service.dart';
+import 'package:maximize/services/energy_service.dart';
 import 'package:uuid/uuid.dart';
-import 'package:maximize/services/reminder_service.dart';
-import 'package:maximize/models/reminder_model.dart'; 
+import 'package:flutter/material.dart';
+import 'package:drift/drift.dart';
+
 class TaskService {
-  final AppDatabase _dbHelper; // Declare a variable to hold the database
+  final AppDatabase _database;
 
-  // Constructor that accepts the database
-  TaskService(this._dbHelper); // Initialize the database
+  TaskService(this._database);
 
-  // Fetch all tasks from the database
   Future<List<TaskModel>> getTasks() async {
     try {
-      final taskDataList = await _dbHelper.getAllTasks(); // Fetch List<TaskData>
-      return taskDataList.map((taskData) => TaskModel.fromData(taskData)).toList(); // Convert to List<TaskModel>
+      final rows = await _database.select(_database.tasks).get();
+      return rows.map(_rowToModel).toList();
     } catch (e) {
-      print('Error fetching tasks: $e');
-      return []; // Return an empty list on error
+      debugPrint('Error fetching tasks: $e');
+      return [];
     }
   }
 
-  // ENHANCED: Fetch tasks with filtering options for better organization
   Future<List<TaskModel>> getTasksFiltered({
     bool? completed,
     String? category,
@@ -37,19 +39,17 @@ class TaskService {
         return true;
       }).toList();
     } catch (e) {
-      print('Error fetching filtered tasks: $e');
+      debugPrint('Error fetching filtered tasks: $e');
       return [];
     }
   }
 
-  // ADDED: Helper method to check if two dates are the same day
   bool _isSameDay(DateTime date1, DateTime date2) {
-    return date1.year == date2.year && 
-           date1.month == date2.month && 
+    return date1.year == date2.year &&
+           date1.month == date2.month &&
            date1.day == date2.day;
   }
 
-  // Add a new task to the database with notification support
   Future<int?> addTask({
     required String title,
     required String description,
@@ -57,11 +57,9 @@ class TaskService {
     required bool completed,
     required String category,
     required String priority,
-    int? pageId, // Optional pageId for associating with pages
-    // ADDED: New completion tracking parameters
+    int? pageId,
     DateTime? completedAt,
     List<SubtaskModel>? subtasks,
-    // ADDED: Recurring task parameters
     bool isRecurring = false,
     String? recurrenceRule,
     int? recurrenceInterval,
@@ -76,18 +74,21 @@ class TaskService {
     DateTime? reminderTime,
     String? reminderPreset,
   }) async {
+    final taskId = const Uuid().v1();
+    final now = DateTime.now();
+
     final task = TaskModel(
-      id: const Uuid().v1(), // Placeholder for new tasks
+      id: taskId,
       title: title,
       description: description,
-      dueDate: dueDate, // Pass DateTime directly
-      completed: completed, // Pass bool directly
+      dueDate: dueDate,
+      completed: completed,
       category: category,
       priority: priority,
-      pageId: pageId?.toString(), // Include pageId if needed
-      completedAt: completedAt, // ADDED: Track completion timestamp
-      subtasks: subtasks, // ADDED: Include subtasks
-      isRecurring: isRecurring, // ADDED: Recurring task support
+      pageId: pageId?.toString(),
+      completedAt: completedAt,
+      subtasks: subtasks,
+      isRecurring: isRecurring,
       recurrenceRule: recurrenceRule,
       recurrenceInterval: recurrenceInterval,
       daysOfWeek: daysOfWeek,
@@ -100,55 +101,97 @@ class TaskService {
       reminderEnabled: reminderEnabled,
       reminderTime: reminderTime,
       reminderPreset: reminderPreset,
+      createdAt: now,
+      updatedAt: now,
     );
 
     try {
-      final result = await _dbHelper.insertTask(task);
-      
-      // Schedule notification if reminder is enabled
+      await _database.into(_database.tasks).insert(
+        _modelToCompanion(task),
+      );
       await _scheduleTaskNotification(task);
-      
-      return result;
+      return 1;
     } catch (e) {
-      print('Error adding task: $e');
-      return null; // Indicate failure
+      debugPrint('Error adding task: $e');
+      return null;
     }
   }
 
-  //Update an existing task with notification support
   Future<void> updateTask(TaskModel task) async {
     if (task.id.isEmpty) {
-      print('Error: Task ID cannot be empty for update.');
-      return; // Early return if ID is empty
+      debugPrint('Error: Task ID cannot be empty for update.');
+      return;
     }
 
     try {
-      // Cancel old notification before updating
       await _cancelTaskNotification(task.id);
-      
-      await _dbHelper.updateTask(task); // Assuming this method accepts TaskModel
-      
-      // Schedule new notification if reminder is enabled
+      task.updatedAt = DateTime.now();
+      await (_database.update(_database.tasks)
+            ..where((t) => t.taskId.equals(task.id)))
+          .write(_modelToCompanion(task, skipPrimaryKey: true));
       await _scheduleTaskNotification(task);
     } catch (e) {
-      print('Error updating task: $e');
+      debugPrint('Error updating task: $e');
     }
   }
 
-  // ADDED: Toggle task completion status (for checkbox functionality)
   Future<void> toggleTaskCompletion(String taskId) async {
     try {
       final task = await getTaskById(taskId);
       if (task != null) {
         final updatedTask = task.toggleCompletion();
         await updateTask(updatedTask);
+
+        if (updatedTask.completed) {
+          try {
+            int? energyLevel;
+            String? moodTags;
+            String? privacyContext;
+            String? location;
+
+            final todayEntry = await _database.select(_database.energyEntries)
+                .get()
+                .then((entries) {
+              final now = DateTime.now();
+              try {
+                return entries.firstWhere((e) =>
+                  e.timestamp.year == now.year &&
+                  e.timestamp.month == now.month &&
+                  e.timestamp.day == now.day
+                );
+              } catch (e) {
+                return null;
+              }
+            });
+
+            if (todayEntry != null) {
+              energyLevel = todayEntry.energyLevel;
+              moodTags = todayEntry.moodTags;
+              privacyContext = todayEntry.privacyContext;
+              location = todayEntry.location;
+            }
+
+            await CompletionLogService(_database).logCompletion(
+              taskId: taskId,
+              taskTitle: task.title,
+              description: task.description,
+              category: task.category,
+              priority: task.priority,
+              energyLevel: energyLevel,
+              moodTags: moodTags,
+              privacyContext: privacyContext,
+              location: location,
+            );
+          } catch (e) {
+            debugPrint('Error logging completion: $e');
+          }
+        }
       }
     } catch (e) {
-      print('Error toggling task completion: $e');
+      debugPrint('Error toggling task completion: $e');
     }
   }
 
-  // Mark task as completed + cancel notification
   Future<void> markTaskCompleted(String taskId) async {
     try {
       final task = await getTaskById(taskId);
@@ -157,17 +200,58 @@ class TaskService {
           completed: true,
           completedAt: DateTime.now(),
         );
-        await _dbHelper.updateTask(updatedTask);
-        
-        // Cancel notification when completed
+        await updateTask(updatedTask);
+
+        try {
+          int? energyLevel;
+          String? moodTags;
+          String? privacyContext;
+          String? location;
+
+          final todayEntry = await _database.select(_database.energyEntries)
+              .get()
+              .then((entries) {
+            final now = DateTime.now();
+            try {
+              return entries.firstWhere((e) =>
+                e.timestamp.year == now.year &&
+                e.timestamp.month == now.month &&
+                e.timestamp.day == now.day
+              );
+            } catch (e) {
+              return null;
+            }
+          });
+
+          if (todayEntry != null) {
+            energyLevel = todayEntry.energyLevel;
+            moodTags = todayEntry.moodTags;
+            privacyContext = todayEntry.privacyContext;
+            location = todayEntry.location;
+          }
+
+          await CompletionLogService(_database).logCompletion(
+            taskId: taskId,
+            taskTitle: task.title,
+            description: task.description,
+            category: task.category,
+            priority: task.priority,
+            energyLevel: energyLevel,
+            moodTags: moodTags,
+            privacyContext: privacyContext,
+            location: location,
+          );
+        } catch (e) {
+          debugPrint('Error logging completion: $e');
+        }
+
         await _cancelTaskNotification(taskId);
       }
     } catch (e) {
-      print('Error marking task as completed: $e');
+      debugPrint('Error marking task as completed: $e');
     }
   }
 
-  // Mark task as incomplete + reschedule notification
   Future<void> markTaskIncomplete(String taskId) async {
     try {
       final task = await getTaskById(taskId);
@@ -176,17 +260,13 @@ class TaskService {
           completed: false,
           completedAt: null,
         );
-        await _dbHelper.updateTask(updatedTask);
-        
-        // Reschedule notification if still in future
-        await _scheduleTaskNotification(updatedTask);
+        await updateTask(updatedTask);
       }
     } catch (e) {
-      print('Error marking task as incomplete: $e');
+      debugPrint('Error marking task as incomplete: $e');
     }
   }
 
-  // ADDED: Get completed tasks for productivity tracking
   Future<List<TaskModel>> getCompletedTasks({DateTime? date}) async {
     try {
       final tasks = await getTasks();
@@ -198,23 +278,21 @@ class TaskService {
         return task.completed;
       }).toList();
     } catch (e) {
-      print('Error fetching completed tasks: $e');
+      debugPrint('Error fetching completed tasks: $e');
       return [];
     }
   }
 
-  // ADDED: Get pending tasks for today's overview
   Future<List<TaskModel>> getTodaysTasks() async {
     try {
       final today = DateTime.now();
       return await getTasksFiltered(dueDate: today, completed: false);
     } catch (e) {
-      print('Error fetching today\'s tasks: $e');
+      debugPrint('Error fetching today\'s tasks: $e');
       return [];
     }
   }
 
-  // ADDED: Get overdue tasks
   Future<List<TaskModel>> getOverdueTasks() async {
     try {
       final tasks = await getTasks();
@@ -223,122 +301,119 @@ class TaskService {
         return !task.completed && task.dueDate.isBefore(now);
       }).toList();
     } catch (e) {
-      print('Error fetching overdue tasks: $e');
+      debugPrint('Error fetching overdue tasks: $e');
       return [];
     }
   }
 
-  // Delete a task with notification cleanup
   Future<void> deleteTask(String taskId) async {
     try {
-      // Cancel notification before deleting
       await _cancelTaskNotification(taskId);
-      
-      // ENHANCED: Also delete associated subtasks
       final subtasks = await getSubtasks(taskId);
       for (final subtask in subtasks) {
         await deleteSubtask(subtask.id);
       }
-      await _dbHelper.deleteTask(taskId);
+      await (_database.delete(_database.tasks)
+            ..where((t) => t.taskId.equals(taskId)))
+          .go();
     } catch (e) {
-      print('Error deleting task: $e');
+      debugPrint('Error deleting task: $e');
     }
   }
 
-// ADD insertSubtask RIGHT HERE
-Future<void> insertSubtask(SubtaskModel subtask) async {
-  try {
-    await _dbHelper.insertSubtask(subtask);
-    print('[TaskService] Subtask restored: ${subtask.title}');
-  } catch (e) {
-    print('Error inserting subtask: $e');
-    rethrow;
+  Future<void> insertSubtask(SubtaskModel subtask) async {
+    try {
+      await _database.into(_database.subtasks).insert(
+        SubtasksCompanion(
+          id: Value(subtask.id),
+          subtaskId: Value(subtask.id),
+          taskId: Value(subtask.taskId),
+          title: Value(subtask.title),
+          completed: Value(subtask.completed),
+          completedAt: Value(subtask.completedAt),
+          createdAt: Value(subtask.createdAt),
+          updatedAt: Value(subtask.updatedAt),
+        ),
+      );
+      debugPrint('[TaskService] Subtask restored: ${subtask.title}');
+    } catch (e) {
+      debugPrint('Error inserting subtask: $e');
+      rethrow;
+    }
   }
-}
 
-  // ADD insertTask RIGHT HERE
-Future<void> insertTask(TaskModel task) async {
-  try {
-    // Cancel any stale notification first
-    await _cancelTaskNotification(task.id);
-
-    // Re-insert into database
-    await _dbHelper.insertTask(task);
-
-    // Reschedule notification if reminder enabled + still in future
-    await _scheduleTaskNotification(task);
-
-    print('[TaskService] Task restored: ${task.title}');
-  } catch (e) {
-    print('Error inserting task: $e');
-    rethrow;
+  Future<void> insertTask(TaskModel task) async {
+    try {
+      await _cancelTaskNotification(task.id);
+      await _database.into(_database.tasks).insert(
+        _modelToCompanion(task),
+      );
+      await _scheduleTaskNotification(task);
+      debugPrint('[TaskService] Task restored: ${task.title}');
+    } catch (e) {
+      debugPrint('Error inserting task: $e');
+      rethrow;
+    }
   }
-}
 
-
-  // Fetch a task by its ID from the database
   Future<TaskModel?> getTaskById(String id) async {
     try {
-      final tasks = await _dbHelper.getAllTasks();
-      final taskData = tasks.firstWhere(
-        (task) => task.id == id,
-        orElse: () => throw Exception('Task not found'), // Throw an exception if no task is found
-      );
-      
-      // ENHANCED: Load subtasks with the task
+      final row = await (_database.select(_database.tasks)
+            ..where((t) => t.taskId.equals(id)))
+          .getSingleOrNull();
+      if (row == null) return null;
+
+      final taskModel = _rowToModel(row);
       final subtasks = await getSubtasks(id);
-      final taskModel = TaskModel.fromData(taskData);
       return taskModel.copyWith(subtasks: subtasks);
     } catch (e) {
-      print('Error fetching task by ID: $e');
-      return null; // Indicate failure
+      debugPrint('Error fetching task by ID: $e');
+      return null;
     }
   }
 
-  // ENHANCED: Get task with all its subtasks loaded
   Future<TaskModel?> getTaskWithSubtasks(String taskId) async {
     try {
       final task = await getTaskById(taskId);
       if (task == null) return null;
-      
+
       final subtasks = await getSubtasks(taskId);
       return task.copyWith(subtasks: subtasks);
     } catch (e) {
-      print('Error fetching task with subtasks: $e');
+      debugPrint('Error fetching task with subtasks: $e');
       return null;
     }
   }
 
-  // ADDED: Helper method to find subtask by ID across all tasks
   Future<SubtaskModel?> getSubtaskById(String subtaskId) async {
     try {
-      final allTasks = await _dbHelper.getAllTasks();
-      
-      for (final task in allTasks) {
-        final subtasks = await getSubtasks(task.id);
-        for (final subtask in subtasks) {
-          if (subtask.id == subtaskId) {
-            return subtask;
-          }
-        }
-      }
-      return null; // Subtask not found
+      final row = await (_database.select(_database.subtasks)
+            ..where((s) => s.subtaskId.equals(subtaskId)))
+          .getSingleOrNull();
+      if (row == null) return null;
+
+      return SubtaskModel(
+        id: row.id,
+        taskId: row.taskId,
+        title: row.title,
+        completed: row.completed,
+        completedAt: row.completedAt,
+        createdAt: row.createdAt,
+        updatedAt: row.updatedAt,
+      );
     } catch (e) {
-      print('Error fetching subtask by ID: $e');
+      debugPrint('Error fetching subtask by ID: $e');
       return null;
     }
   }
 
-  // Schedule notification for task reminder
   Future<void> _scheduleTaskNotification(TaskModel task) async {
     try {
-      // Only schedule if reminder is enabled and time is set
-      if (task.reminderEnabled == true && 
-          task.reminderTime != null && 
+      if (task.reminderEnabled == true &&
+          task.reminderTime != null &&
           !task.completed &&
           task.reminderTime!.isAfter(DateTime.now())) {
-        
-        // Create a reminder model for the notification system
+
         final reminder = ReminderModel(
           id: 'task_${task.id}',
           title: task.title,
@@ -347,137 +422,179 @@ Future<void> insertTask(TaskModel task) async {
           notificationId: task.id.hashCode.toString(),
           completed: false,
         );
-        
-        await NotificationService.instance.scheduleNotification(reminder);
-        print('[TaskService] Scheduled notification for task: ${task.title} at ${task.reminderTime}');
+
+        // await NotificationService.instance.scheduleNotification(reminder);
+        debugPrint('[TaskService] Scheduled notification for task: ${task.title} at ${task.reminderTime}');
       }
     } catch (e) {
-      print('[TaskService] Error scheduling task notification: $e');
+      debugPrint('[TaskService] Error scheduling task notification: $e');
     }
   }
 
-  // Cancel notification for task
   Future<void> _cancelTaskNotification(String taskId) async {
     try {
-      await NotificationService.instance.cancelNotification('task_$taskId');
-      print('[TaskService] Cancelled notification for task: $taskId');
+      // await NotificationService.instance.cancelNotification('task_$taskId');
+      debugPrint('[TaskService] Cancelled notification for task: $taskId');
     } catch (e) {
-      print('[TaskService] Error cancelling task notification: $e');
+      debugPrint('[TaskService] Error cancelling task notification: $e');
     }
   }
 
-  // Subtask Methods
-
-  // Fetch all subtasks for a specific task
   Future<List<SubtaskModel>> getSubtasks(String taskId) async {
     try {
-      final subtaskDataList = await _dbHelper.getAllSubtasks(taskId); // Fetch List<SubtaskData>
-      
-      // Check if subtaskDataList is null or empty
-      if (subtaskDataList.isEmpty) {
-        return []; // Return an empty list if no subtasks found
-      }
-
-      return subtaskDataList.map((subtaskData) {
-        return SubtaskModel(
-          id: subtaskData.id,
-          taskId: subtaskData.taskId,
-          title: subtaskData.title,
-          completed: subtaskData.completed,
-          completedAt: subtaskData.completedAt, // ADDED: Map completion timestamp
-        );
-      }).toList(); // Convert to List<SubtaskModel>
+      final rows = await (_database.select(_database.subtasks)
+            ..where((s) => s.taskId.equals(taskId)))
+          .get();
+      return rows.map((row) => SubtaskModel(
+        id: row.id,
+        taskId: row.taskId,
+        title: row.title,
+        completed: row.completed,
+        completedAt: row.completedAt,
+        createdAt: row.createdAt,
+        updatedAt: row.updatedAt,
+      )).toList();
     } catch (e) {
-      print('Error fetching subtasks: $e');
-      return []; // Return an empty list on error
+      debugPrint('Error fetching subtasks: $e');
+      return [];
     }
   }
 
-  // Add a new subtask to a specific task
   Future<int?> addSubtask(String taskId, {
     required String title,
-    bool completed = false, // Default to false
-    DateTime? completedAt, // ADDED: Support completion timestamp
+    bool completed = false,
+    DateTime? completedAt,
   }) async {
     final subtask = SubtaskModel(
-      id: const Uuid().v1(), // Placeholder for new subtasks
+      id: const Uuid().v1(),
       taskId: taskId,
       title: title,
       completed: completed,
-      completedAt: completedAt, // ADDED: Include completion timestamp
+      completedAt: completedAt,
     );
 
     try {
-      return await _dbHelper.insertSubtask(subtask);
+      await insertSubtask(subtask);
+      return 1;
     } catch (e) {
-      print('Error adding subtask: $e');
-      return null; // Indicate failure
+      debugPrint('Error adding subtask: $e');
+      return null;
     }
   }
 
-  // Update an existing subtask in the database
   Future<void> updateSubtask(SubtaskModel subtask) async {
     if (subtask.id.isEmpty) {
-      print('Error: Subtask ID cannot be empty for update.');
-      return; // Early return if ID is empty
+      debugPrint('Error: Subtask ID cannot be empty for update.');
+      return;
     }
 
     try {
-      await _dbHelper.updateSubtask(subtask); // Assuming this method accepts SubtaskModel
+      await (_database.update(_database.subtasks)
+            ..where((s) => s.subtaskId.equals(subtask.id)))
+          .write(SubtasksCompanion(
+            id: Value(subtask.id),
+            subtaskId: Value(subtask.id),
+            taskId: Value(subtask.taskId),
+            title: Value(subtask.title),
+            completed: Value(subtask.completed),
+            completedAt: Value(subtask.completedAt),
+            createdAt: Value(subtask.createdAt),
+            updatedAt: Value(DateTime.now()),
+          ));
     } catch (e) {
-      print('Error updating subtask: $e');
+      debugPrint('Error updating subtask: $e');
     }
   }
 
-  // FIXED: Toggle subtask completion status (for checkbox functionality)
   Future<void> toggleSubtaskCompletion(String subtaskId) async {
     try {
-      final subtask = await getSubtaskById(subtaskId); // FIXED: Use helper method
-      
+      final subtask = await getSubtaskById(subtaskId);
+
       if (subtask == null) {
-        print('Subtask with ID $subtaskId not found');
-        return; // Exit gracefully
+        debugPrint('Subtask with ID $subtaskId not found');
+        return;
       }
-      
+
       final updatedSubtask = subtask.toggleCompletion();
       await updateSubtask(updatedSubtask);
     } catch (e) {
-      print('Error toggling subtask completion: $e');
+      debugPrint('Error toggling subtask completion: $e');
     }
   }
 
-  // FIXED: Mark subtask as completed (for checkbox functionality)
   Future<void> markSubtaskCompleted(String subtaskId) async {
     try {
-      final subtask = await getSubtaskById(subtaskId); // FIXED: Use helper method
-      
+      final subtask = await getSubtaskById(subtaskId);
+
       if (subtask == null) {
-        print('Subtask with ID $subtaskId not found');
-        return; // Exit gracefully
+        debugPrint('Subtask with ID $subtaskId not found');
+        return;
       }
-      
+
       if (!subtask.completed) {
         final updatedSubtask = subtask.copyWith(
           completed: true,
           completedAt: DateTime.now(),
         );
         await updateSubtask(updatedSubtask);
+
+        try {
+          final parentTask = await getTaskById(subtask.taskId);
+          int? energyLevel;
+          String? moodTags;
+          String? privacyContext;
+          String? location;
+
+          final todayEntry = await _database.select(_database.energyEntries)
+              .get()
+              .then((entries) {
+            final now = DateTime.now();
+            try {
+              return entries.firstWhere((e) =>
+                e.timestamp.year == now.year &&
+                e.timestamp.month == now.month &&
+                e.timestamp.day == now.day
+              );
+            } catch (e) {
+              return null;
+            }
+          });
+
+          if (todayEntry != null) {
+            energyLevel = todayEntry.energyLevel;
+            moodTags = todayEntry.moodTags;
+            privacyContext = todayEntry.privacyContext;
+            location = todayEntry.location;
+          }
+
+          await CompletionLogService(_database).logCompletion(
+            taskId: subtaskId,
+            taskTitle: subtask.title,
+            isSubtask: true,
+            parentTaskTitle: parentTask?.title,
+            energyLevel: energyLevel,
+            moodTags: moodTags,
+            privacyContext: privacyContext,
+            location: location,
+          );
+        } catch (e) {
+          debugPrint('Error logging subtask completion: $e');
+        }
       }
     } catch (e) {
-      print('Error marking subtask as completed: $e');
+      debugPrint('Error marking subtask as completed: $e');
     }
   }
 
-  // ADDED: Mark subtask as incomplete (for checkbox functionality)
   Future<void> markSubtaskIncomplete(String subtaskId) async {
     try {
       final subtask = await getSubtaskById(subtaskId);
-      
+
       if (subtask == null) {
-        print('Subtask with ID $subtaskId not found');
-        return; // Exit gracefully
+        debugPrint('Subtask with ID $subtaskId not found');
+        return;
       }
-      
+
       if (subtask.completed) {
         final updatedSubtask = subtask.copyWith(
           completed: false,
@@ -486,28 +603,28 @@ Future<void> insertTask(TaskModel task) async {
         await updateSubtask(updatedSubtask);
       }
     } catch (e) {
-      print('Error marking subtask as incomplete: $e');
+      debugPrint('Error marking subtask as incomplete: $e');
     }
   }
 
-  // Delete a subtask from the database
   Future<void> deleteSubtask(String subtaskId) async {
     try {
-      await _dbHelper.deleteSubtask(subtaskId);
+      await (_database.delete(_database.subtasks)
+            ..where((s) => s.subtaskId.equals(subtaskId)))
+          .go();
     } catch (e) {
-      print('Error deleting subtask: $e');
+      debugPrint('Error deleting subtask: $e');
     }
   }
 
-  // ADDED: Get task completion statistics
   Future<Map<String, int>> getTaskStats() async {
     try {
       final tasks = await getTasks();
       final completed = tasks.where((task) => task.completed).length;
       final pending = tasks.where((task) => !task.completed).length;
-      final overdue = tasks.where((task) => 
+      final overdue = tasks.where((task) =>
         !task.completed && task.dueDate.isBefore(DateTime.now())).length;
-      
+
       return {
         'total': tasks.length,
         'completed': completed,
@@ -515,8 +632,69 @@ Future<void> insertTask(TaskModel task) async {
         'overdue': overdue,
       };
     } catch (e) {
-      print('Error getting task stats: $e');
+      debugPrint('Error getting task stats: $e');
       return {'total': 0, 'completed': 0, 'pending': 0, 'overdue': 0};
     }
+  }
+
+  TaskModel _rowToModel(Task row) {
+    return TaskModel(
+      id: row.taskId,
+      title: row.title,
+      description: row.description,
+      dueDate: row.dueDate ?? DateTime.now(),
+      completed: row.completed,
+      category: row.category,
+      priority: row.priority,
+      pageId: row.pageId,
+      completedAt: row.completedAt,
+      isRecurring: row.isRecurring,
+      recurrenceRule: row.recurrenceRule,
+      recurrenceInterval: row.recurrenceInterval,
+      daysOfWeek: row.daysOfWeek != null
+          ? row.daysOfWeek!.split(',').map((e) => int.parse(e.trim())).toList()
+          : null,
+      recurrenceEndDate: row.recurrenceEndDate,
+      parentTaskId: row.parentTaskId,
+      maxOccurrences: row.maxOccurrences,
+      skipWeekends: row.skipWeekends,
+      dayOfMonth: row.dayOfMonth,
+      weekOfMonth: row.weekOfMonth,
+      reminderEnabled: row.reminderEnabled,
+      reminderTime: row.reminderTime,
+      reminderPreset: row.reminderPreset,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
+    );
+  }
+
+  TasksCompanion _modelToCompanion(TaskModel model, {bool skipPrimaryKey = false}) {
+    return TasksCompanion(
+      id: skipPrimaryKey ? const Value.absent() : Value(model.id),
+      taskId: skipPrimaryKey ? const Value.absent() : Value(model.id),
+      title: Value(model.title),
+      description: Value(model.description),
+      dueDate: Value(model.dueDate),
+      completed: Value(model.completed),
+      completedAt: Value(model.completedAt),
+      category: Value(model.category),
+      priority: Value(model.priority),
+      isRecurring: Value(model.isRecurring),
+      recurrenceRule: Value(model.recurrenceRule),
+      recurrenceInterval: Value(model.recurrenceInterval ?? 1),
+      daysOfWeek: Value(model.daysOfWeek?.join(',')),
+      recurrenceEndDate: Value(model.recurrenceEndDate),
+      parentTaskId: Value(model.parentTaskId),
+      maxOccurrences: Value(model.maxOccurrences),
+      skipWeekends: Value(model.skipWeekends),
+      dayOfMonth: Value(model.dayOfMonth),
+      weekOfMonth: Value(model.weekOfMonth),
+      reminderEnabled: Value(model.reminderEnabled ?? false),
+      reminderTime: Value(model.reminderTime),
+      reminderPreset: Value(model.reminderPreset),
+      pageId: Value(model.pageId),
+      createdAt: Value(model.createdAt),
+      updatedAt: Value(model.updatedAt),
+    );
   }
 }

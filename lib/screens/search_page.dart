@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import '../models/database.dart';
+import 'package:provider/provider.dart';
 import 'package:maximize/models/task_model.dart';
-import 'package:maximize/models/event_model.dart';
+import 'package:maximize/models/event_model.dart' as event_model;
 import 'package:maximize/models/note_model.dart';
 import 'package:maximize/models/reminder_model.dart';
+import 'package:maximize/services/task_service.dart';
+import 'package:maximize/services/event_service.dart';
+import 'package:maximize/services/note_service.dart';
+import 'package:maximize/services/reminder_service.dart';
 
 class SearchPage extends StatefulWidget {
-  final AppDatabase database;
-  const SearchPage({Key? key, required this.database}) : super(key: key);
+  const SearchPage({Key? key}) : super(key: key);
 
   @override
   SearchPageState createState() => SearchPageState();
@@ -17,10 +20,10 @@ class SearchPage extends StatefulWidget {
 class SearchPageState extends State<SearchPage> {
   String query = '';
   bool isSearching = false;
-  List<TaskData> matchedTasks = [];
-  List<EventData> matchedEvents = [];
+  List<TaskModel> matchedTasks = [];
+  List<event_model.Event> matchedEvents = [];
   List<NoteModel> matchedNotes = [];
-  List<ReminderData> matchedReminders = [];
+  List<ReminderModel> matchedReminders = [];
 
   Future<void> _performSearch(String q) async {
     if (q.length < 2) {
@@ -36,35 +39,22 @@ class SearchPageState extends State<SearchPage> {
     setState(() => isSearching = true);
 
     try {
+      final taskService = Provider.of<TaskService>(context, listen: false);
+      final eventService = Provider.of<EventService>(context, listen: false);
+      final reminderService = Provider.of<ReminderService>(context, listen: false);
+      final noteService = Provider.of<NoteService>(context, listen: false);
+
       final futures = await Future.wait([
-        widget.database.getAllTasks(),
-        widget.database.getAllEvents(),
-        widget.database.getAllReminders?.call() ?? Future.value(<ReminderData>[]),
-        widget.database.getAllNotes?.call() ?? Future.value([]),
+        taskService.getTasks(),
+        eventService.getAllEvents(),
+        reminderService.getReminders(),
+        noteService.getNotes(),
       ]);
 
-      final tasks = futures[0] as List<TaskData>;
-      final events = futures[1] as List<EventData>;
-      final remindersRaw = futures[2];
-      final notesRaw = futures[3];
-
-      final reminders = remindersRaw is List
-          ? (remindersRaw as List).cast<ReminderData>()
-          : <ReminderData>[];
-
-      //  Map raw Drift Note → NoteModel (no cast, explicit conversion)
-      final notes = notesRaw is List
-          ? (notesRaw as List).map((n) => NoteModel(
-                id: n.id,
-                title: n.title,
-                content: n.content,
-                category: n.category,
-                color: n.color,
-                isPinned: n.isPinned,
-                createdAt: n.createdAt,
-                updatedAt: n.updatedAt,
-              )).toList()
-          : <NoteModel>[];
+      final tasks = futures[0] as List<TaskModel>;
+      final events = futures[1] as List<event_model.Event>;
+      final reminders = futures[2] as List<ReminderModel>;
+      final notes = futures[3] as List<NoteModel>;
 
       final lowerQuery = q.toLowerCase();
 
@@ -195,7 +185,7 @@ class SearchPageState extends State<SearchPage> {
     );
   }
 
-  Widget _buildTaskTile(TaskData task) {
+  Widget _buildTaskTile(TaskModel task) {
     return ListTile(
       leading: CircleAvatar(backgroundColor: Colors.blue, child: Icon(Icons.task, color: Colors.white)),
       title: Text(task.title),
@@ -217,7 +207,7 @@ class SearchPageState extends State<SearchPage> {
     );
   }
 
-  Widget _buildEventTile(EventData event) {
+  Widget _buildEventTile(event_model.Event event) {
     return ListTile(
       leading: CircleAvatar(backgroundColor: Colors.green, child: Icon(Icons.event, color: Colors.white)),
       title: Text(event.title),
@@ -225,16 +215,15 @@ class SearchPageState extends State<SearchPage> {
                      '${DateFormat('h:mm a').format(event.startDateTime)}'),
       onTap: () {
         Navigator.pop(context, {
-          'type': 'event', 
+          'type': 'event',
           'id': event.id,
           'title': event.title,
-
         });
       }
     );
   }
 
-  Widget _buildReminderTile(ReminderData reminder) {
+  Widget _buildReminderTile(ReminderModel reminder) {
     return ListTile(
       leading: CircleAvatar(backgroundColor: Colors.orange, child: Icon(Icons.alarm, color: Colors.white)),
       title: Text(reminder.title),

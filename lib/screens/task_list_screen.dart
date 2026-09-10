@@ -1,10 +1,21 @@
+import "package:provider/provider.dart";
 import 'package:flutter/material.dart';
+import "package:provider/provider.dart";
 import 'package:flutter/gestures.dart';
+import "package:provider/provider.dart";
 import 'package:maximize/models/task_model.dart';
+import "package:provider/provider.dart";
+import 'package:maximize/models/subtask_model.dart';
+import "package:provider/provider.dart";
 import 'package:maximize/services/task_service.dart';
+import "package:provider/provider.dart";
+import 'package:maximize/services/firebase_realtime_sync_service.dart';
+import "package:provider/provider.dart";
 import 'package:maximize/screens/add_task_page.dart';
+import "package:provider/provider.dart";
 import 'package:maximize/utils/task_utils.dart';
-import 'package:maximize/models/database.dart';
+import "package:provider/provider.dart";
+import 'package:maximize/database/app_database.dart';
 import 'package:intl/intl.dart';
 
 // CustomScrollBehavior to fix RefreshIndicator on Windows desktop
@@ -53,7 +64,7 @@ class TaskListScreenState extends State<TaskListScreen> with TickerProviderState
   @override
   void initState() {
     super.initState();
-    _taskService = TaskService(widget.database);
+    _taskService = context.read<TaskService>();
     _animationController = AnimationController(
       duration: const Duration(milliseconds: 300),
       vsync: this,
@@ -62,6 +73,18 @@ class TaskListScreenState extends State<TaskListScreen> with TickerProviderState
       CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
     );
     _loadTasks();
+
+    // Listen for real-time task changes from Firebase
+    if (FirebaseRealtimeSyncService.instance.isInitialized) {
+      FirebaseRealtimeSyncService.instance.listenToTasks((tasks) {
+        if (mounted) {
+          setState(() {
+            _tasks = tasks;
+            _updateFilterOptions();
+          });
+        }
+      });
+    }
   }
 
   @override
@@ -1120,12 +1143,11 @@ return matchesCategory && matchesPriority && matchesDueDate && matchesRecurrence
     );
   }
 
-  // UPDATED: Pass taskService parameter
   void _addTask() {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => AddTaskPage(taskService: _taskService), //  ADD taskService
+        builder: (context) => const AddTaskPage(),
       ),
     ).then((value) {
       if (value != null) {
@@ -1274,8 +1296,7 @@ return matchesCategory && matchesPriority && matchesDueDate && matchesRecurrence
       context,
       MaterialPageRoute(
         builder: (context) => AddTaskPage(
-          task: convertTaskModelToData(task),
-          taskService: _taskService, // ADD taskService
+          task: task,
         ),
       ),
     ).then((value) {
@@ -1292,6 +1313,8 @@ return matchesCategory && matchesPriority && matchesDueDate && matchesRecurrence
       } else {
         await _taskService.markTaskIncomplete(task.id);
       }
+      // Add small delay to ensure database update completes
+      await Future.delayed(const Duration(milliseconds: 100));
       _loadTasks();
     } catch (error) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1311,6 +1334,8 @@ return matchesCategory && matchesPriority && matchesDueDate && matchesRecurrence
         );
         await _taskService.updateSubtask(updatedSubtask);
       }
+      // Add small delay to ensure database update completes
+      await Future.delayed(const Duration(milliseconds: 100));
       _loadTasks();
     } catch (error) {
       ScaffoldMessenger.of(context).showSnackBar(

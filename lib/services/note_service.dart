@@ -1,71 +1,60 @@
+import 'package:maximize/database/app_database.dart';
 import 'package:maximize/models/note_model.dart';
-import 'package:maximize/models/database.dart';
 import 'package:uuid/uuid.dart';
-import 'package:drift/drift.dart'; 
+import 'package:flutter/material.dart';
+import 'package:drift/drift.dart';
 
 class NoteService {
   final AppDatabase _database;
 
   NoteService(this._database);
 
-  // Get all notes (sorted by pinned first, then most recent)
   Future<List<NoteModel>> getNotes() async {
     try {
-      final noteDataList = await _database.getAllNotes();
-      final notes = noteDataList.map((data) => NoteModel.fromData(data)).toList();
-      
-      // Sort: pinned first, then by updated time (newest first)
-      notes.sort((a, b) {
-        if (a.isPinned && !b.isPinned) return -1;
-        if (!a.isPinned && b.isPinned) return 1;
-        return b.updatedAt.compareTo(a.updatedAt);
-      });
-      
+      final rows = await _database.select(_database.notes).get();
+      final notes = rows.map(_rowToModel).toList();
+      notes.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
       return notes;
     } catch (e) {
-      print('Error fetching notes: $e');
+      debugPrint('Error fetching notes: $e');
       return [];
     }
   }
 
-  // Get pinned notes only
   Future<List<NoteModel>> getPinnedNotes() async {
     try {
       final notes = await getNotes();
       return notes.where((note) => note.isPinned).toList();
     } catch (e) {
-      print('Error fetching pinned notes: $e');
+      debugPrint('Error fetching pinned notes: $e');
       return [];
     }
   }
 
-  // Get notes by category
   Future<List<NoteModel>> getNotesByCategory(String category) async {
     try {
       final notes = await getNotes();
       return notes.where((note) => note.category == category).toList();
     } catch (e) {
-      print('Error fetching notes by category: $e');
+      debugPrint('Error fetching notes by category: $e');
       return [];
     }
   }
 
-  // Search notes by title or content
   Future<List<NoteModel>> searchNotes(String query) async {
     try {
       final notes = await getNotes();
       final lowerQuery = query.toLowerCase();
-      return notes.where((note) => 
+      return notes.where((note) =>
         note.title.toLowerCase().contains(lowerQuery) ||
         note.content.toLowerCase().contains(lowerQuery)
       ).toList();
     } catch (e) {
-      print('Error searching notes: $e');
+      debugPrint('Error searching notes: $e');
       return [];
     }
   }
 
-  // Add note 
   Future<String?> addNote({
     required String title,
     required String content,
@@ -74,56 +63,57 @@ class NoteService {
     bool isPinned = false,
   }) async {
     try {
-      final id = Uuid().v4();
+      final id = const Uuid().v4();
       final now = DateTime.now();
-      
-      final note = NotesCompanion.insert(
-        id: Value(id), 
-        title: title,
-        content: content,
-        category: Value(category),
-        color: Value(color), 
-        createdAt: now,
-        updatedAt: now,
-        isPinned: Value(isPinned), 
+
+      await _database.into(_database.notes).insert(
+        NotesCompanion(
+          id: Value(id),
+          noteId: Value(id),
+          title: Value(title),
+          content: Value(content),
+          createdAt: Value(now),
+          updatedAt: Value(now),
+        ),
       );
-      
-      await _database.insertNote(note);
-      print('[NoteService] Note added successfully: $id');
+      debugPrint('[NoteService] Note added successfully: $id');
       return id;
     } catch (e) {
-      print('Error adding note: $e');
+      debugPrint('Error adding note: $e');
       return null;
     }
   }
 
-  // Update note
   Future<bool> updateNote(NoteModel note) async {
     try {
-      final updatedNote = note.copyWith(updatedAt: DateTime.now());
-      final companion = updatedNote.toCompanion();
-      await _database.updateNote(companion);
-      print('[NoteService] Note updated successfully: ${note.id}');
+      await (_database.update(_database.notes)
+            ..where((n) => n.noteId.equals(note.id)))
+          .write(NotesCompanion(
+            title: Value(note.title),
+            content: Value(note.content),
+            updatedAt: Value(DateTime.now()),
+          ));
+      debugPrint('[NoteService] Note updated successfully: ${note.id}');
       return true;
     } catch (e) {
-      print('Error updating note: $e');
+      debugPrint('Error updating note: $e');
       return false;
     }
   }
 
-  // Delete note
   Future<bool> deleteNote(String noteId) async {
     try {
-      await _database.deleteNote(noteId);
-      print('[NoteService] Note deleted successfully: $noteId');
+      await (_database.delete(_database.notes)
+            ..where((n) => n.noteId.equals(noteId)))
+          .go();
+      debugPrint('[NoteService] Note deleted successfully: $noteId');
       return true;
     } catch (e) {
-      print('Error deleting note: $e');
+      debugPrint('Error deleting note: $e');
       return false;
     }
   }
 
-  // Toggle pin status
   Future<bool> togglePin(String noteId) async {
     try {
       final notes = await getNotes();
@@ -134,12 +124,11 @@ class NoteService {
       );
       return await updateNote(updated);
     } catch (e) {
-      print('Error toggling pin: $e');
+      debugPrint('Error toggling pin: $e');
       return false;
     }
   }
 
-  // Get all unique categories
   Future<List<String>> getCategories() async {
     try {
       final notes = await getNotes();
@@ -151,8 +140,18 @@ class NoteService {
       categories.sort();
       return categories;
     } catch (e) {
-      print('Error getting categories: $e');
+      debugPrint('Error getting categories: $e');
       return [];
     }
+  }
+
+  NoteModel _rowToModel(Note row) {
+    return NoteModel(
+      id: row.noteId,
+      title: row.title,
+      content: row.content,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
+    );
   }
 }
