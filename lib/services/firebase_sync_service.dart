@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:maximize/models/database.dart';
+import 'package:maximize/database/app_database_adapter.dart';
 import 'package:maximize/services/settings_service.dart';
 
 class FirebaseSyncService {

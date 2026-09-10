@@ -10,8 +10,8 @@ list(APPEND FLUTTER_PLUGIN_LIST
   flutter_gemma
   flutter_secure_storage_windows
   flutter_timezone
+  isar_flutter_libs
   screen_retriever
-  sqlite3_flutter_libs
   tray_manager
   url_launcher_windows
   win_toast
@@ -19,6 +19,7 @@ list(APPEND FLUTTER_PLUGIN_LIST
 )
 
 list(APPEND FLUTTER_FFI_PLUGIN_LIST
+  jni
 )
 
 set(PLUGIN_BUNDLED_LIBRARIES)

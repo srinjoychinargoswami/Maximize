@@ -1,8 +1,11 @@
 import 'dart:io';
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:maximize/models/reminder_model.dart';
-import 'package:maximize/models/database.dart';
+import 'package:maximize/database/daos/reminder_dao.dart';
+import 'package:maximize/database/converters/reminder_converter.dart';
+import 'package:maximize/services/firebase_realtime_sync_service.dart';
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 import 'package:win_toast/win_toast.dart';
@@ -12,14 +15,12 @@ import 'package:win_toast/win_toast.dart';
 // Handles Database Operations & Business Logic
 
 class ReminderService {
-  final AppDatabase _database;
-
-  ReminderService(this._database);
+  final ReminderDAO _dao = ReminderDAO();
 
   Future<List<ReminderModel>> getReminders() async {
     try {
-      final reminderDataList = await _database.getAllReminders();
-      return reminderDataList.map((reminderData) => ReminderModel.fromData(reminderData)).toList();
+      final isarReminders = await _dao.getAllReminders();
+      return isarReminders.map((r) => ReminderConverter.toReminderModel(r)).toList();
     } catch (e) {
       print('Error fetching reminders: $e');
       return [];
@@ -85,10 +86,17 @@ class ReminderService {
 
   Future<void> addReminder(ReminderModel reminder) async {
     try {
-      await _database.insertReminder(reminder);
-      
+      final isarReminder = ReminderConverter.fromReminderModel(reminder);
+      await _dao.insertReminder(isarReminder);
+
       if (!reminder.completed && reminder.scheduledTime.isAfter(DateTime.now())) {
         await NotificationService.instance.scheduleNotification(reminder);
+      }
+
+      // CRITICAL FIX: Sync to Firebase so other devices get the reminder
+      if (FirebaseRealtimeSyncService.instance.isInitialized) {
+        await FirebaseRealtimeSyncService.instance.syncReminder(reminder);
+        print('[ReminderService] Reminder synced to Firebase: ${reminder.id}');
       }
     } catch (e) {
       print('Error adding reminder: $e');
@@ -96,33 +104,41 @@ class ReminderService {
   }
 
   Future<void> insertReminder(ReminderModel reminder) async {
-  try {
-    // Cancel any stale notification first
-    await NotificationService.instance.cancelNotification(reminder.id);
-    
-    // Re-insert into database
-    await _database.insertReminder(reminder);
-    
-    // Reschedule notification if still in future
-    if (!reminder.completed && reminder.scheduledTime.isAfter(DateTime.now())) {
-      await NotificationService.instance.scheduleNotification(reminder);
+    try {
+      // Cancel any stale notification first
+      await NotificationService.instance.cancelNotification(reminder.id);
+
+      // Re-insert into database
+      final isarReminder = ReminderConverter.fromReminderModel(reminder);
+      await _dao.insertReminder(isarReminder);
+
+      // Reschedule notification if still in future
+      if (!reminder.completed && reminder.scheduledTime.isAfter(DateTime.now())) {
+        await NotificationService.instance.scheduleNotification(reminder);
+      }
+
+      print('[ReminderService] Reminder restored: ${reminder.title}');
+    } catch (e) {
+      print('Error inserting reminder: $e');
+      rethrow;
     }
-    
-    print('[ReminderService] Reminder restored: ${reminder.title}');
-  } catch (e) {
-    print('Error inserting reminder: $e');
-    rethrow;
   }
-}
 
   Future<void> updateReminder(ReminderModel reminder) async {
     try {
-      await _database.updateReminder(reminder);
-      
+      final isarReminder = ReminderConverter.fromReminderModel(reminder);
+      await _dao.updateReminder(isarReminder);
+
       await NotificationService.instance.cancelNotification(reminder.id);
-      
+
       if (!reminder.completed && reminder.scheduledTime.isAfter(DateTime.now())) {
         await NotificationService.instance.scheduleNotification(reminder);
+      }
+
+      // CRITICAL FIX: Sync to Firebase so other devices get updates
+      if (FirebaseRealtimeSyncService.instance.isInitialized) {
+        await FirebaseRealtimeSyncService.instance.syncReminder(reminder);
+        print('[ReminderService] Reminder updated and synced to Firebase: ${reminder.id}');
       }
     } catch (e) {
       print('Error updating reminder: $e');
@@ -198,7 +214,13 @@ class ReminderService {
       final reminder = await getReminderById(reminderId);
       if (reminder != null) {
         await NotificationService.instance.deleteReminderWithCleanup(reminder);
-        await _database.deleteReminder(reminderId);
+        await _dao.deleteReminder(reminderId);
+
+        // CRITICAL FIX: Sync deletion to Firebase so other devices delete it too
+        if (FirebaseRealtimeSyncService.instance.isInitialized) {
+          await FirebaseRealtimeSyncService.instance.deleteReminder(reminderId);
+          print('[ReminderService] Reminder deleted and synced to Firebase: $reminderId');
+        }
       }
     } catch (e) {
       print('Error deleting reminder: $e');

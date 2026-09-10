@@ -1,26 +1,32 @@
 import 'package:maximize/models/task_model.dart';
-import 'package:maximize/models/database.dart';
-import 'package:uuid/uuid.dart';
+import 'package:maximize/models/subtask_model.dart';
+import 'package:maximize/models/reminder_model.dart';
+import 'package:maximize/database/daos/task_dao.dart';
+import 'package:maximize/database/daos/subtask_dao.dart';
+import 'package:maximize/database/daos/energy_entry_dao.dart';
+import 'package:maximize/database/converters/task_converter.dart';
+import 'package:maximize/database/converters/subtask_converter.dart';
+import 'package:maximize/database/converters/energy_entry_converter.dart';
+import 'package:maximize/database/models/isar_models.dart';
+import 'package:maximize/services/completion_log_service.dart';
 import 'package:maximize/services/reminder_service.dart';
-import 'package:maximize/models/reminder_model.dart'; 
+import 'package:uuid/uuid.dart';
+
 class TaskService {
-  final AppDatabase _dbHelper; // Declare a variable to hold the database
+  final TaskDAO _taskDao = TaskDAO();
+  final SubtaskDAO _subtaskDao = SubtaskDAO();
+  final EnergyEntryDAO _energyDao = EnergyEntryDAO();
 
-  // Constructor that accepts the database
-  TaskService(this._dbHelper); // Initialize the database
-
-  // Fetch all tasks from the database
   Future<List<TaskModel>> getTasks() async {
     try {
-      final taskDataList = await _dbHelper.getAllTasks(); // Fetch List<TaskData>
-      return taskDataList.map((taskData) => TaskModel.fromData(taskData)).toList(); // Convert to List<TaskModel>
+      final isarTasks = await _taskDao.getAllTasks();
+      return isarTasks.map(TaskConverter.toTaskModel).toList();
     } catch (e) {
       print('Error fetching tasks: $e');
-      return []; // Return an empty list on error
+      return [];
     }
   }
 
-  // ENHANCED: Fetch tasks with filtering options for better organization
   Future<List<TaskModel>> getTasksFiltered({
     bool? completed,
     String? category,
@@ -42,14 +48,12 @@ class TaskService {
     }
   }
 
-  // ADDED: Helper method to check if two dates are the same day
   bool _isSameDay(DateTime date1, DateTime date2) {
-    return date1.year == date2.year && 
-           date1.month == date2.month && 
+    return date1.year == date2.year &&
+           date1.month == date2.month &&
            date1.day == date2.day;
   }
 
-  // Add a new task to the database with notification support
   Future<int?> addTask({
     required String title,
     required String description,
@@ -57,11 +61,9 @@ class TaskService {
     required bool completed,
     required String category,
     required String priority,
-    int? pageId, // Optional pageId for associating with pages
-    // ADDED: New completion tracking parameters
+    int? pageId,
     DateTime? completedAt,
     List<SubtaskModel>? subtasks,
-    // ADDED: Recurring task parameters
     bool isRecurring = false,
     String? recurrenceRule,
     int? recurrenceInterval,
@@ -77,17 +79,17 @@ class TaskService {
     String? reminderPreset,
   }) async {
     final task = TaskModel(
-      id: const Uuid().v1(), // Placeholder for new tasks
+      id: const Uuid().v1(),
       title: title,
       description: description,
-      dueDate: dueDate, // Pass DateTime directly
-      completed: completed, // Pass bool directly
+      dueDate: dueDate,
+      completed: completed,
       category: category,
       priority: priority,
-      pageId: pageId?.toString(), // Include pageId if needed
-      completedAt: completedAt, // ADDED: Track completion timestamp
-      subtasks: subtasks, // ADDED: Include subtasks
-      isRecurring: isRecurring, // ADDED: Recurring task support
+      pageId: pageId?.toString(),
+      completedAt: completedAt,
+      subtasks: subtasks,
+      isRecurring: isRecurring,
       recurrenceRule: recurrenceRule,
       recurrenceInterval: recurrenceInterval,
       daysOfWeek: daysOfWeek,
@@ -103,52 +105,76 @@ class TaskService {
     );
 
     try {
-      final result = await _dbHelper.insertTask(task);
-      
-      // Schedule notification if reminder is enabled
+      final isarTask = TaskConverter.fromTaskModel(task);
+      await _taskDao.insertTask(isarTask);
       await _scheduleTaskNotification(task);
-      
-      return result;
+      return 1;
     } catch (e) {
       print('Error adding task: $e');
-      return null; // Indicate failure
+      return null;
     }
   }
 
-  //Update an existing task with notification support
   Future<void> updateTask(TaskModel task) async {
     if (task.id.isEmpty) {
       print('Error: Task ID cannot be empty for update.');
-      return; // Early return if ID is empty
+      return;
     }
 
     try {
-      // Cancel old notification before updating
       await _cancelTaskNotification(task.id);
-      
-      await _dbHelper.updateTask(task); // Assuming this method accepts TaskModel
-      
-      // Schedule new notification if reminder is enabled
+      final isarTask = TaskConverter.fromTaskModel(task);
+      await _taskDao.updateTask(isarTask);
       await _scheduleTaskNotification(task);
     } catch (e) {
       print('Error updating task: $e');
     }
   }
 
-  // ADDED: Toggle task completion status (for checkbox functionality)
   Future<void> toggleTaskCompletion(String taskId) async {
     try {
       final task = await getTaskById(taskId);
       if (task != null) {
         final updatedTask = task.toggleCompletion();
         await updateTask(updatedTask);
+
+        // If toggled to completed, log the completion
+        if (updatedTask.completed) {
+          try {
+            int? energyLevel;
+            String? moodTags;
+            String? privacyContext;
+            String? location;
+
+            final todayEntry = await _energyDao.getTodaysEntry();
+            if (todayEntry != null) {
+              energyLevel = todayEntry.energyLevel;
+              moodTags = todayEntry.moodTags;
+              privacyContext = todayEntry.privacyContext;
+              location = todayEntry.location;
+            }
+
+            await CompletionLogService().logCompletion(
+              taskId: taskId,
+              taskTitle: task.title,
+              description: task.description,
+              category: task.category,
+              priority: task.priority,
+              energyLevel: energyLevel,
+              moodTags: moodTags,
+              privacyContext: privacyContext,
+              location: location,
+            );
+          } catch (e) {
+            print('Error logging completion: $e');
+          }
+        }
       }
     } catch (e) {
       print('Error toggling task completion: $e');
     }
   }
 
-  // Mark task as completed + cancel notification
   Future<void> markTaskCompleted(String taskId) async {
     try {
       final task = await getTaskById(taskId);
@@ -157,9 +183,38 @@ class TaskService {
           completed: true,
           completedAt: DateTime.now(),
         );
-        await _dbHelper.updateTask(updatedTask);
-        
-        // Cancel notification when completed
+        final isarTask = TaskConverter.fromTaskModel(updatedTask);
+        await _taskDao.updateTask(isarTask);
+
+        try {
+          int? energyLevel;
+          String? moodTags;
+          String? privacyContext;
+          String? location;
+
+          final todayEntry = await _energyDao.getTodaysEntry();
+          if (todayEntry != null) {
+            energyLevel = todayEntry.energyLevel;
+            moodTags = todayEntry.moodTags;
+            privacyContext = todayEntry.privacyContext;
+            location = todayEntry.location;
+          }
+
+          await CompletionLogService().logCompletion(
+            taskId: taskId,
+            taskTitle: task.title,
+            description: task.description,
+            category: task.category,
+            priority: task.priority,
+            energyLevel: energyLevel,
+            moodTags: moodTags,
+            privacyContext: privacyContext,
+            location: location,
+          );
+        } catch (e) {
+          print('Error logging completion: $e');
+        }
+
         await _cancelTaskNotification(taskId);
       }
     } catch (e) {
@@ -167,7 +222,6 @@ class TaskService {
     }
   }
 
-  // Mark task as incomplete + reschedule notification
   Future<void> markTaskIncomplete(String taskId) async {
     try {
       final task = await getTaskById(taskId);
@@ -176,9 +230,8 @@ class TaskService {
           completed: false,
           completedAt: null,
         );
-        await _dbHelper.updateTask(updatedTask);
-        
-        // Reschedule notification if still in future
+        final isarTask = TaskConverter.fromTaskModel(updatedTask);
+        await _taskDao.updateTask(isarTask);
         await _scheduleTaskNotification(updatedTask);
       }
     } catch (e) {
@@ -186,7 +239,6 @@ class TaskService {
     }
   }
 
-  // ADDED: Get completed tasks for productivity tracking
   Future<List<TaskModel>> getCompletedTasks({DateTime? date}) async {
     try {
       final tasks = await getTasks();
@@ -203,7 +255,6 @@ class TaskService {
     }
   }
 
-  // ADDED: Get pending tasks for today's overview
   Future<List<TaskModel>> getTodaysTasks() async {
     try {
       final today = DateTime.now();
@@ -214,7 +265,6 @@ class TaskService {
     }
   }
 
-  // ADDED: Get overdue tasks
   Future<List<TaskModel>> getOverdueTasks() async {
     try {
       final tasks = await getTasks();
@@ -228,79 +278,62 @@ class TaskService {
     }
   }
 
-  // Delete a task with notification cleanup
   Future<void> deleteTask(String taskId) async {
     try {
-      // Cancel notification before deleting
       await _cancelTaskNotification(taskId);
-      
-      // ENHANCED: Also delete associated subtasks
       final subtasks = await getSubtasks(taskId);
       for (final subtask in subtasks) {
         await deleteSubtask(subtask.id);
       }
-      await _dbHelper.deleteTask(taskId);
+      await _taskDao.deleteTask(taskId);
     } catch (e) {
       print('Error deleting task: $e');
     }
   }
 
-// ADD insertSubtask RIGHT HERE
-Future<void> insertSubtask(SubtaskModel subtask) async {
-  try {
-    await _dbHelper.insertSubtask(subtask);
-    print('[TaskService] Subtask restored: ${subtask.title}');
-  } catch (e) {
-    print('Error inserting subtask: $e');
-    rethrow;
-  }
-}
-
-  // ADD insertTask RIGHT HERE
-Future<void> insertTask(TaskModel task) async {
-  try {
-    // Cancel any stale notification first
-    await _cancelTaskNotification(task.id);
-
-    // Re-insert into database
-    await _dbHelper.insertTask(task);
-
-    // Reschedule notification if reminder enabled + still in future
-    await _scheduleTaskNotification(task);
-
-    print('[TaskService] Task restored: ${task.title}');
-  } catch (e) {
-    print('Error inserting task: $e');
-    rethrow;
-  }
-}
-
-
-  // Fetch a task by its ID from the database
-  Future<TaskModel?> getTaskById(String id) async {
+  Future<void> insertSubtask(SubtaskModel subtask) async {
     try {
-      final tasks = await _dbHelper.getAllTasks();
-      final taskData = tasks.firstWhere(
-        (task) => task.id == id,
-        orElse: () => throw Exception('Task not found'), // Throw an exception if no task is found
-      );
-      
-      // ENHANCED: Load subtasks with the task
-      final subtasks = await getSubtasks(id);
-      final taskModel = TaskModel.fromData(taskData);
-      return taskModel.copyWith(subtasks: subtasks);
+      final isarSubtask = SubtaskConverter.fromSubtaskModel(subtask);
+      await _subtaskDao.insertSubtask(isarSubtask);
+      print('[TaskService] Subtask restored: ${subtask.title}');
     } catch (e) {
-      print('Error fetching task by ID: $e');
-      return null; // Indicate failure
+      print('Error inserting subtask: $e');
+      rethrow;
     }
   }
 
-  // ENHANCED: Get task with all its subtasks loaded
+  Future<void> insertTask(TaskModel task) async {
+    try {
+      await _cancelTaskNotification(task.id);
+      final isarTask = TaskConverter.fromTaskModel(task);
+      await _taskDao.insertTask(isarTask);
+      await _scheduleTaskNotification(task);
+      print('[TaskService] Task restored: ${task.title}');
+    } catch (e) {
+      print('Error inserting task: $e');
+      rethrow;
+    }
+  }
+
+  Future<TaskModel?> getTaskById(String id) async {
+    try {
+      final isarTask = await _taskDao.getTaskById(id);
+      if (isarTask == null) return null;
+
+      final taskModel = TaskConverter.toTaskModel(isarTask);
+      final subtasks = await getSubtasks(id);
+      return taskModel.copyWith(subtasks: subtasks);
+    } catch (e) {
+      print('Error fetching task by ID: $e');
+      return null;
+    }
+  }
+
   Future<TaskModel?> getTaskWithSubtasks(String taskId) async {
     try {
       final task = await getTaskById(taskId);
       if (task == null) return null;
-      
+
       final subtasks = await getSubtasks(taskId);
       return task.copyWith(subtasks: subtasks);
     } catch (e) {
@@ -309,12 +342,11 @@ Future<void> insertTask(TaskModel task) async {
     }
   }
 
-  // ADDED: Helper method to find subtask by ID across all tasks
   Future<SubtaskModel?> getSubtaskById(String subtaskId) async {
     try {
-      final allTasks = await _dbHelper.getAllTasks();
-      
-      for (final task in allTasks) {
+      final tasks = await getTasks();
+
+      for (final task in tasks) {
         final subtasks = await getSubtasks(task.id);
         for (final subtask in subtasks) {
           if (subtask.id == subtaskId) {
@@ -322,23 +354,20 @@ Future<void> insertTask(TaskModel task) async {
           }
         }
       }
-      return null; // Subtask not found
+      return null;
     } catch (e) {
       print('Error fetching subtask by ID: $e');
       return null;
     }
   }
 
-  // Schedule notification for task reminder
   Future<void> _scheduleTaskNotification(TaskModel task) async {
     try {
-      // Only schedule if reminder is enabled and time is set
-      if (task.reminderEnabled == true && 
-          task.reminderTime != null && 
+      if (task.reminderEnabled == true &&
+          task.reminderTime != null &&
           !task.completed &&
           task.reminderTime!.isAfter(DateTime.now())) {
-        
-        // Create a reminder model for the notification system
+
         final reminder = ReminderModel(
           id: 'task_${task.id}',
           title: task.title,
@@ -347,7 +376,7 @@ Future<void> insertTask(TaskModel task) async {
           notificationId: task.id.hashCode.toString(),
           completed: false,
         );
-        
+
         await NotificationService.instance.scheduleNotification(reminder);
         print('[TaskService] Scheduled notification for task: ${task.title} at ${task.reminderTime}');
       }
@@ -356,7 +385,6 @@ Future<void> insertTask(TaskModel task) async {
     }
   }
 
-  // Cancel notification for task
   Future<void> _cancelTaskNotification(String taskId) async {
     try {
       await NotificationService.instance.cancelNotification('task_$taskId');
@@ -366,79 +394,62 @@ Future<void> insertTask(TaskModel task) async {
     }
   }
 
-  // Subtask Methods
-
-  // Fetch all subtasks for a specific task
   Future<List<SubtaskModel>> getSubtasks(String taskId) async {
     try {
-      final subtaskDataList = await _dbHelper.getAllSubtasks(taskId); // Fetch List<SubtaskData>
-      
-      // Check if subtaskDataList is null or empty
-      if (subtaskDataList.isEmpty) {
-        return []; // Return an empty list if no subtasks found
-      }
-
-      return subtaskDataList.map((subtaskData) {
-        return SubtaskModel(
-          id: subtaskData.id,
-          taskId: subtaskData.taskId,
-          title: subtaskData.title,
-          completed: subtaskData.completed,
-          completedAt: subtaskData.completedAt, // ADDED: Map completion timestamp
-        );
-      }).toList(); // Convert to List<SubtaskModel>
+      final isarSubtasks = await _subtaskDao.getAllSubtasks(taskId);
+      return isarSubtasks.map(SubtaskConverter.toSubtaskModel).toList();
     } catch (e) {
       print('Error fetching subtasks: $e');
-      return []; // Return an empty list on error
+      return [];
     }
   }
 
-  // Add a new subtask to a specific task
   Future<int?> addSubtask(String taskId, {
     required String title,
-    bool completed = false, // Default to false
-    DateTime? completedAt, // ADDED: Support completion timestamp
+    bool completed = false,
+    DateTime? completedAt,
   }) async {
     final subtask = SubtaskModel(
-      id: const Uuid().v1(), // Placeholder for new subtasks
+      id: const Uuid().v1(),
       taskId: taskId,
       title: title,
       completed: completed,
-      completedAt: completedAt, // ADDED: Include completion timestamp
+      completedAt: completedAt,
     );
 
     try {
-      return await _dbHelper.insertSubtask(subtask);
+      final isarSubtask = SubtaskConverter.fromSubtaskModel(subtask);
+      await _subtaskDao.insertSubtask(isarSubtask);
+      return 1;
     } catch (e) {
       print('Error adding subtask: $e');
-      return null; // Indicate failure
+      return null;
     }
   }
 
-  // Update an existing subtask in the database
   Future<void> updateSubtask(SubtaskModel subtask) async {
     if (subtask.id.isEmpty) {
       print('Error: Subtask ID cannot be empty for update.');
-      return; // Early return if ID is empty
+      return;
     }
 
     try {
-      await _dbHelper.updateSubtask(subtask); // Assuming this method accepts SubtaskModel
+      final isarSubtask = SubtaskConverter.fromSubtaskModel(subtask);
+      await _subtaskDao.updateSubtask(isarSubtask);
     } catch (e) {
       print('Error updating subtask: $e');
     }
   }
 
-  // FIXED: Toggle subtask completion status (for checkbox functionality)
   Future<void> toggleSubtaskCompletion(String subtaskId) async {
     try {
-      final subtask = await getSubtaskById(subtaskId); // FIXED: Use helper method
-      
+      final subtask = await getSubtaskById(subtaskId);
+
       if (subtask == null) {
         print('Subtask with ID $subtaskId not found');
-        return; // Exit gracefully
+        return;
       }
-      
+
       final updatedSubtask = subtask.toggleCompletion();
       await updateSubtask(updatedSubtask);
     } catch (e) {
@@ -446,68 +457,95 @@ Future<void> insertTask(TaskModel task) async {
     }
   }
 
-  // FIXED: Mark subtask as completed (for checkbox functionality)
   Future<void> markSubtaskCompleted(String subtaskId) async {
     try {
-      final subtask = await getSubtaskById(subtaskId); // FIXED: Use helper method
-      
+      final subtask = await getSubtaskById(subtaskId);
+
       if (subtask == null) {
         print('Subtask with ID $subtaskId not found');
-        return; // Exit gracefully
+        return;
       }
-      
+
       if (!subtask.completed) {
         final updatedSubtask = subtask.copyWith(
           completed: true,
           completedAt: DateTime.now(),
         );
-        await updateSubtask(updatedSubtask);
+        final isarSubtask = SubtaskConverter.fromSubtaskModel(updatedSubtask);
+        await _subtaskDao.updateSubtask(isarSubtask);
+
+        try {
+          final parentTask = await getTaskById(subtask.taskId);
+          int? energyLevel;
+          String? moodTags;
+          String? privacyContext;
+          String? location;
+
+          final todayEntry = await _energyDao.getTodaysEntry();
+          if (todayEntry != null) {
+            energyLevel = todayEntry.energyLevel;
+            moodTags = todayEntry.moodTags;
+            privacyContext = todayEntry.privacyContext;
+            location = todayEntry.location;
+          }
+
+          await CompletionLogService().logCompletion(
+            taskId: subtaskId,
+            taskTitle: subtask.title,
+            isSubtask: true,
+            parentTaskTitle: parentTask?.title,
+            energyLevel: energyLevel,
+            moodTags: moodTags,
+            privacyContext: privacyContext,
+            location: location,
+          );
+        } catch (e) {
+          print('Error logging subtask completion: $e');
+        }
       }
     } catch (e) {
       print('Error marking subtask as completed: $e');
     }
   }
 
-  // ADDED: Mark subtask as incomplete (for checkbox functionality)
   Future<void> markSubtaskIncomplete(String subtaskId) async {
     try {
       final subtask = await getSubtaskById(subtaskId);
-      
+
       if (subtask == null) {
         print('Subtask with ID $subtaskId not found');
-        return; // Exit gracefully
+        return;
       }
-      
+
       if (subtask.completed) {
         final updatedSubtask = subtask.copyWith(
           completed: false,
           completedAt: null,
         );
-        await updateSubtask(updatedSubtask);
+        final isarSubtask = SubtaskConverter.fromSubtaskModel(updatedSubtask);
+        await _subtaskDao.updateSubtask(isarSubtask);
       }
     } catch (e) {
       print('Error marking subtask as incomplete: $e');
     }
   }
 
-  // Delete a subtask from the database
   Future<void> deleteSubtask(String subtaskId) async {
     try {
-      await _dbHelper.deleteSubtask(subtaskId);
+      await _subtaskDao.deleteSubtask(subtaskId);
     } catch (e) {
       print('Error deleting subtask: $e');
     }
   }
 
-  // ADDED: Get task completion statistics
   Future<Map<String, int>> getTaskStats() async {
     try {
       final tasks = await getTasks();
       final completed = tasks.where((task) => task.completed).length;
       final pending = tasks.where((task) => !task.completed).length;
-      final overdue = tasks.where((task) => 
+      final overdue = tasks.where((task) =>
         !task.completed && task.dueDate.isBefore(DateTime.now())).length;
-      
+
       return {
         'total': tasks.length,
         'completed': completed,

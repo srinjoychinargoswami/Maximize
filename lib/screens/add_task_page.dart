@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:maximize/models/database.dart';
+import 'package:maximize/database/app_database_adapter.dart';
+import 'package:maximize/models/subtask_model.dart';
 import 'package:maximize/utils/task_utils.dart';
 import 'package:uuid/uuid.dart';
 import 'package:maximize/models/task_model.dart';
 import 'package:maximize/services/task_service.dart';
 
 class AddTaskPage extends StatefulWidget {
-  final TaskData? task;
+  final TaskModel? task;
   final TaskService? taskService;
   const AddTaskPage({super.key, this.task, this.taskService});
 
@@ -73,7 +74,7 @@ class _AddTaskPageState extends State<AddTaskPage> {
       _isRecurring = widget.task!.isRecurring ?? false;
       _recurrenceRule = widget.task!.recurrenceRule ?? 'daily';
       _recurrenceInterval = widget.task!.recurrenceInterval ?? 1;
-      _selectedDaysOfWeek = widget.task!.daysOfWeek?.split(',').map((e) => int.tryParse(e.trim())).where((e) => e != null).cast<int>().toList() ?? [];
+      _selectedDaysOfWeek = widget.task!.daysOfWeek ?? [];
       _recurrenceEndDate = widget.task!.recurrenceEndDate;
       _maxOccurrences = widget.task!.maxOccurrences;
       _skipWeekends = widget.task!.skipWeekends ?? false;

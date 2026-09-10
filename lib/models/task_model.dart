@@ -1,4 +1,5 @@
 import 'package:maximize/models/database.dart'; // Import your database file
+import 'package:maximize/models/subtask_model.dart'; // Import SubtaskModel from separate file
 import 'package:json_annotation/json_annotation.dart';
 
 part 'task_model.g.dart'; 
@@ -32,6 +33,10 @@ class TaskModel {
   final DateTime? completedAt; // When the task was completed (NEW)
   final List<SubtaskModel>? subtasks; // List of subtasks (ADDED for better integration)
 
+  // ADDED: Timestamp tracking
+  late DateTime createdAt; // When the task was created
+  late DateTime updatedAt; // When the task was last updated
+
   // NEW: Reminder fields
   final bool? reminderEnabled; // Whether reminder notification is enabled
   final DateTime? reminderTime; // When to show the reminder notification
@@ -60,10 +65,16 @@ class TaskModel {
     this.weekOfMonth,
     this.completedAt, // ADDED: Track completion timestamp
     this.subtasks, // ADDED: Include subtasks in model
-    this.reminderEnabled, 
-    this.reminderTime, 
-    this.reminderPreset, 
-  });
+    DateTime? createdAt, // ADDED: Allow setting createdAt
+    DateTime? updatedAt, // ADDED: Allow setting updatedAt
+    this.reminderEnabled,
+    this.reminderTime,
+    this.reminderPreset,
+  }) {
+    // Initialize timestamps
+    this.createdAt = createdAt ?? DateTime.now();
+    this.updatedAt = updatedAt ?? DateTime.now();
+  }
 
   factory TaskModel.fromData(TaskData data) {
     return TaskModel(
@@ -189,6 +200,8 @@ class TaskModel {
     int? weekOfMonth,
     DateTime? completedAt, // ADDED: Allow updating completion timestamp
     List<SubtaskModel>? subtasks, // ADDED: Allow updating subtasks
+    DateTime? createdAt, // ADDED: Allow updating creation timestamp
+    DateTime? updatedAt, // ADDED: Allow updating update timestamp
     bool? reminderEnabled, // Allow updating reminder enabled
     DateTime? reminderTime, //  Allow updating reminder time
     String? reminderPreset, //Allow updating reminder preset
@@ -216,6 +229,8 @@ class TaskModel {
       weekOfMonth: weekOfMonth ?? this.weekOfMonth,
       completedAt: completedAt ?? this.completedAt, // ADDED: Update completion timestamp
       subtasks: subtasks ?? this.subtasks, // ADDED: Update subtasks
+      createdAt: createdAt ?? this.createdAt, // ADDED: Update creation timestamp
+      updatedAt: updatedAt ?? this.updatedAt, // ADDED: Update update timestamp
       reminderEnabled: reminderEnabled ?? this.reminderEnabled, // Update reminder enabled
       reminderTime: reminderTime ?? this.reminderTime, // Update reminder time
       reminderPreset: reminderPreset ?? this.reminderPreset, // Update reminder preset
@@ -269,74 +284,5 @@ class TaskModel {
       default:
         return false;
     }
-  }
-}
-
-// Updated Subtask Model
-@JsonSerializable()
-class SubtaskModel {
-  final String id; // Non-optional ID for the subtask
-  final String taskId; // ID of the parent task (made final for consistency)
-  String title; // Title of the subtask
-  bool completed; // Completion status of the subtask - ALREADY PERFECT FOR CHECKBOXES
-  final DateTime? completedAt; // ADDED: When the subtask was completed
-
-  SubtaskModel({
-    required this.id,
-    required this.taskId,
-    required this.title,
-    this.completed = false, // Default to false - PERFECT FOR CHECKBOXES
-    this.completedAt, // ADDED: Track completion timestamp
-  });
-
-  factory SubtaskModel.fromJson(Map<String, dynamic> json) => _$SubtaskModelFromJson(json);
-  Map<String, dynamic> toJson() => _$SubtaskModelToJson(this);
-
-  // Convert to Map for database operations
-  Map<String, dynamic> toMap() {
-    return {
-      'id': id,
-      'taskId': taskId,
-      'title': title,
-      'completed': completed, // ALREADY PERFECT FOR DATABASE STORAGE
-      'completedAt': completedAt?.toIso8601String(), // ADDED: Include completion timestamp
-    };
-  }
-
-  // Create from Map for database operations
-  factory SubtaskModel.fromMap(Map<String, dynamic> map) {
-    return SubtaskModel(
-      id: map['id'] ?? '',
-      taskId: map['taskId'] ?? '',
-      title: map['title'] ?? '',
-      completed: map['completed'] ?? false, // ALREADY PERFECT FOR CHECKBOXES
-      completedAt: map['completedAt'] != null // ADDED: Parse completion timestamp
-          ? DateTime.parse(map['completedAt'])
-          : null,
-    );
-  }
-
-  SubtaskModel copyWith({
-    String? id,
-    String? taskId,
-    String? title,
-    bool? completed, // Make this optional - PERFECT FOR CHECKBOX UPDATES
-    DateTime? completedAt, // ADDED: Allow updating completion timestamp
-  }) {
-    return SubtaskModel(
-      id: id ?? this.id,
-      taskId: taskId ?? this.taskId,
-      title: title ?? this.title,
-      completed: completed ?? this.completed, // Ensure this is correctly updated - PERFECT
-      completedAt: completedAt ?? this.completedAt, // ADDED: Update completion timestamp
-    );
-  }
-
-  // ADDED: Method to toggle completion status (for checkbox functionality)
-  SubtaskModel toggleCompletion() {
-    return copyWith(
-      completed: !completed,
-      completedAt: !completed ? DateTime.now() : null, // Set timestamp when completing
-    );
   }
 }

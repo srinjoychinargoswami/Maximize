@@ -4,9 +4,9 @@ PODS:
   - flutter_secure_storage_macos (6.1.3):
     - FlutterMacOS
   - FlutterMacOS (1.0.0)
-  - screen_retriever (0.0.1):
+  - isar_flutter_libs (1.0.0):
     - FlutterMacOS
-  - tray_manager (0.0.1):
+  - screen_retriever (0.0.1):
     - FlutterMacOS
   - window_manager (0.2.0):
     - FlutterMacOS
@@ -15,8 +15,8 @@ DEPENDENCIES:
   - flutter_local_notifications (from `Flutter/ephemeral/.symlinks/plugins/flutter_local_notifications/macos`)
   - flutter_secure_storage_macos (from `Flutter/ephemeral/.symlinks/plugins/flutter_secure_storage_macos/macos`)
   - FlutterMacOS (from `Flutter/ephemeral`)
+  - isar_flutter_libs (from `Flutter/ephemeral/.symlinks/plugins/isar_flutter_libs/macos`)
   - screen_retriever (from `Flutter/ephemeral/.symlinks/plugins/screen_retriever/macos`)
-  - tray_manager (from `Flutter/ephemeral/.symlinks/plugins/tray_manager/macos`)
   - window_manager (from `Flutter/ephemeral/.symlinks/plugins/window_manager/macos`)
 
 EXTERNAL SOURCES:
@@ -26,10 +26,10 @@ EXTERNAL SOURCES:
     :path: Flutter/ephemeral/.symlinks/plugins/flutter_secure_storage_macos/macos
   FlutterMacOS:
     :path: Flutter/ephemeral
+  isar_flutter_libs:
+    :path: Flutter/ephemeral/.symlinks/plugins/isar_flutter_libs/macos
   screen_retriever:
     :path: Flutter/ephemeral/.symlinks/plugins/screen_retriever/macos
-  tray_manager:
-    :path: Flutter/ephemeral/.symlinks/plugins/tray_manager/macos
   window_manager:
     :path: Flutter/ephemeral/.symlinks/plugins/window_manager/macos
 
@@ -37,8 +37,8 @@ SPEC CHECKSUMS:
   flutter_local_notifications: 7e5a17a1dbc00d83dc10d43c2c4c05f2ceed233c
   flutter_secure_storage_macos: 7f45e30f838cf2659862a4e4e3ee1c347c2b3b54
   FlutterMacOS: c232990155153907050900a2e175c7773903ba4e
+  isar_flutter_libs: a65381780401f81ad6bf3f2e7cd0de5698fb98c4
   screen_retriever: 4f97c103641aab8ce183fa5af3b87029df167936
-  tray_manager: a104b5c81b578d83f3c3d0f40a997c8b10810166
   window_manager: 1d01fa7ac65a6e6f83b965471b1a7fdd3f06166c
 
 PODFILE CHECKSUM: 1e95c36afbfd1cb6423ceca4de7a8e1b256fb6ac

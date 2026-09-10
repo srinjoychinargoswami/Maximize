@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:provider/provider.dart';
 import 'package:maximize/config/app_config.dart';
+import 'package:maximize/providers/theme_notifier.dart';
+import 'package:maximize/services/completion_log_service.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -52,7 +55,12 @@ class _SettingsPageState extends State<SettingsPage> {
 
   Future<void> _saveThemePreference(String theme) async {
     try {
-      await _prefs.setString('theme', theme);
+      // Notify the ThemeNotifier to update the app's theme
+      if (mounted) {
+        context.read<ThemeNotifier>().setTheme(theme);
+      }
+
+      // Update local UI state
       if (mounted) {
         setState(() => _currentTheme = theme);
       }
@@ -237,6 +245,52 @@ class _SettingsPageState extends State<SettingsPage> {
     }
   }
 
+  Future<void> _showClearAllDialog() async {
+    showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Clear All Data?'),
+        content: const Text(
+          "This will delete:\n"
+          "• All completion logs\n"
+          "• Streaks and metrics\n"
+          "• All stats\n\n"
+          "Your tasks, events, and reminders will NOT be deleted.\n"
+          "This action cannot be undone."
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text("Cancel"),
+          ),
+          TextButton(
+            onPressed: () async {
+              try {
+                await CompletionLogService().clearAllCompletionLogs();
+                if (mounted) {
+                  Navigator.pop(ctx);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text("All logs cleared. Metrics reset to 0.")),
+                  );
+                  // Pop back to home page to trigger refresh
+                  Navigator.pop(context);
+                }
+              } catch (e) {
+                if (mounted) {
+                  Navigator.pop(ctx);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text("Error: $e")),
+                  );
+                }
+              }
+            },
+            child: const Text("Clear All", style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
@@ -342,6 +396,18 @@ class _SettingsPageState extends State<SettingsPage> {
                         backgroundColor: Colors.red[700],
                       ),
                       child: const Text('Clear Cache', style: TextStyle(fontSize: 12)),
+                    ),
+                  ),
+                  const Divider(height: 0),
+                  ListTile(
+                    title: const Text('Clear All Metrics & Logs'),
+                    subtitle: const Text('Reset completion logs and metrics'),
+                    trailing: ElevatedButton(
+                      onPressed: _showClearAllDialog,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.red[700],
+                      ),
+                      child: const Text('Clear All', style: TextStyle(fontSize: 12)),
                     ),
                   ),
                   const Divider(height: 0),

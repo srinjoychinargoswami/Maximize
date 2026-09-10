@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
 import 'package:maximize/models/task_model.dart';
+import 'package:maximize/models/subtask_model.dart';
 import 'package:maximize/services/task_service.dart';
 import 'package:maximize/services/firebase_realtime_sync_service.dart';
 import 'package:maximize/screens/add_task_page.dart';
 import 'package:maximize/utils/task_utils.dart';
-import 'package:maximize/models/database.dart';
+import 'package:maximize/database/app_database_adapter.dart';
 import 'package:intl/intl.dart';
 
 // CustomScrollBehavior to fix RefreshIndicator on Windows desktop
@@ -54,7 +55,7 @@ class TaskListScreenState extends State<TaskListScreen> with TickerProviderState
   @override
   void initState() {
     super.initState();
-    _taskService = TaskService(widget.database);
+    _taskService = TaskService();
     _animationController = AnimationController(
       duration: const Duration(milliseconds: 300),
       vsync: this,
@@ -1287,7 +1288,7 @@ return matchesCategory && matchesPriority && matchesDueDate && matchesRecurrence
       context,
       MaterialPageRoute(
         builder: (context) => AddTaskPage(
-          task: convertTaskModelToData(task),
+          task: task,
           taskService: _taskService, // ADD taskService
         ),
       ),
@@ -1305,6 +1306,8 @@ return matchesCategory && matchesPriority && matchesDueDate && matchesRecurrence
       } else {
         await _taskService.markTaskIncomplete(task.id);
       }
+      // Add small delay to ensure database update completes
+      await Future.delayed(const Duration(milliseconds: 100));
       _loadTasks();
     } catch (error) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1324,6 +1327,8 @@ return matchesCategory && matchesPriority && matchesDueDate && matchesRecurrence
         );
         await _taskService.updateSubtask(updatedSubtask);
       }
+      // Add small delay to ensure database update completes
+      await Future.delayed(const Duration(milliseconds: 100));
       _loadTasks();
     } catch (error) {
       ScaffoldMessenger.of(context).showSnackBar(

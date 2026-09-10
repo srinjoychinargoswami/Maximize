@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:maximize/models/database.dart' hide EnergyEntry;
+import 'package:maximize/database/app_database_adapter.dart';
 import 'package:maximize/models/energy_model.dart';
 import 'package:maximize/models/energy_entry.dart';
 import 'package:maximize/services/energy_service.dart';
@@ -34,7 +34,7 @@ class _EnergyPageState extends State<EnergyPage> with TickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
-    _energyService = EnergyService(widget.database);
+    _energyService = EnergyService();
     _fadeController = AnimationController(
       duration: const Duration(milliseconds: 300),
       vsync: this,

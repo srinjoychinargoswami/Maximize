@@ -14,7 +14,9 @@ class Event {
   String color; // New field for event color
   bool completed; // CHANGED: Made mutable for checkbox functionality
   final DateTime? completedAt; // ALREADY GOOD: Track completion timestamp
-  
+  late DateTime createdAt; // ADDED: When the event was created
+  late DateTime updatedAt; // ADDED: When the event was last updated
+
   // Recurring event fields
   bool isRecurring;
   RecurrencePattern? recurrencePattern;
@@ -41,6 +43,8 @@ class Event {
     required this.color, // New required field for color
     this.completed = false, // CHANGED: Made mutable and default to false
     this.completedAt, // ALREADY GOOD: Track completion timestamp
+    DateTime? createdAt, // ADDED: Allow setting createdAt
+    DateTime? updatedAt, // ADDED: Allow setting updatedAt
     this.isRecurring = false,
     this.recurrencePattern,
     this.recurrenceRule,
@@ -48,10 +52,14 @@ class Event {
     this.recurrenceExceptionDates,
     this.recurrenceEndDate,
     this.recurrenceCount,
-    this.reminderEnabled, 
-    this.reminderTime, 
-    this.reminderPreset, 
-  }) : id = id ?? const Uuid().v4(); // Auto-generate ID if not provided
+    this.reminderEnabled,
+    this.reminderTime,
+    this.reminderPreset,
+  }) : id = id ?? const Uuid().v4() {
+    // Initialize timestamps
+    this.createdAt = createdAt ?? DateTime.now();
+    this.updatedAt = updatedAt ?? DateTime.now();
+  }
 
   // Conversion method from EventData to Event
   factory Event.fromEventData(EventData eventData) {
@@ -67,6 +75,8 @@ class Event {
       color: eventData.color ?? '#FFFFFF', // Map color from EventData (default to white)
       completed: eventData.completed ?? false, // ADDED: Map completion status from database
       completedAt: eventData.completedAt, // ADDED: Map completion timestamp from database
+      createdAt: eventData.createdAt, // ADDED: Map creation timestamp
+      updatedAt: eventData.updatedAt, // ADDED: Map update timestamp
       isRecurring: eventData.isRecurring ?? false,
       recurrenceRule: eventData.recurrenceRule,
       parentEventId: eventData.parentEventId,
@@ -77,8 +87,8 @@ class Event {
       recurrenceEndDate: eventData.recurrenceEndDate,
       recurrenceCount: eventData.recurrenceCount,
       reminderEnabled: eventData.reminderEnabled,
-      reminderTime: eventData.reminderTime, 
-      reminderPreset: eventData.reminderPreset, 
+      reminderTime: eventData.reminderTime,
+      reminderPreset: eventData.reminderPreset,
     );
   }
 
@@ -158,6 +168,8 @@ class Event {
     String? color,
     bool? completed, // ADDED: Allow updating completion status
     DateTime? completedAt, // ADDED: Allow updating completion timestamp
+    DateTime? createdAt, // ADDED: Allow updating creation timestamp
+    DateTime? updatedAt, // ADDED: Allow updating update timestamp
     bool? isRecurring,
     RecurrencePattern? recurrencePattern,
     String? recurrenceRule,
@@ -165,9 +177,9 @@ class Event {
     List<DateTime>? recurrenceExceptionDates,
     DateTime? recurrenceEndDate,
     int? recurrenceCount,
-    bool? reminderEnabled, 
-    DateTime? reminderTime, 
-    String? reminderPreset, 
+    bool? reminderEnabled,
+    DateTime? reminderTime,
+    String? reminderPreset,
   }) {
     return Event(
       id: id ?? this.id,
@@ -181,6 +193,8 @@ class Event {
       color: color ?? this.color,
       completed: completed ?? this.completed, // ADDED: Update completion status
       completedAt: completedAt ?? this.completedAt, // ADDED: Update completion timestamp
+      createdAt: createdAt ?? this.createdAt, // ADDED: Update creation timestamp
+      updatedAt: updatedAt ?? this.updatedAt, // ADDED: Update update timestamp
       isRecurring: isRecurring ?? this.isRecurring,
       recurrencePattern: recurrencePattern ?? this.recurrencePattern,
       recurrenceRule: recurrenceRule ?? this.recurrenceRule,
@@ -188,8 +202,8 @@ class Event {
       recurrenceExceptionDates: recurrenceExceptionDates ?? this.recurrenceExceptionDates,
       recurrenceEndDate: recurrenceEndDate ?? this.recurrenceEndDate,
       recurrenceCount: recurrenceCount ?? this.recurrenceCount,
-      reminderEnabled: reminderEnabled ?? this.reminderEnabled, 
-      reminderTime: reminderTime ?? this.reminderTime, 
+      reminderEnabled: reminderEnabled ?? this.reminderEnabled,
+      reminderTime: reminderTime ?? this.reminderTime,
       reminderPreset: reminderPreset ?? this.reminderPreset,
     );
   }

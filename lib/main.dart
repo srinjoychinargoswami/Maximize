@@ -3,17 +3,40 @@ import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/data/latest.dart' as tz_data;
 import 'package:firebase_core/firebase_core.dart';
+import 'package:provider/provider.dart';
 import 'package:maximize/firebase_options.dart';
-import 'package:maximize/models/database.dart';
+import 'package:maximize/database/isar_database_service.dart';
 import 'package:maximize/screens/home_page.dart';
 import 'package:maximize/services/reminder_service.dart';
 import 'package:maximize/services/firebase_realtime_sync_service.dart';
+import 'package:maximize/services/encryption_service.dart';
+import 'package:maximize/config/theme_config.dart';
+import 'package:maximize/providers/theme_notifier.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // Initialize timezone for notifications
   tz_data.initializeTimeZones();
+
+  // Initialize Isar database FIRST
+  try {
+    await IsarDatabaseService.initialize();
+    debugPrint('[Main] Isar database initialized');
+  } catch (e) {
+    debugPrint('[Main] Isar initialization error: $e');
+    rethrow;
+  }
+
+  // CRITICAL: Initialize encryption service SECOND
+  // Must be done before Firebase listeners start decrypting data
+  try {
+    await EncryptionService.instance.initialize();
+    debugPrint('[Main] Encryption service initialized');
+  } catch (e) {
+    debugPrint('[Main] Encryption initialization error: $e');
+    // App continues even if encryption setup fails
+  }
 
   // Initialize Firebase
   try {
@@ -23,7 +46,7 @@ void main() async {
     // Initialize Firebase Realtime Database sync service
     await FirebaseRealtimeSyncService.instance.initialize();
   } catch (e) {
-    print('[Firebase] Initialization error: $e');
+    debugPrint('[Firebase] Initialization error: $e');
     // App continues even if Firebase fails to initialize
   }
 
@@ -38,35 +61,33 @@ void main() async {
     await androidPlugin?.requestNotificationsPermission();
   }
 
-  // Initialize Drift database
-  final database = AppDatabase.instance;
+  // Initialize theme notifier
+  final themeNotifier = ThemeNotifier();
+  await themeNotifier.initialize();
 
   // Start the app
-  runApp(MyApp(database: database));
+  runApp(MyApp(themeNotifier: themeNotifier));
 }
 
 class MyApp extends StatelessWidget {
-  final AppDatabase database;
-  const MyApp({super.key, required this.database});
+  final ThemeNotifier themeNotifier;
+  const MyApp({super.key, required this.themeNotifier});
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Maximize',
-      theme: ThemeData(
-        brightness: Brightness.dark,
-        primarySwatch: Colors.blue,
-        scaffoldBackgroundColor: Colors.grey[850],
-        appBarTheme: AppBarTheme(
-          backgroundColor: Colors.grey[800],
-          titleTextStyle: const TextStyle(color: Colors.white, fontSize: 20),
-        ),
-        textTheme: const TextTheme(
-          bodyLarge: TextStyle(color: Colors.grey, fontSize: 16),
-          bodyMedium: TextStyle(color: Colors.grey, fontSize: 14),
-        ),
+    return ChangeNotifierProvider.value(
+      value: themeNotifier,
+      child: Consumer<ThemeNotifier>(
+        builder: (context, themeNotifier, _) {
+          return MaterialApp(
+            title: 'Maximize',
+            theme: ThemeConfig.buildLightTheme(context),
+            darkTheme: ThemeConfig.buildDarkTheme(context),
+            themeMode: themeNotifier.themeMode,
+            home: const MyHomePage(),
+          );
+        },
       ),
-      home: MyHomePage(database: database),
     );
   }
 }

@@ -7,11 +7,14 @@ class ReminderModel {
   final String body; // Body/content of the notification
   final DateTime scheduledTime; // Exact time to trigger notification
   final String notificationId; // Changed to String to match flutter_local_notifications
-  
+
   // ADDED: Completion tracking fields for checkbox functionality
   bool completed; // Completion status of the reminder (made mutable)
   final DateTime? completedAt; // When the reminder was completed
-  
+
+  late DateTime createdAt; // ADDED: When the reminder was created
+  late DateTime updatedAt; // ADDED: When the reminder was last updated
+
   // Recurring reminder fields
   final bool isRecurring;
   final ReminderRecurrencePattern? recurrencePattern;
@@ -29,6 +32,8 @@ class ReminderModel {
     String? notificationId,
     this.completed = false, // ADDED: Default to false for checkbox functionality
     this.completedAt, // ADDED: Track completion timestamp
+    DateTime? createdAt, // ADDED: Allow setting createdAt
+    DateTime? updatedAt, // ADDED: Allow setting updatedAt
     this.isRecurring = false,
     this.recurrencePattern,
     this.recurrenceRule,
@@ -37,7 +42,11 @@ class ReminderModel {
     this.recurrenceEndDate,
     this.recurrenceCount,
   })  : id = id ?? const Uuid().v4(),
-        notificationId = notificationId ?? ((DateTime.now().millisecondsSinceEpoch % 2147483647).toString());
+        notificationId = notificationId ?? ((DateTime.now().millisecondsSinceEpoch % 2147483647).toString()) {
+    // Initialize timestamps
+    this.createdAt = createdAt ?? DateTime.now();
+    this.updatedAt = updatedAt ?? DateTime.now();
+  }
 
   // ADDED: Factory constructor for converting from ReminderData (database class)
   factory ReminderModel.fromData(ReminderData data) {
@@ -49,13 +58,12 @@ class ReminderModel {
       notificationId: data.notificationId,
       completed: data.completed ?? false, // ADDED: Map completion status from database
       completedAt: data.completedAt, // ADDED: Map completion timestamp from database
+      createdAt: data.createdAt, // ADDED: Map creation timestamp
+      updatedAt: data.updatedAt, // ADDED: Map update timestamp
       isRecurring: data.isRecurring ?? false,
       recurrenceRule: data.recurrenceRule,
       parentReminderId: data.parentReminderId,
-      recurrenceExceptionDates: data.recurrenceExceptionDates?.split(',')
-          .where((d) => d.isNotEmpty)
-          .map<DateTime>((d) => DateTime.parse(d))
-          .toList(),
+      recurrenceExceptionDates: data.recurrenceExceptionDates,
       recurrenceEndDate: data.recurrenceEndDate,
       recurrenceCount: data.recurrenceCount,
     );
@@ -112,6 +120,8 @@ class ReminderModel {
     String? notificationId,
     bool? completed, // ADDED: Allow updating completion status
     DateTime? completedAt, // ADDED: Allow updating completion timestamp
+    DateTime? createdAt, // ADDED: Allow updating creation timestamp
+    DateTime? updatedAt, // ADDED: Allow updating update timestamp
     bool? isRecurring,
     ReminderRecurrencePattern? recurrencePattern,
     String? recurrenceRule,
@@ -128,6 +138,8 @@ class ReminderModel {
       notificationId: notificationId ?? this.notificationId,
       completed: completed ?? this.completed, // ADDED: Update completion status
       completedAt: completedAt ?? this.completedAt, // ADDED: Update completion timestamp
+      createdAt: createdAt ?? this.createdAt, // ADDED: Update creation timestamp
+      updatedAt: updatedAt ?? this.updatedAt, // ADDED: Update update timestamp
       isRecurring: isRecurring ?? this.isRecurring,
       recurrencePattern: recurrencePattern ?? this.recurrencePattern,
       recurrenceRule: recurrenceRule ?? this.recurrenceRule,

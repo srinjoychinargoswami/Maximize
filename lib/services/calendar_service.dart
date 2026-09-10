@@ -1,35 +1,35 @@
-import 'package:maximize/models/database.dart';
+import 'package:maximize/database/daos/event_dao.dart';
+import 'package:maximize/database/converters/event_converter.dart';
 import 'package:maximize/models/event_model.dart';
-import 'package:maximize/services/reminder_service.dart'; 
-import 'package:maximize/models/reminder_model.dart'; 
+import 'package:maximize/services/reminder_service.dart';
+import 'package:maximize/models/reminder_model.dart';
 
 class CalendarService {
-  final AppDatabase _database;
-
-  CalendarService(this._database);
+  final _eventDao = EventDAO();
 
 // removeRecurrenceException method
   Future<void> removeRecurrenceException(String parentId, DateTime exceptionDate) async {
     try {
       print('Removing exception for parent: $parentId, date: $exceptionDate');
-      
-      final eventsData = await _database.getAllEvents();
-      final events = eventsData.map((e) => Event.fromEventData(e)).toList();
-      
+
+      final isarEvents = await _eventDao.getAllEvents();
+      final events = isarEvents.map((e) => EventConverter.toEventModel(e)).toList();
+
       final parentEvent = events.firstWhere(
         (e) => e.id == parentId,
         orElse: () => throw Exception('Parent event not found'),
       );
-      
+
       List<DateTime>? exceptions = List.from(parentEvent.recurrenceExceptionDates ?? []);
       final exceptionStr = exceptionDate.toIso8601String();
-      
+
       if (exceptions.remove(exceptionDate)) { // Remove by date comparison
         final updatedEvent = parentEvent.copyWith(
           recurrenceExceptionDates: exceptions.isEmpty ? null : exceptions,
         );
-        
-        await _database.updateEvent(updatedEvent);
+
+        final isarEvent = EventConverter.fromEventModel(updatedEvent);
+        await _eventDao.updateEvent(isarEvent);
         print('Successfully removed exception date');
       } else {
         print('Exception date not found');
@@ -45,8 +45,8 @@ class CalendarService {
   // Fetch all events and expand recurring events
   Future<List<Event>> getEvents() async {
     try {
-      final eventsData = await _database.getAllEvents();
-      List<Event> events = eventsData.map((eventData) => Event.fromEventData(eventData)).toList();
+      final isarEvents = await _eventDao.getAllEvents();
+      List<Event> events = isarEvents.map((e) => EventConverter.toEventModel(e)).toList();
 
       List<Event> expandedEvents = [];
       final now = DateTime.now();
@@ -64,19 +64,19 @@ class CalendarService {
           );
 
           for (DateTime occurrence in occurrences) {
-            if (event.recurrenceCount != null && 
+            if (event.recurrenceCount != null &&
                 occurrences.indexOf(occurrence) >= event.recurrenceCount!) {
               break;
             }
-            
-            if (event.recurrenceEndDate != null && 
+
+            if (event.recurrenceEndDate != null &&
                 occurrence.isAfter(event.recurrenceEndDate!)) {
               break;
             }
 
             // Calculate duration
             Duration eventDuration = event.endDateTime.difference(event.startDateTime);
-            
+
             // Create instance for this occurrence
             Event instance = event.copyWith(
               id: '${event.id}_${occurrence.millisecondsSinceEpoch}',
@@ -87,7 +87,7 @@ class CalendarService {
             );
             expandedEvents.add(instance);
           }
-          
+
           // DON'T add the parent event to expandedEvents - only add instances
         } else if (!event.isRecurring || event.parentEventId != null) {
           // Non-recurring event OR it's already an instance - add it
@@ -97,7 +97,7 @@ class CalendarService {
       }
 
       print('Total events loaded: ${expandedEvents.length}');
-      
+
       // Count recurring vs non-recurring for debugging
       int instanceCount = expandedEvents.where((e) => e.parentEventId != null).length;
       int singleCount = expandedEvents.where((e) => !e.isRecurring && e.parentEventId == null).length;
@@ -177,8 +177,8 @@ class CalendarService {
   // Fetch only base events (without expansion) for editing purposes
   Future<List<Event>> getBaseEvents() async {
     try {
-      final eventsData = await _database.getAllEvents();
-      return eventsData.map((eventData) => Event.fromEventData(eventData)).toList();
+      final isarEvents = await _eventDao.getAllEvents();
+      return isarEvents.map((e) => EventConverter.toEventModel(e)).toList();
     } catch (e) {
       print('Error fetching base events: $e');
       throw Exception('Error fetching base events');
@@ -196,13 +196,14 @@ class CalendarService {
       if (event.isRecurring && event.recurrencePattern != null) {
         event.recurrenceRule = event.generateRRule();
       }
-      
-      final result = await _database.insertEvent(event);
-      
+
+      final isarEvent = EventConverter.fromEventModel(event);
+      await _eventDao.insertEvent(isarEvent);
+
       // Schedule notification if reminder is enabled
       await _scheduleEventNotification(event);
-      
-      return result;
+
+      return 1;
     } catch (e) {
       print('Error inserting event: $e');
       throw Exception('Error inserting event');
@@ -218,16 +219,16 @@ class CalendarService {
     try {
       // Cancel old notification before updating
       await _cancelEventNotification(event.id);
-      
+
       if (updateSeries && event.parentEventId != null) {
         // Update entire series - find parent event
-        final eventsData = await _database.getAllEvents();
-        final events = eventsData.map((e) => Event.fromEventData(e)).toList();
+        final isarEvents = await _eventDao.getAllEvents();
+        final events = isarEvents.map((e) => EventConverter.toEventModel(e)).toList();
         final parentEvent = events.firstWhere(
           (e) => e.id == event.parentEventId,
           orElse: () => throw Exception('Parent event not found'),
         );
-        
+
         // Update parent with new details but keep original start time
         final updatedParent = parentEvent.copyWith(
           title: event.title,
@@ -240,17 +241,18 @@ class CalendarService {
           recurrencePattern: event.recurrencePattern,
           recurrenceCount: event.recurrenceCount,
           recurrenceEndDate: event.recurrenceEndDate,
-          reminderEnabled: event.reminderEnabled, 
-          reminderTime: event.reminderTime, 
-          reminderPreset: event.reminderPreset, 
+          reminderEnabled: event.reminderEnabled,
+          reminderTime: event.reminderTime,
+          reminderPreset: event.reminderPreset,
         );
-        
+
         if (updatedParent.isRecurring && updatedParent.recurrencePattern != null) {
           updatedParent.recurrenceRule = updatedParent.generateRRule();
         }
-        
-        await _database.updateEvent(updatedParent);
-        
+
+        final isarParent = EventConverter.fromEventModel(updatedParent);
+        await _eventDao.updateEvent(isarParent);
+
         // Schedule notification for updated parent
         await _scheduleEventNotification(updatedParent);
       } else {
@@ -258,8 +260,9 @@ class CalendarService {
         if (event.isRecurring && event.recurrencePattern != null) {
           event.recurrenceRule = event.generateRRule();
         }
-        await _database.updateEvent(event);
-        
+        final isarEvent = EventConverter.fromEventModel(event);
+        await _eventDao.updateEvent(isarEvent);
+
         // Schedule notification for updated event
         await _scheduleEventNotification(event);
       }
@@ -291,8 +294,9 @@ class CalendarService {
           completed: true,
           completedAt: DateTime.now(),
         );
-        await _database.updateEvent(updatedEvent);
-        
+        final isarEvent = EventConverter.fromEventModel(updatedEvent);
+        await _eventDao.updateEvent(isarEvent);
+
         //  Cancel notification when completed
         await _cancelEventNotification(eventId);
       }
@@ -310,8 +314,9 @@ class CalendarService {
           completed: false,
           completedAt: null,
         );
-        await _database.updateEvent(updatedEvent);
-        
+        final isarEvent2 = EventConverter.fromEventModel(updatedEvent);
+        await _eventDao.updateEvent(isarEvent2);
+
         // Reschedule notification if still in future
         await _scheduleEventNotification(updatedEvent);
       }
@@ -323,12 +328,9 @@ class CalendarService {
   // ADDED: Get event by ID (helper method for completion functions)
   Future<Event?> getEventById(String eventId) async {
     try {
-      final eventsData = await _database.getAllEvents();
-      final eventData = eventsData.firstWhere(
-        (event) => event.id == eventId,
-        orElse: () => throw Exception('Event not found'),
-      );
-      return Event.fromEventData(eventData);
+      final isarEvent = await _eventDao.getEventById(eventId);
+      if (isarEvent == null) return null;
+      return EventConverter.toEventModel(isarEvent);
     } catch (e) {
       print('Error fetching event by ID: $e');
       return null;
@@ -339,41 +341,41 @@ class CalendarService {
   Future<void> deleteEvent(String id, {bool deleteSeries = false}) async {
     try {
       print('Deleting event - ID: $id, deleteSeries: $deleteSeries');
-      
+
       // Cancel notification before deleting
       await _cancelEventNotification(id);
-      
+
       if (deleteSeries) {
         // Delete entire series - find all related events
-        final eventsData = await _database.getAllEvents();
-        final events = eventsData.map((e) => Event.fromEventData(e)).toList();
-        
+        final isarEvents = await _eventDao.getAllEvents();
+        final events = isarEvents.map((e) => EventConverter.toEventModel(e)).toList();
+
         // Find the parent event
-        Event? parentEvent = events.firstWhere(
+        final parentEvent = events.firstWhere(
           (e) => e.id == id || e.parentEventId == id,
           orElse: () => throw Exception('Event not found'),
         );
-        
+
         String parentId = parentEvent.parentEventId ?? parentEvent.id;
         print('Deleting parent event with ID: $parentId');
-        
+
         // Delete parent event
-        await _database.deleteEvent(parentId);
-        
+        await _eventDao.deleteEvent(parentId);
+
         // Also delete any instances that might exist as separate records
         for (Event event in events) {
           if (event.parentEventId == parentId && event.id != parentId) {
             print('Deleting instance: ${event.id}');
-            await _cancelEventNotification(event.id); 
-            await _database.deleteEvent(event.id);
+            await _cancelEventNotification(event.id);
+            await _eventDao.deleteEvent(event.id);
           }
         }
-        
+
         print('Successfully deleted entire series');
       } else {
         // Delete single event
         print('Deleting single event with ID: $id');
-        await _database.deleteEvent(id);
+        await _eventDao.deleteEvent(id);
         print('Successfully deleted single event');
       }
     } catch (e) {
@@ -386,24 +388,25 @@ class CalendarService {
   Future<void> addRecurrenceException(String parentEventId, DateTime exceptionDate) async {
     try {
       print('Adding exception for parent: $parentEventId, date: $exceptionDate');
-      
-      final eventsData = await _database.getAllEvents();
-      final events = eventsData.map((e) => Event.fromEventData(e)).toList();
-      
+
+      final isarEvents = await _eventDao.getAllEvents();
+      final events = isarEvents.map((e) => EventConverter.toEventModel(e)).toList();
+
       final parentEvent = events.firstWhere(
         (e) => e.id == parentEventId,
         orElse: () => throw Exception('Parent event not found'),
       );
-      
+
       List<DateTime> exceptions = List.from(parentEvent.recurrenceExceptionDates ?? []);
       if (!exceptions.any((ex) => _isSameDay(ex, exceptionDate))) {
         exceptions.add(exceptionDate);
-        
+
         final updatedEvent = parentEvent.copyWith(
           recurrenceExceptionDates: exceptions,
         );
-        
-        await _database.updateEvent(updatedEvent);
+
+        final isarEvent = EventConverter.fromEventModel(updatedEvent);
+        await _eventDao.updateEvent(isarEvent);
         print('Successfully added exception date');
       } else {
         print('Exception date already exists');
@@ -421,7 +424,7 @@ class CalendarService {
       if (originalEvent.parentEventId != null) {
         await addRecurrenceException(originalEvent.parentEventId!, originalEvent.startDateTime);
       }
-      
+
       // Create new single event
       final newSingleEvent = modifiedEvent.copyWith(
         isRecurring: false,
@@ -432,7 +435,7 @@ class CalendarService {
         recurrenceCount: null,
         recurrenceEndDate: null,
       );
-      
+
       await addEvent(newSingleEvent);
     } catch (e) {
       print('Error creating modified occurrence: $e');
@@ -444,11 +447,11 @@ class CalendarService {
   Future<void> _scheduleEventNotification(Event event) async {
     try {
       // Only schedule if reminder is enabled and time is set
-      if (event.reminderEnabled == true && 
-          event.reminderTime != null && 
+      if (event.reminderEnabled == true &&
+          event.reminderTime != null &&
           !event.completed &&
           event.reminderTime!.isAfter(DateTime.now())) {
-        
+
         // Create a reminder model for the notification system
         final reminder = ReminderModel(
           id: 'event_${event.id}',
@@ -458,7 +461,7 @@ class CalendarService {
           notificationId: event.id.hashCode.toString(),
           completed: false,
         );
-        
+
         await NotificationService.instance.scheduleNotification(reminder);
         print('[CalendarService] Scheduled notification for event: ${event.title} at ${event.reminderTime}');
       }
@@ -487,14 +490,14 @@ class CalendarService {
   ) {
     List<DateTime> occurrences = [];
     Map<String, String> rules = _parseRRule(rrule);
-    
+
     String? frequency = rules['FREQ'];
     int interval = int.parse(rules['INTERVAL'] ?? '1');
     int? count = rules['COUNT'] != null ? int.parse(rules['COUNT']!) : null;
-    
+
     DateTime current = startDate;
     int occurrenceCount = 0;
-    
+
     while (current.isBefore(rangeEnd) && (count == null || occurrenceCount < count)) {
       if (current.isAfter(rangeStart) || current.isAtSameMomentAs(rangeStart)) {
         bool isException = exceptions?.any((ex) => _isSameDay(ex, current)) ?? false;
@@ -503,13 +506,13 @@ class CalendarService {
           occurrenceCount++;
         }
       }
-      
+
       current = _getNextOccurrence(current, frequency!, interval);
-      
+
       // Safety check to prevent infinite loops
       if (occurrenceCount > 1000) break;
     }
-    
+
     return occurrences;
   }
 
@@ -517,14 +520,14 @@ class CalendarService {
   Map<String, String> _parseRRule(String rrule) {
     Map<String, String> rules = {};
     List<String> parts = rrule.split(';');
-    
+
     for (String part in parts) {
       List<String> keyValue = part.split('=');
       if (keyValue.length == 2) {
         rules[keyValue[0]] = keyValue[1];
       }
     }
-    
+
     return rules;
   }
 
@@ -536,10 +539,10 @@ class CalendarService {
       case 'WEEKLY':
         return current.add(Duration(days: 7 * interval));
       case 'MONTHLY':
-        return DateTime(current.year, current.month + interval, current.day, 
+        return DateTime(current.year, current.month + interval, current.day,
                        current.hour, current.minute);
       case 'YEARLY':
-        return DateTime(current.year + interval, current.month, current.day, 
+        return DateTime(current.year + interval, current.month, current.day,
                        current.hour, current.minute);
       default:
         return current.add(Duration(days: interval));
@@ -591,12 +594,12 @@ class CalendarService {
     try {
       final allEvents = await getEvents();
       final now = DateTime.now();
-      
+
       final upcomingEvents = allEvents
           .where((event) => event.startDateTime.isAfter(now))
           .toList()
         ..sort((a, b) => a.startDateTime.compareTo(b.startDateTime));
-      
+
       return upcomingEvents.take(limit).toList();
     } catch (e) {
       print('Error fetching upcoming events: $e');
@@ -610,9 +613,9 @@ class CalendarService {
       final events = await getEvents();
       final completed = events.where((event) => event.completed).length;
       final pending = events.where((event) => !event.completed).length;
-      final overdue = events.where((event) => 
+      final overdue = events.where((event) =>
         !event.completed && event.endDateTime.isBefore(DateTime.now())).length;
-      
+
       return {
         'total': events.length,
         'completed': completed,
@@ -628,19 +631,19 @@ class CalendarService {
   // Debug method to check database state
   Future<void> debugDatabaseState() async {
     try {
-      final allEvents = await _database.getAllEvents();
+      final isarEvents = await _eventDao.getAllEvents();
       print('=== Database Events Debug ===');
-      for (var event in allEvents) {
-        print('ID: ${event.id}');
+      for (var event in isarEvents) {
+        print('ID: ${event.eventId}');
         print('  Title: ${event.title}');
         print('  Parent: ${event.parentEventId}');
         print('  Recurring: ${event.isRecurring}');
         print('  Start: ${event.startDateTime}');
         print('  Completed: ${event.completed}');
-        print('  Reminder: ${event.reminderEnabled}'); 
+        print('  Reminder: ${event.reminderEnabled}');
         print('---');
       }
-      print('Total database events: ${allEvents.length}');
+      print('Total database events: ${isarEvents.length}');
     } catch (e) {
       print('Error debugging database state: $e');
     }

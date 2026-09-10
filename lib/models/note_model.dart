@@ -1,6 +1,5 @@
 import 'package:maximize/models/database.dart';
-import 'package:drift/drift.dart'; 
-
+import 'package:uuid/uuid.dart';
 
 class NoteModel {
   final String id;
@@ -13,41 +12,61 @@ class NoteModel {
   final bool isPinned;
 
   NoteModel({
-    required this.id,
+    String? id,
     required this.title,
     required this.content,
     this.category,
     this.color = '#FFD700',
-    required this.createdAt,
-    required this.updatedAt,
+    DateTime? createdAt,
+    DateTime? updatedAt,
     this.isPinned = false,
-  });
+  })  : id = id ?? const Uuid().v4(),
+        createdAt = createdAt ?? DateTime.now(),
+        updatedAt = updatedAt ?? DateTime.now();
 
-  // Convert from database Note to NoteModel
-  factory NoteModel.fromData(Note noteData) {
+  // Convert from database NoteData to NoteModel
+  factory NoteModel.fromData(NoteData noteData) {
     return NoteModel(
       id: noteData.id,
       title: noteData.title,
       content: noteData.content,
       category: noteData.category,
-      color: noteData.color,
+      color: '#FFD700',
       createdAt: noteData.createdAt,
       updatedAt: noteData.updatedAt,
-      isPinned: noteData.isPinned,
+      isPinned: false,
     );
   }
 
-  // Convert NoteModel to database NotesCompanion
-  NotesCompanion toCompanion() {
-    return NotesCompanion(
-      id: Value(id),
-      title: Value(title),
-      content: Value(content),
-      category: Value(category),
-      color: Value(color),
-      createdAt: Value(createdAt),
-      updatedAt: Value(updatedAt),
-      isPinned: Value(isPinned),
+  // Convert to Map for database operations
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'title': title,
+      'content': content,
+      'category': category,
+      'color': color,
+      'createdAt': createdAt.toIso8601String(),
+      'updatedAt': updatedAt.toIso8601String(),
+      'isPinned': isPinned,
+    };
+  }
+
+  // Create from Map
+  factory NoteModel.fromMap(Map<String, dynamic> map) {
+    return NoteModel(
+      id: map['id'] ?? '',
+      title: map['title'] ?? '',
+      content: map['content'] ?? '',
+      category: map['category'],
+      color: map['color'] ?? '#FFD700',
+      createdAt: map['createdAt'] != null
+          ? DateTime.parse(map['createdAt'])
+          : DateTime.now(),
+      updatedAt: map['updatedAt'] != null
+          ? DateTime.parse(map['updatedAt'])
+          : DateTime.now(),
+      isPinned: map['isPinned'] ?? false,
     );
   }
 

@@ -6,6 +6,8 @@ import 'package:maximize/models/reminder_model.dart';
 import 'package:maximize/models/note_model.dart';
 import 'package:maximize/models/energy_entry.dart';
 import 'package:maximize/config/app_config.dart';
+import 'package:maximize/services/reminder_service.dart' show NotificationService;
+import 'package:maximize/services/encryption_service.dart';
 
 class FirebaseRealtimeSyncService {
   static final FirebaseRealtimeSyncService _instance =
@@ -71,12 +73,16 @@ class FirebaseRealtimeSyncService {
     }
   }
 
-  /// Sync a single task to Firebase
+  /// Sync a single task to Firebase (encrypted)
   Future<void> syncTask(TaskModel task) async {
     try {
-      await _tasksRef.child(task.id).set(task.toJson());
+      // Encrypt task data before uploading
+      final taskJson = task.toJson();
+      final encryptedPayload = await EncryptionService.instance.encryptPayload(taskJson);
+
+      await _tasksRef.child(task.id).set(encryptedPayload);
       if (AppConfig.debugLogging) {
-        print('[Firebase] Task synced: ${task.id}');
+        print('[Firebase] Task synced (encrypted): ${task.id}');
       }
     } catch (e) {
       if (AppConfig.debugLogging) {
@@ -85,12 +91,16 @@ class FirebaseRealtimeSyncService {
     }
   }
 
-  /// Sync a single event to Firebase
+  /// Sync a single event to Firebase (encrypted)
   Future<void> syncEvent(Event event) async {
     try {
-      await _eventsRef.child(event.id).set(event.toMap());
+      // Encrypt event data before uploading
+      final eventMap = event.toMap();
+      final encryptedPayload = await EncryptionService.instance.encryptPayload(eventMap);
+
+      await _eventsRef.child(event.id).set(encryptedPayload);
       if (AppConfig.debugLogging) {
-        print('[Firebase] Event synced: ${event.id}');
+        print('[Firebase] Event synced (encrypted): ${event.id}');
       }
     } catch (e) {
       if (AppConfig.debugLogging) {
@@ -99,12 +109,16 @@ class FirebaseRealtimeSyncService {
     }
   }
 
-  /// Sync a single reminder to Firebase
+  /// Sync a single reminder to Firebase (encrypted)
   Future<void> syncReminder(ReminderModel reminder) async {
     try {
-      await _remindersRef.child(reminder.id).set(reminder.toMap());
+      // Encrypt reminder data before uploading
+      final reminderMap = reminder.toMap();
+      final encryptedPayload = await EncryptionService.instance.encryptPayload(reminderMap);
+
+      await _remindersRef.child(reminder.id).set(encryptedPayload);
       if (AppConfig.debugLogging) {
-        print('[Firebase] Reminder synced: ${reminder.id}');
+        print('[Firebase] Reminder synced (encrypted): ${reminder.id}');
       }
     } catch (e) {
       if (AppConfig.debugLogging) {
@@ -113,10 +127,11 @@ class FirebaseRealtimeSyncService {
     }
   }
 
-  /// Sync a single note to Firebase
+  /// Sync a single note to Firebase (encrypted)
   Future<void> syncNote(NoteModel note) async {
     try {
-      await _notesRef.child(note.id).set({
+      // Encrypt note data before uploading
+      final noteData = {
         'id': note.id,
         'title': note.title,
         'content': note.content,
@@ -125,9 +140,12 @@ class FirebaseRealtimeSyncService {
         'createdAt': note.createdAt.toIso8601String(),
         'updatedAt': note.updatedAt.toIso8601String(),
         'isPinned': note.isPinned,
-      });
+      };
+      final encryptedPayload = await EncryptionService.instance.encryptPayload(noteData);
+
+      await _notesRef.child(note.id).set(encryptedPayload);
       if (AppConfig.debugLogging) {
-        print('[Firebase] Note synced: ${note.id}');
+        print('[Firebase] Note synced (encrypted): ${note.id}');
       }
     } catch (e) {
       if (AppConfig.debugLogging) {
@@ -136,22 +154,71 @@ class FirebaseRealtimeSyncService {
     }
   }
 
-  /// Listen to real-time task changes
+  /// Listen to real-time task changes (decrypted)
+  /// CRITICAL: Decrypts encrypted tasks and schedules notifications for synced tasks
   void listenToTasks(Function(List<TaskModel>) callback) {
-    _tasksRef.onValue.listen((event) {
+    _tasksRef.onValue.listen((event) async {
       try {
         final tasks = <TaskModel>[];
         if (event.snapshot.value is Map) {
           final data = Map<String, dynamic>.from(event.snapshot.value as Map);
-          data.forEach((key, value) {
-            if (value is Map<String, dynamic>) {
-              tasks.add(TaskModel.fromJson(value));
+          for (final entry in data.entries) {
+            try {
+              final value = entry.value as Map<String, dynamic>;
+
+              // Decrypt task data
+              Map<String, dynamic> taskData;
+              if (value.containsKey('v') && value.containsKey('data')) {
+                // New encrypted format
+                taskData = await EncryptionService.instance.decryptPayload(value);
+              } else {
+                // Legacy plaintext format (backward compatibility)
+                if (AppConfig.debugLogging) {
+                  print('[Firebase] Found legacy unencrypted task, will re-sync encrypted');
+                }
+                taskData = value;
+              }
+
+              tasks.add(TaskModel.fromJson(taskData));
+            } catch (e) {
+              if (AppConfig.debugLogging) {
+                print('[Firebase] Error decrypting task: $e');
+              }
             }
-          });
+          }
         }
+
+        // Schedule notifications for synced tasks
+        for (final task in tasks) {
+          try {
+            if (task.reminderEnabled == true &&
+                task.reminderTime != null &&
+                !task.completed &&
+                task.reminderTime!.isAfter(DateTime.now())) {
+              final reminder = ReminderModel(
+                id: 'task_${task.id}',
+                title: task.title,
+                body: task.description ?? 'Task reminder',
+                scheduledTime: task.reminderTime!,
+                notificationId: task.id.hashCode.toString(),
+                completed: false,
+              );
+
+              await NotificationService.instance.scheduleNotification(reminder);
+              if (AppConfig.debugLogging) {
+                print('[Firebase] Scheduled notification for synced task: ${task.title}');
+              }
+            }
+          } catch (e) {
+            if (AppConfig.debugLogging) {
+              print('[Firebase] Error scheduling notification for synced task: $e');
+            }
+          }
+        }
+
         callback(tasks);
         if (AppConfig.debugLogging) {
-          print('[Firebase] Tasks updated: ${tasks.length} items');
+          print('[Firebase] Tasks updated: ${tasks.length} items (decrypted)');
         }
       } catch (e) {
         if (AppConfig.debugLogging) {
@@ -161,22 +228,71 @@ class FirebaseRealtimeSyncService {
     });
   }
 
-  /// Listen to real-time event changes
+  /// Listen to real-time event changes (decrypted)
+  /// CRITICAL: Decrypts encrypted events and schedules notifications for synced events
   void listenToEvents(Function(List<Event>) callback) {
-    _eventsRef.onValue.listen((event) {
+    _eventsRef.onValue.listen((event) async {
       try {
         final events = <Event>[];
         if (event.snapshot.value is Map) {
           final data = Map<String, dynamic>.from(event.snapshot.value as Map);
-          data.forEach((key, value) {
-            if (value is Map<String, dynamic>) {
-              events.add(Event.fromMap(value));
+          for (final entry in data.entries) {
+            try {
+              final value = entry.value as Map<String, dynamic>;
+
+              // Decrypt event data
+              Map<String, dynamic> eventData;
+              if (value.containsKey('v') && value.containsKey('data')) {
+                // New encrypted format
+                eventData = await EncryptionService.instance.decryptPayload(value);
+              } else {
+                // Legacy plaintext format (backward compatibility)
+                if (AppConfig.debugLogging) {
+                  print('[Firebase] Found legacy unencrypted event, will re-sync encrypted');
+                }
+                eventData = value;
+              }
+
+              events.add(Event.fromMap(eventData));
+            } catch (e) {
+              if (AppConfig.debugLogging) {
+                print('[Firebase] Error decrypting event: $e');
+              }
             }
-          });
+          }
         }
+
+        // Schedule notifications for synced events
+        for (final evt in events) {
+          try {
+            if (evt.reminderEnabled == true &&
+                evt.reminderTime != null &&
+                !evt.completed &&
+                evt.reminderTime!.isAfter(DateTime.now())) {
+              final reminder = ReminderModel(
+                id: 'event_${evt.id}',
+                title: evt.title,
+                body: evt.description ?? 'Event reminder',
+                scheduledTime: evt.reminderTime!,
+                notificationId: evt.id.hashCode.toString(),
+                completed: false,
+              );
+
+              await NotificationService.instance.scheduleNotification(reminder);
+              if (AppConfig.debugLogging) {
+                print('[Firebase] Scheduled notification for synced event: ${evt.title}');
+              }
+            }
+          } catch (e) {
+            if (AppConfig.debugLogging) {
+              print('[Firebase] Error scheduling notification for synced event: $e');
+            }
+          }
+        }
+
         callback(events);
         if (AppConfig.debugLogging) {
-          print('[Firebase] Events updated: ${events.length} items');
+          print('[Firebase] Events updated: ${events.length} items (decrypted)');
         }
       } catch (e) {
         if (AppConfig.debugLogging) {
@@ -186,22 +302,59 @@ class FirebaseRealtimeSyncService {
     });
   }
 
-  /// Listen to real-time reminder changes
+  /// Listen to real-time reminder changes (decrypted)
+  /// CRITICAL: Decrypts encrypted reminders and schedules notifications
   void listenToReminders(Function(List<ReminderModel>) callback) {
-    _remindersRef.onValue.listen((event) {
+    _remindersRef.onValue.listen((event) async {
       try {
         final reminders = <ReminderModel>[];
         if (event.snapshot.value is Map) {
           final data = Map<String, dynamic>.from(event.snapshot.value as Map);
-          data.forEach((key, value) {
-            if (value is Map<String, dynamic>) {
-              reminders.add(ReminderModel.fromMap(value));
+          for (final entry in data.entries) {
+            try {
+              final value = entry.value as Map<String, dynamic>;
+
+              // Decrypt reminder data
+              Map<String, dynamic> reminderData;
+              if (value.containsKey('v') && value.containsKey('data')) {
+                // New encrypted format
+                reminderData = await EncryptionService.instance.decryptPayload(value);
+              } else {
+                // Legacy plaintext format (backward compatibility)
+                if (AppConfig.debugLogging) {
+                  print('[Firebase] Found legacy unencrypted reminder, will re-sync encrypted');
+                }
+                reminderData = value;
+              }
+
+              reminders.add(ReminderModel.fromMap(reminderData));
+            } catch (e) {
+              if (AppConfig.debugLogging) {
+                print('[Firebase] Error decrypting reminder: $e');
+              }
             }
-          });
+          }
         }
+
+        // Schedule notifications for synced reminders
+        for (final reminder in reminders) {
+          try {
+            if (!reminder.completed && reminder.scheduledTime.isAfter(DateTime.now())) {
+              await NotificationService.instance.scheduleNotification(reminder);
+              if (AppConfig.debugLogging) {
+                print('[Firebase] Scheduled notification for synced reminder: ${reminder.title}');
+              }
+            }
+          } catch (e) {
+            if (AppConfig.debugLogging) {
+              print('[Firebase] Error scheduling notification for synced reminder: $e');
+            }
+          }
+        }
+
         callback(reminders);
         if (AppConfig.debugLogging) {
-          print('[Firebase] Reminders updated: ${reminders.length} items');
+          print('[Firebase] Reminders updated: ${reminders.length} items (decrypted)');
         }
       } catch (e) {
         if (AppConfig.debugLogging) {
@@ -211,22 +364,41 @@ class FirebaseRealtimeSyncService {
     });
   }
 
-  /// Listen to real-time note changes
+  /// Listen to real-time note changes (decrypted)
   void listenToNotes(Function(List<NoteModel>) callback) {
-    _notesRef.onValue.listen((event) {
+    _notesRef.onValue.listen((event) async {
       try {
         final notes = <NoteModel>[];
         if (event.snapshot.value is Map) {
           final data = Map<String, dynamic>.from(event.snapshot.value as Map);
-          data.forEach((key, value) {
-            if (value is Map<String, dynamic>) {
-              notes.add(_noteFromMap(value));
+          for (final entry in data.entries) {
+            try {
+              final value = entry.value as Map<String, dynamic>;
+
+              // Decrypt note data
+              Map<String, dynamic> noteData;
+              if (value.containsKey('v') && value.containsKey('data')) {
+                // New encrypted format
+                noteData = await EncryptionService.instance.decryptPayload(value);
+              } else {
+                // Legacy plaintext format (backward compatibility)
+                if (AppConfig.debugLogging) {
+                  print('[Firebase] Found legacy unencrypted note, will re-sync encrypted');
+                }
+                noteData = value;
+              }
+
+              notes.add(_noteFromMap(noteData));
+            } catch (e) {
+              if (AppConfig.debugLogging) {
+                print('[Firebase] Error decrypting note: $e');
+              }
             }
-          });
+          }
         }
         callback(notes);
         if (AppConfig.debugLogging) {
-          print('[Firebase] Notes updated: ${notes.length} items');
+          print('[Firebase] Notes updated: ${notes.length} items (decrypted)');
         }
       } catch (e) {
         if (AppConfig.debugLogging) {
@@ -292,12 +464,16 @@ class FirebaseRealtimeSyncService {
     }
   }
 
-  /// Sync a single energy entry to Firebase
+  /// Sync a single energy entry to Firebase (encrypted)
   Future<void> syncEnergyEntry(EnergyEntry entry) async {
     try {
-      await _energyEntriesRef.child(entry.id).set(entry.toJson());
+      // Encrypt energy entry data before uploading
+      final entryJson = entry.toJson();
+      final encryptedPayload = await EncryptionService.instance.encryptPayload(entryJson);
+
+      await _energyEntriesRef.child(entry.id).set(encryptedPayload);
       if (AppConfig.debugLogging) {
-        print('[Firebase] Energy entry synced: ${entry.id}');
+        print('[Firebase] Energy entry synced (encrypted): ${entry.id}');
       }
     } catch (e) {
       if (AppConfig.debugLogging) {
@@ -320,22 +496,41 @@ class FirebaseRealtimeSyncService {
     }
   }
 
-  /// Listen to real-time energy entry changes
+  /// Listen to real-time energy entry changes (decrypted)
   void listenToEnergyEntries(Function(List<EnergyEntry>) callback) {
-    _energyEntriesRef.onValue.listen((event) {
+    _energyEntriesRef.onValue.listen((event) async {
       try {
         final entries = <EnergyEntry>[];
         if (event.snapshot.value is Map) {
           final data = Map<String, dynamic>.from(event.snapshot.value as Map);
-          data.forEach((key, value) {
-            if (value is Map<String, dynamic>) {
-              entries.add(EnergyEntry.fromJson(value));
+          for (final entry in data.entries) {
+            try {
+              final value = entry.value as Map<String, dynamic>;
+
+              // Decrypt energy entry data
+              Map<String, dynamic> entryData;
+              if (value.containsKey('v') && value.containsKey('data')) {
+                // New encrypted format
+                entryData = await EncryptionService.instance.decryptPayload(value);
+              } else {
+                // Legacy plaintext format (backward compatibility)
+                if (AppConfig.debugLogging) {
+                  print('[Firebase] Found legacy unencrypted energy entry, will re-sync encrypted');
+                }
+                entryData = value;
+              }
+
+              entries.add(EnergyEntry.fromJson(entryData));
+            } catch (e) {
+              if (AppConfig.debugLogging) {
+                print('[Firebase] Error decrypting energy entry: $e');
+              }
             }
-          });
+          }
         }
         callback(entries);
         if (AppConfig.debugLogging) {
-          print('[Firebase] Energy entries updated: ${entries.length} items');
+          print('[Firebase] Energy entries updated: ${entries.length} items (decrypted)');
         }
       } catch (e) {
         if (AppConfig.debugLogging) {

@@ -1,19 +1,20 @@
-import 'package:maximize/models/database.dart';
 import 'package:maximize/models/energy_model.dart';
 import 'package:maximize/services/energy_service.dart';
 import 'package:maximize/config/app_config.dart';
+import 'package:flutter/material.dart';
 
 class EnergyAnalyticsService {
   static final EnergyAnalyticsService _instance = EnergyAnalyticsService._internal();
 
-  factory EnergyAnalyticsService(AppDatabase database) {
-    _instance._energyService = EnergyService(database);
+  late EnergyService _energyService;
+
+  factory EnergyAnalyticsService() {
     return _instance;
   }
 
-  EnergyAnalyticsService._internal();
-
-  late EnergyService _energyService;
+  EnergyAnalyticsService._internal() {
+    _energyService = EnergyService();
+  }
 
   // Cache
   DateTime? _lastCacheTime;

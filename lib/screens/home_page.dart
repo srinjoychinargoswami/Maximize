@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:maximize/models/database.dart';
 import 'package:maximize/screens/calendar_page.dart';
 import 'package:maximize/screens/about_page.dart';
 import 'package:maximize/screens/task_list_screen.dart';
@@ -15,17 +14,19 @@ import 'package:maximize/services/task_service.dart';
 import 'package:maximize/services/reminder_service.dart';
 import 'package:maximize/services/note_service.dart';
 import 'package:maximize/services/energy_service.dart';
+import 'package:maximize/services/metrics_service.dart';
 import 'package:maximize/models/task_model.dart';
+import 'package:maximize/models/subtask_model.dart';
 import 'package:maximize/models/event_model.dart';
 import 'package:maximize/models/reminder_model.dart';
 import 'package:maximize/models/energy_model.dart';
+import 'package:maximize/database/app_database_adapter.dart';
 import 'package:flutter/gestures.dart';
 
 /* HOME PAGE – Drawer, Bottom Nav, and IndexedStack */
 
 class MyHomePage extends StatefulWidget {
-  final AppDatabase database;
-  const MyHomePage({super.key, required this.database});
+  const MyHomePage({super.key});
 
   @override
   State<MyHomePage> createState() => _MyHomePageState();
@@ -34,7 +35,7 @@ class MyHomePage extends StatefulWidget {
 class _MyHomePageState extends State<MyHomePage> {
   final _scaffoldKey = GlobalKey<ScaffoldState>();
   int _currentIndex = 0;
-  
+
   // ADDED: Keys to access refresh methods in child pages
   final GlobalKey<_OverviewPageState> _overviewKey = GlobalKey<_OverviewPageState>();
   final GlobalKey<TaskListScreenState> _tasksKey = GlobalKey<TaskListScreenState>();
@@ -42,11 +43,14 @@ class _MyHomePageState extends State<MyHomePage> {
   final GlobalKey<NotesPageState> _notesKey = GlobalKey<NotesPageState>();
   final GlobalKey<ReminderPageState> _remindersKey = GlobalKey<ReminderPageState>();
 
+  late final CalendarService _calendarService;
+  late final NoteService _noteService;
+
   void _navigateToSearch() {
   Navigator.push(
     context,
     MaterialPageRoute(
-      builder: (context) => SearchPage(database: widget.database),
+      builder: (context) => SearchPage(database: AppDatabase.instance),
     ),
   ).then((result) {
     if (result == null || result is! Map<String, dynamic>) return;
@@ -104,14 +108,16 @@ class _MyHomePageState extends State<MyHomePage> {
   @override
   void initState() {
     super.initState();
+    _calendarService = CalendarService();
+    _noteService = NoteService();
     // Initialize screens with keys
     _screens = [
-      OverviewPage(key: _overviewKey, database: widget.database),
-      TaskListScreen(key: _tasksKey, database: widget.database),
-      CalendarPage(key: _calendarKey, calendarService: CalendarService(widget.database)),
-      NotesPage(key: _notesKey, noteService: NoteService(widget.database)),
-      ReminderPage(key: _remindersKey, database: widget.database),
-      EnergyInsightsPage(database: widget.database),
+      OverviewPage(key: _overviewKey),
+      TaskListScreen(key: _tasksKey, database: AppDatabase.instance),
+      CalendarPage(key: _calendarKey, calendarService: _calendarService),
+      NotesPage(key: _notesKey, noteService: _noteService),
+      ReminderPage(key: _remindersKey, database: AppDatabase.instance),
+      EnergyInsightsPage(database: AppDatabase.instance),
     ];
   }
 
@@ -254,8 +260,7 @@ class _MyHomePageState extends State<MyHomePage> {
 /* OVERVIEW PAGE */
 
 class OverviewPage extends StatefulWidget {
-  final AppDatabase database;
-  const OverviewPage({super.key, required this.database});
+  const OverviewPage({super.key});
   @override
   State<OverviewPage> createState() => _OverviewPageState();
 }
@@ -269,112 +274,185 @@ class _OverviewPageState extends State<OverviewPage> {
   @override
   void initState() {
     super.initState();
-    _taskService = TaskService(widget.database);
-    _calendarService = CalendarService(widget.database);
-    _reminderService = ReminderService(widget.database);
-    _energyService = EnergyService(widget.database);
+    _taskService = TaskService();
+    _calendarService = CalendarService();
+    _reminderService = ReminderService();
+    _energyService = EnergyService();
   }
 
   // UPDATED: Made public so parent can call it
   Future<void> _refreshData() async {
-    setState(() {}); // This triggers all FutureBuilders to rebuild
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Overview refreshed!'),
-        duration: Duration(seconds: 1),
-      ),
-    );
+    setState(() {}); // This triggers all FutureBuilders to rebuild with fresh futures
+    // Add a small delay to ensure database is updated
+    await Future.delayed(const Duration(milliseconds: 300));
+    if (mounted) {
+      setState(() {});
+    }
   }
 
   Widget _statsSection() {
-    return FutureBuilder<Map<String, int>>(
-      future: _loadStats(),
-      builder: (context, snapshot) {
-        final stats = snapshot.data ?? {
-          'totalCompleted': 0,
-          'thisWeek': 0,
-          'streak': 0,
-        };
-        return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          child: Row(
-            children: [
-              _statCard('Total Done', '${stats['totalCompleted']}', '✅', Colors.green),
-              const SizedBox(width: 8),
-              _statCard('This Week', '${stats['thisWeek']}', '📈', Colors.blue),
-              const SizedBox(width: 8),
-              _statCard('Streak', '${stats['streak']}d', '🔥', Colors.orange),
-            ],
-          ),
-        );
-      },
-    );
-  }
+    final metricsService = MetricsService();
 
-  Widget _statCard(String label, String value, String emoji, Color color) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: color.withOpacity(0.15),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: color.withOpacity(0.3)),
-        ),
-        child: Column(
-          children: [
-            Text(emoji, style: const TextStyle(fontSize: 20)),
-            const SizedBox(height: 4),
-            Text(
-              value,
-              style: TextStyle(
-                color: color,
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
+    return SingleChildScrollView(
+      scrollDirection: Axis.vertical,
+      child: Column(
+        children: [
+          // Top row: Total Done, This Week, Streak
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Row(
+              children: [
+                Expanded(
+                  child: FutureBuilder<int>(
+                    future: metricsService.getTotalDone(),
+                    builder: (context, snapshot) {
+                      return _metricCard('Total Done', snapshot.data?.toString() ?? '0', Icons.check_circle, Colors.green);
+                    },
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: FutureBuilder<int>(
+                    future: metricsService.getThisWeekDone(),
+                    builder: (context, snapshot) {
+                      return _metricCard('This Week', snapshot.data?.toString() ?? '0', Icons.calendar_today, Colors.blue);
+                    },
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: FutureBuilder<int>(
+                    future: metricsService.getStreak(),
+                    builder: (context, snapshot) {
+                      return _metricCard('Streak', snapshot.data?.toString() ?? '0', Icons.local_fire_department, Colors.orange);
+                    },
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 2),
-            Text(
-              label,
-              style: const TextStyle(color: Colors.grey, fontSize: 11),
-              textAlign: TextAlign.center,
+          ),
+
+          // Task Status Breakdown Card
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: FutureBuilder<int>(
+              future: metricsService.getTotalTasks(),
+              builder: (context, snapshot1) {
+                int total = snapshot1.data ?? 0;
+
+                return FutureBuilder<int>(
+                  future: metricsService.getCompletedTasks(),
+                  builder: (context, snapshot2) {
+                    int completed = snapshot2.data ?? 0;
+                    int uncompleted = total - completed;
+                    double completedPercent = total == 0 ? 0 : (completed / total) * 100;
+                    double uncompletedPercent = total == 0 ? 0 : (uncompleted / total) * 100;
+
+                    return Card(
+                      color: Colors.grey[800],
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text("Task Status", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+                            const SizedBox(height: 16),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceAround,
+                              children: [
+                                Column(
+                                  children: [
+                                    Text("$completed/$total", style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.green)),
+                                    Text("${completedPercent.toStringAsFixed(1)}%", style: TextStyle(fontSize: 12, color: Colors.grey[400])),
+                                    Text("Completed", style: TextStyle(fontSize: 10, color: Colors.grey[500])),
+                                  ],
+                                ),
+                                Column(
+                                  children: [
+                                    Text("$uncompleted/$total", style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.red)),
+                                    Text("${uncompletedPercent.toStringAsFixed(1)}%", style: TextStyle(fontSize: 12, color: Colors.grey[400])),
+                                    Text("Uncompleted", style: TextStyle(fontSize: 10, color: Colors.grey[500])),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                );
+              },
             ),
-          ],
-        ),
+          ),
+
+          // Peak Completion Hint Card
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: FutureBuilder<String>(
+              future: metricsService.getPeakCompletionWindow(),
+              builder: (context, snapshot) {
+                final peakWindow = snapshot.data;
+                if (peakWindow == null || peakWindow.isEmpty) {
+                  return const SizedBox.shrink();
+                }
+
+                return Card(
+                  color: Colors.amber.withOpacity(0.1),
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.lightbulb, color: Colors.amber),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            "💡 Peak completions: $peakWindow",
+                            style: const TextStyle(fontSize: 14, color: Colors.white),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  Future<Map<String, int>> _loadStats() async {
-    final now = DateTime.now();
-    final weekStart = now.subtract(Duration(days: now.weekday - 1));
-    final allTasks = await widget.database.getAllTasks();
-
-    final totalCompleted = allTasks.where((t) => t.completed).length;
-
-    final thisWeekCompleted = allTasks.where((t) =>
-      t.completed &&
-      t.completedAt != null &&
-      t.completedAt!.isAfter(weekStart.subtract(const Duration(days: 1)))
-    ).length;
-
-    int streak = 0;
-    DateTime checkDate = DateTime(now.year, now.month, now.day);
-    while (true) {
-      final hasCompleted = allTasks.any((t) =>
-        t.completed &&
-        t.completedAt != null &&
-        DateTime(t.completedAt!.year, t.completedAt!.month, t.completedAt!.day) == checkDate
-      );
-      if (!hasCompleted) break;
-      streak++;
-      checkDate = checkDate.subtract(const Duration(days: 1));
-    }
-
-    return {
-      'totalCompleted': totalCompleted,
-      'thisWeek': thisWeekCompleted,
-      'streak': streak,
-    };
+  Widget _metricCard(String label, String value, IconData icon, Color color) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.15),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, color: color, size: 24),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: TextStyle(
+              color: color,
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            style: const TextStyle(color: Colors.grey, fontSize: 11),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -430,7 +508,6 @@ class _OverviewPageState extends State<OverviewPage> {
               ),
               _statsSection(),
               _EnergyStatusWidget(
-                database: widget.database,
                 energyService: _energyService,
               ),
               _sectionHeader('Today\'s Tasks'),
@@ -748,7 +825,8 @@ class _OverviewPageState extends State<OverviewPage> {
       } else {
         await _taskService.markTaskIncomplete(taskId);
       }
-      setState(() {});
+      // Refresh the entire page to update tasks and metrics
+      await _refreshData();
     } catch (error) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Failed to update task: $error')),
@@ -761,20 +839,13 @@ class _OverviewPageState extends State<OverviewPage> {
       if (isCompleted == true) {
         await _taskService.markSubtaskCompleted(subtaskId);
       } else {
-        final subtasks = await widget.database.getAllSubtasks('');
-        final subtaskData = subtasks.firstWhere((s) => s.id == subtaskId);
-        final subtask = SubtaskModel(
-          id: subtaskData.id,
-          taskId: subtaskData.taskId,
-          title: subtaskData.title,
-          completed: subtaskData.completed,
-          completedAt: subtaskData.completedAt,
-        );
-        
+        final subtask = await _taskService.getSubtaskById(subtaskId);
+        if (subtask == null) return;
         final updatedSubtask = subtask.copyWith(completed: false, completedAt: null);
         await _taskService.updateSubtask(updatedSubtask);
       }
-      setState(() {});
+      // Refresh the entire page to update tasks and metrics
+      await _refreshData();
     } catch (error) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Failed to update subtask: $error')),
@@ -816,11 +887,9 @@ class _OverviewPageState extends State<OverviewPage> {
 /* ENERGY STATUS WIDGET */
 
 class _EnergyStatusWidget extends StatefulWidget {
-  final AppDatabase database;
   final EnergyService energyService;
 
   const _EnergyStatusWidget({
-    required this.database,
     required this.energyService,
   });
 
@@ -858,7 +927,7 @@ class _EnergyStatusWidgetState extends State<_EnergyStatusWidget> {
     final result = await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => EnergyPage(database: widget.database),
+        builder: (context) => EnergyPage(database: AppDatabase.instance),
       ),
     );
 

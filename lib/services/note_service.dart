@@ -1,26 +1,24 @@
 import 'package:maximize/models/note_model.dart';
-import 'package:maximize/models/database.dart';
+import 'package:maximize/database/daos/note_dao.dart';
+import 'package:maximize/database/converters/note_converter.dart';
 import 'package:uuid/uuid.dart';
-import 'package:drift/drift.dart'; 
 
 class NoteService {
-  final AppDatabase _database;
-
-  NoteService(this._database);
+  final _dao = NoteDAO();
 
   // Get all notes (sorted by pinned first, then most recent)
   Future<List<NoteModel>> getNotes() async {
     try {
-      final noteDataList = await _database.getAllNotes();
-      final notes = noteDataList.map((data) => NoteModel.fromData(data)).toList();
-      
+      final isarNotes = await _dao.getAllNotes();
+      final notes = isarNotes.map((n) => NoteConverter.fromIsar(n)).toList();
+
       // Sort: pinned first, then by updated time (newest first)
       notes.sort((a, b) {
         if (a.isPinned && !b.isPinned) return -1;
         if (!a.isPinned && b.isPinned) return 1;
         return b.updatedAt.compareTo(a.updatedAt);
       });
-      
+
       return notes;
     } catch (e) {
       print('Error fetching notes: $e');
@@ -55,7 +53,7 @@ class NoteService {
     try {
       final notes = await getNotes();
       final lowerQuery = query.toLowerCase();
-      return notes.where((note) => 
+      return notes.where((note) =>
         note.title.toLowerCase().contains(lowerQuery) ||
         note.content.toLowerCase().contains(lowerQuery)
       ).toList();
@@ -65,7 +63,7 @@ class NoteService {
     }
   }
 
-  // Add note 
+  // Add note
   Future<String?> addNote({
     required String title,
     required String content,
@@ -76,19 +74,20 @@ class NoteService {
     try {
       final id = Uuid().v4();
       final now = DateTime.now();
-      
-      final note = NotesCompanion.insert(
-        id: Value(id), 
+
+      final note = NoteModel(
+        id: id,
         title: title,
         content: content,
-        category: Value(category),
-        color: Value(color), 
+        category: category,
+        color: color,
         createdAt: now,
         updatedAt: now,
-        isPinned: Value(isPinned), 
+        isPinned: isPinned,
       );
-      
-      await _database.insertNote(note);
+
+      final isarNote = NoteConverter.toIsar(note);
+      await _dao.insertNote(isarNote);
       print('[NoteService] Note added successfully: $id');
       return id;
     } catch (e) {
@@ -101,8 +100,8 @@ class NoteService {
   Future<bool> updateNote(NoteModel note) async {
     try {
       final updatedNote = note.copyWith(updatedAt: DateTime.now());
-      final companion = updatedNote.toCompanion();
-      await _database.updateNote(companion);
+      final isarNote = NoteConverter.toIsar(updatedNote);
+      await _dao.updateNote(isarNote);
       print('[NoteService] Note updated successfully: ${note.id}');
       return true;
     } catch (e) {
@@ -114,7 +113,7 @@ class NoteService {
   // Delete note
   Future<bool> deleteNote(String noteId) async {
     try {
-      await _database.deleteNote(noteId);
+      await _dao.deleteNote(noteId);
       print('[NoteService] Note deleted successfully: $noteId');
       return true;
     } catch (e) {
