@@ -26,10 +26,21 @@ class _SettingsPageState extends State<SettingsPage> {
   TimeOfDay _energyReminderTime = const TimeOfDay(hour: 9, minute: 0);
   bool _isLoading = true;
 
+  // GitHub sync fields
+  late TextEditingController _gitTokenController;
+  late TextEditingController _gitUsernameController;
+  late TextEditingController _gitRepoController;
+  bool _obscureToken = true;
+  bool _gitConfigured = false;
+
   @override
   void initState() {
     super.initState();
+    _gitTokenController = TextEditingController();
+    _gitUsernameController = TextEditingController();
+    _gitRepoController = TextEditingController();
     _loadPreferences();
+    _loadGitHubSettings();
   }
 
   Future<void> _loadPreferences() async {
@@ -55,6 +66,34 @@ class _SettingsPageState extends State<SettingsPage> {
         print('[Settings] Error loading preferences: $e');
       }
       setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _loadGitHubSettings() async {
+    final githubService = GitHubSyncService();
+    try {
+      final token = await githubService.getToken();
+      final username = await githubService.getUsername();
+      final repo = await githubService.getRepo();
+
+      if (mounted) {
+        setState(() {
+          if (token != null) {
+            _gitTokenController.text = token;
+          }
+          if (username.isNotEmpty) {
+            _gitUsernameController.text = username;
+          }
+          if (repo.isNotEmpty) {
+            _gitRepoController.text = repo;
+          }
+          _gitConfigured = token != null && username.isNotEmpty && repo.isNotEmpty;
+        });
+      }
+    } catch (e) {
+      if (AppConfig.debugLogging) {
+        print('[Settings] Error loading GitHub settings: $e');
+      }
     }
   }
 
@@ -296,6 +335,142 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
+  @override
+  void dispose() {
+    _gitTokenController.dispose();
+    _gitUsernameController.dispose();
+    _gitRepoController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _saveGitHubSettings() async {
+    final token = _gitTokenController.text.trim();
+    final username = _gitUsernameController.text.trim();
+    final repo = _gitRepoController.text.trim();
+
+    if (token.isEmpty || username.isEmpty || repo.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please fill in all GitHub fields')),
+      );
+      return;
+    }
+
+    try {
+      final githubService = GitHubSyncService();
+      await githubService.saveToken(token);
+      await githubService.saveUsername(username);
+      await githubService.saveRepo(repo);
+
+      if (mounted) {
+        setState(() => _gitConfigured = true);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('GitHub settings saved')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _clearGitHubSettings() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Clear GitHub Settings?'),
+        content: const Text('This will remove all stored GitHub credentials.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Clear', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      try {
+        final githubService = GitHubSyncService();
+        await githubService.logout();
+
+        if (mounted) {
+          setState(() {
+            _gitTokenController.clear();
+            _gitUsernameController.clear();
+            _gitRepoController.clear();
+            _gitConfigured = false;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('GitHub settings cleared')),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error: $e')),
+          );
+        }
+      }
+    }
+  }
+
+  Future<void> _syncToCloud() async {
+    final githubService = GitHubSyncService();
+
+    try {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Uploading to GitHub...')),
+      );
+
+      // Upload requires GitHub credentials to be set
+      await githubService.uploadData();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Uploaded to GitHub successfully')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Upload failed: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _syncFromCloud() async {
+    final githubService = GitHubSyncService();
+
+    try {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Downloading from GitHub...')),
+      );
+
+      // Download requires GitHub credentials to be set
+      await githubService.downloadData();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Downloaded from GitHub successfully')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Download failed: $e')),
+        );
+      }
+    }
+  }
+
   Future<void> _syncWithGitHub() async {
     final githubService = GitHubSyncService();
 
@@ -320,35 +495,6 @@ class _SettingsPageState extends State<SettingsPage> {
     }
   }
 
-  Future<void> _logoutGitHub() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Disconnect GitHub?'),
-        content: const Text('Your local data will remain.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Disconnect'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed == true) {
-      final githubService = GitHubSyncService();
-      await githubService.logout();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Disconnected from GitHub')),
-        );
-      }
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -473,27 +619,125 @@ class _SettingsPageState extends State<SettingsPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text(
-                      'Sync your data with GitHub',
+                      'Connect your GitHub account to sync data',
                       style: TextStyle(fontSize: 14),
                     ),
                     const SizedBox(height: 16),
+                    // GitHub Username
+                    const Text(
+                      'GitHub Username',
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: _gitUsernameController,
+                      decoration: InputDecoration(
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        labelText: 'Your GitHub username',
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    // GitHub Repo
+                    const Text(
+                      'Repository Name',
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: _gitRepoController,
+                      decoration: InputDecoration(
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        labelText: 'Repository name',
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    // GitHub Token
+                    const Text(
+                      'Personal Access Token',
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: _gitTokenController,
+                      obscureText: _obscureToken,
+                      decoration: InputDecoration(
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        labelText: 'github_pat_XXXXXXXXXXXX',
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            _obscureToken ? Icons.visibility_off : Icons.visibility,
+                            size: 20,
+                          ),
+                          onPressed: () {
+                            setState(() => _obscureToken = !_obscureToken);
+                          },
+                        ),
+                      ),
+                      enableSuggestions: false,
+                      autocorrect: false,
+                    ),
+                    const SizedBox(height: 16),
+                    // Save button
                     SizedBox(
                       width: double.infinity,
-                      child: ElevatedButton.icon(
-                        onPressed: _syncWithGitHub,
-                        icon: const Icon(Icons.cloud_upload),
-                        label: const Text('Sync Now'),
+                      child: ElevatedButton(
+                        onPressed: _saveGitHubSettings,
+                        child: Text(
+                          _gitConfigured ? 'Update Settings' : 'Save Settings',
+                        ),
                       ),
                     ),
                     const SizedBox(height: 12),
-                    SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton.icon(
-                        onPressed: _logoutGitHub,
-                        icon: const Icon(Icons.logout),
-                        label: const Text('Disconnect GitHub'),
+                    // Sync buttons
+                    if (_gitConfigured) ...[
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: _syncToCloud,
+                          icon: const Icon(Icons.cloud_upload),
+                          label: const Text('Sync to Cloud'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.blue,
+                          ),
+                        ),
                       ),
-                    ),
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: _syncFromCloud,
+                          icon: const Icon(Icons.cloud_download),
+                          label: const Text('Sync from Cloud'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.green,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                    ],
+                    // Clear button
+                    if (_gitConfigured)
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          onPressed: _clearGitHubSettings,
+                          icon: const Icon(Icons.delete_outline),
+                          label: const Text('Clear All Settings'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.red[400],
+                            side: BorderSide(color: Colors.red[400]!),
+                          ),
+                        ),
+                      ),
                   ],
                 ),
               ),
