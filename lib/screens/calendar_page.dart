@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
 import 'package:intl/intl.dart';
 import 'package:table_calendar/table_calendar.dart';
-import 'package:maximize/models/event_model.dart';
-import 'package:maximize/services/calendar_service.dart';
+import 'package:kinetic/models/event_model.dart';
+import 'package:kinetic/services/calendar_service.dart';
 import 'package:uuid/uuid.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 

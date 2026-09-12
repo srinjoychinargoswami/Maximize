@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:maximize/screens/privacy_policy_screen.dart';
-import 'package:maximize/screens/terms_conditions_screen.dart';
+import 'package:kinetic/screens/privacy_policy_screen.dart';
+import 'package:kinetic/screens/terms_conditions_screen.dart';
 
 class AboutPage extends StatelessWidget {
   const AboutPage({super.key});
@@ -9,7 +9,7 @@ class AboutPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('About Maximize'),
+        title: const Text('About Kinetic'),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
       ),
       body: SingleChildScrollView(
@@ -21,17 +21,17 @@ class AboutPage extends StatelessWidget {
             Center(
               child: Column(
                 children: [
-                  const Icon(Icons.task_alt, size: 64, color: Colors.blue),
+                  const Icon(Icons.electric_bolt, size: 64, color: Colors.amber),
                   const SizedBox(height: 16),
                   const Text(
-                    'Maximize',
+                    'Kinetic',
                     style: TextStyle(
                       fontSize: 28,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                   const Text(
-                    'Version 1.0.0',
+                    'Version 1.0.1',
                     style: TextStyle(
                       fontSize: 14,
                       color: Colors.grey,
@@ -44,7 +44,7 @@ class AboutPage extends StatelessWidget {
 
             // About Description
             const Text(
-              'About Maximize',
+              'About Kinetic',
               style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
@@ -52,7 +52,7 @@ class AboutPage extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             const Text(
-              'Maximize is a cross-platform productivity app that combines task management, calendar, reminders, and energy tracking in one unified application.',
+              'Kinetic is your energy operating system. Stop fighting your natural rhythm. Track your energy, understand your peak productivity window, and schedule work when you\'re actually ready.',
               style: TextStyle(
                 fontSize: 14,
                 height: 1.6,
@@ -69,14 +69,15 @@ class AboutPage extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 12),
-            _buildFeatureItem('✓ Task Management', 'Create, organize, and track tasks with priorities and categories'),
+            _buildFeatureItem('⚡ Energy Tracking', 'Monitor your energy levels and understand your productivity patterns'),
+            _buildFeatureItem('📊 Peak Window Detection', 'Identify when YOUR energy is highest'),
+            _buildFeatureItem('✓ Task Management', 'Create, organize, and track tasks by energy requirement'),
             _buildFeatureItem('✓ Calendar', 'Month, week, day, and list views for event management'),
-            _buildFeatureItem('✓ Reminders', 'Set reminders with notifications across all platforms'),
-            _buildFeatureItem('✓ Energy Tracking', 'Monitor your energy levels and correlate with productivity'),
-            _buildFeatureItem('✓ Analytics', '11+ metrics and 4 chart types for insights'),
-            _buildFeatureItem('✓ Notes', 'Quick capture and organized note-taking'),
+            _buildFeatureItem('🔔 Energy-Triggered Reminders', 'Get reminded when your energy level is right for the task'),
+            _buildFeatureItem('📝 Notes', 'Quick capture and organized note-taking'),
+            _buildFeatureItem('📊 Analytics', '11+ metrics and 4 chart types for deep insights'),
             _buildFeatureItem('✓ Cross-Device Sync', 'Sync your data securely across Android, iOS, macOS, Windows, Linux, and Web'),
-            _buildFeatureItem('✓ AES-256 Encryption', 'Your data is encrypted before syncing to the cloud'),
+            _buildFeatureItem('🔐 AES-256 Encryption', 'Your data is encrypted before syncing to the cloud'),
             _buildFeatureItem('✓ Offline-First', 'Full functionality works without internet connection'),
             const SizedBox(height: 24),
 
@@ -163,7 +164,7 @@ class AboutPage extends StatelessWidget {
             const SizedBox(height: 16),
             const Center(
               child: Text(
-                '© 2026 Maximize. All rights reserved.',
+                '© 2026 Kinetic. All rights reserved.',
                 style: TextStyle(
                   fontSize: 12,
                   color: Colors.grey,

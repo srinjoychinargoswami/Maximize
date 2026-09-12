@@ -1,14 +1,14 @@
 import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:maximize/models/task_model.dart';
-import 'package:maximize/models/event_model.dart';
-import 'package:maximize/models/reminder_model.dart';
-import 'package:maximize/models/note_model.dart';
-import 'package:maximize/models/energy_entry.dart';
-import 'package:maximize/config/app_config.dart';
-import 'package:maximize/services/notification_service.dart';
-import 'package:maximize/services/encryption_service.dart';
-import 'package:maximize/services/database_encryption_service.dart';
+import 'package:kinetic/models/task_model.dart';
+import 'package:kinetic/models/event_model.dart';
+import 'package:kinetic/models/reminder_model.dart';
+import 'package:kinetic/models/note_model.dart';
+import 'package:kinetic/models/energy_entry.dart';
+import 'package:kinetic/config/app_config.dart';
+import 'package:kinetic/services/notification_service.dart';
+import 'package:kinetic/services/encryption_service.dart';
+import 'package:kinetic/services/database_encryption_service.dart';
 
 class FirebaseRealtimeSyncService {
   static final FirebaseRealtimeSyncService _instance =

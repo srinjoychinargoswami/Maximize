@@ -1,5 +1,5 @@
 import 'package:uuid/uuid.dart';
-import 'package:maximize/models/database.dart'; // ADDED: Import for ReminderData
+import 'package:kinetic/models/database.dart'; // ADDED: Import for ReminderData
 
 class ReminderModel {
   final String id; // UUID for internal tracking

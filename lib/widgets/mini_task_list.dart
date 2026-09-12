@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:maximize/services/task_service.dart';
-import 'package:maximize/models/task_model.dart';
-import 'package:maximize/widgets/task_widget.dart';
+import 'package:kinetic/services/task_service.dart';
+import 'package:kinetic/models/task_model.dart';
+import 'package:kinetic/widgets/task_widget.dart';
 import 'package:provider/provider.dart';
 
 class MiniTaskList extends StatefulWidget {

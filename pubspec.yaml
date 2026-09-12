@@ -1,8 +1,8 @@
-name: maximize
-description: "A new Flutter project."
+name: kinetic
+description: "Your Energy Operating System. Track energy, understand your peak productivity window, schedule work when you're ready."
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 
-version: 1.0.0+1
+version: 1.0.1+1
 
 environment:
   sdk: ^3.5.3

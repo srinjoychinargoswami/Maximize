@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:maximize/models/page_model.dart' as page_model;
+import 'package:kinetic/models/page_model.dart' as page_model;
 
 class PageManagementScreen extends StatefulWidget {
   const PageManagementScreen({super.key});

@@ -1,5 +1,5 @@
-import 'package:maximize/database/app_database.dart';
-import 'package:maximize/models/event_model.dart' as event_model;
+import 'package:kinetic/database/app_database.dart';
+import 'package:kinetic/models/event_model.dart' as event_model;
 import 'package:uuid/uuid.dart';
 import 'package:flutter/material.dart';
 import 'package:drift/drift.dart';

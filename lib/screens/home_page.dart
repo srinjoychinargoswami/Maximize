@@ -1,27 +1,27 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:maximize/screens/calendar_page.dart';
-import 'package:maximize/screens/about_page.dart';
-import 'package:maximize/screens/task_list_screen.dart';
-import 'package:maximize/screens/search_page.dart';
-import 'package:maximize/screens/reminder_page.dart';
-import 'package:maximize/screens/notes_page.dart';
-import 'package:maximize/screens/energy_page.dart';
-import 'package:maximize/screens/energy_insights_page.dart';
-import 'package:maximize/screens/settings_page.dart';
-import 'package:maximize/services/calendar_service.dart';
-import 'package:maximize/services/task_service.dart';
-import 'package:maximize/services/reminder_service.dart';
-import 'package:maximize/services/note_service.dart';
-import 'package:maximize/services/energy_service.dart';
-import 'package:maximize/services/completion_log_service.dart';
-import 'package:maximize/services/metrics_service.dart';
-import 'package:maximize/database/app_database.dart' as db;
-import 'package:maximize/models/task_model.dart';
-import 'package:maximize/models/subtask_model.dart';
-import 'package:maximize/models/event_model.dart' as event_model;
-import 'package:maximize/models/reminder_model.dart';
-import 'package:maximize/models/energy_model.dart';
+import 'package:kinetic/screens/calendar_page.dart';
+import 'package:kinetic/screens/about_page.dart';
+import 'package:kinetic/screens/task_list_screen.dart';
+import 'package:kinetic/screens/search_page.dart';
+import 'package:kinetic/screens/reminder_page.dart';
+import 'package:kinetic/screens/notes_page.dart';
+import 'package:kinetic/screens/energy_page.dart';
+import 'package:kinetic/screens/energy_insights_page.dart';
+import 'package:kinetic/screens/settings_page.dart';
+import 'package:kinetic/services/calendar_service.dart';
+import 'package:kinetic/services/task_service.dart';
+import 'package:kinetic/services/reminder_service.dart';
+import 'package:kinetic/services/note_service.dart';
+import 'package:kinetic/services/energy_service.dart';
+import 'package:kinetic/services/completion_log_service.dart';
+import 'package:kinetic/services/metrics_service.dart';
+import 'package:kinetic/database/app_database.dart' as db;
+import 'package:kinetic/models/task_model.dart';
+import 'package:kinetic/models/subtask_model.dart';
+import 'package:kinetic/models/event_model.dart' as event_model;
+import 'package:kinetic/models/reminder_model.dart';
+import 'package:kinetic/models/energy_model.dart';
 import 'package:flutter/gestures.dart';
 import 'package:provider/provider.dart';
 
@@ -163,7 +163,7 @@ class _MyHomePageState extends State<MyHomePage> {
     return Scaffold(
       key: _scaffoldKey,
       appBar: AppBar(
-        title: const Text('Maximize'),
+        title: const Text('Kinetic'),
         leading: IconButton(
           icon: const Icon(Icons.menu),
           onPressed: () => _scaffoldKey.currentState?.openDrawer(),
@@ -189,7 +189,7 @@ class _MyHomePageState extends State<MyHomePage> {
           children: [
             const DrawerHeader(
               decoration: BoxDecoration(color: Colors.blue),
-              child: Text('Maximize', style: TextStyle(color: Colors.white, fontSize: 24)),
+              child: Text('Kinetic', style: TextStyle(color: Colors.white, fontSize: 24)),
             ),
             _drawerTile(title: 'Home', icon: Icons.home, index: 0),
             _drawerTile(title: 'Tasks', icon: Icons.list, index: 1),

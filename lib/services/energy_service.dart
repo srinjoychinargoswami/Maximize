@@ -1,5 +1,5 @@
-import 'package:maximize/database/app_database.dart';
-import 'package:maximize/models/energy_model.dart';
+import 'package:kinetic/database/app_database.dart';
+import 'package:kinetic/models/energy_model.dart';
 import 'package:uuid/uuid.dart';
 import 'package:flutter/material.dart';
 import 'package:drift/drift.dart';

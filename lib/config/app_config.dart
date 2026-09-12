@@ -7,9 +7,9 @@ class AppConfig {
   static const String firebaseDatabaseUrl = '';
 
   // App Configuration
-  static const String appName = 'Maximize';
-  static const String appVersion = '1.0.0';
-  static const String supportEmail = 'support@maximize.app';
+  static const String appName = 'Kinetic';
+  static const String appVersion = '1.0.1';
+  static const String supportEmail = 'support@kinetic.app';
 
   // Legal URLs
   // [BUYER CUSTOMIZATION]: Add your privacy policy URL

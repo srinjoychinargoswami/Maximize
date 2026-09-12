@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:maximize/models/task_model.dart';
+import 'package:kinetic/models/task_model.dart';
 import 'package:intl/intl.dart';
 
 class TaskWidget extends StatefulWidget {

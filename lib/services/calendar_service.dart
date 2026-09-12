@@ -1,6 +1,6 @@
-import 'package:maximize/database/app_database.dart';
-import 'package:maximize/models/event_model.dart' as models;
-import 'package:maximize/models/reminder_model.dart';
+import 'package:kinetic/database/app_database.dart';
+import 'package:kinetic/models/event_model.dart' as models;
+import 'package:kinetic/models/reminder_model.dart';
 import 'package:drift/drift.dart' as drift;
 
 class CalendarService {

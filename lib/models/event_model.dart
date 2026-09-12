@@ -1,4 +1,4 @@
-import 'package:maximize/models/database.dart'; // Import your database file
+import 'package:kinetic/models/database.dart'; // Import your database file
 import 'package:intl/intl.dart'; // Import intl package
 import 'package:uuid/uuid.dart';
 

@@ -29,12 +29,12 @@ class PrivacyPolicyScreen extends StatelessWidget {
 
             _buildSection(
               'Introduction',
-              'Maximize ("we", "our", or "us") is committed to protecting your privacy. This Privacy Policy explains how we collect, use, disclose, and otherwise handle your information when you use our mobile and web application.',
+              'Kinetic ("we", "our", or "us") is committed to protecting your privacy. This Privacy Policy explains how we collect, use, disclose, and otherwise handle your information when you use our mobile and web application.',
             ),
 
             _buildSection(
               'Information We Collect',
-              'When you use Maximize, we collect the following types of information:\n\n'
+              'When you use Kinetic, we collect the following types of information:\n\n'
               '• Data you enter: Tasks, events, reminders, notes, and energy tracking entries\n'
               '• Usage data: App interactions, features used (collected locally only)\n'
               '• Device information: Device type, platform (Android/iOS/macOS/Windows/Linux/Web)\n'
@@ -61,7 +61,7 @@ class PrivacyPolicyScreen extends StatelessWidget {
 
             _buildSection(
               'Firebase Sync',
-              'Maximize offers optional Firebase sync to synchronize your data across devices. When you enable sync:\n\n'
+              'Kinetic offers optional Firebase sync to synchronize your data across devices. When you enable sync:\n\n'
               '• Your data is encrypted with AES-256 before upload\n'
               '• Encrypted data is stored in Firebase Realtime Database\n'
               '• Platform information (device type) is logged with sync timestamps\n'
@@ -70,7 +70,7 @@ class PrivacyPolicyScreen extends StatelessWidget {
 
             _buildSection(
               'Third-Party Services',
-              'Maximize uses the following third-party services:\n\n'
+              'Kinetic uses the following third-party services:\n\n'
               '• Firebase (Google): Cloud sync and data storage\n'
               '• Flutter: Mobile and web framework\n'
               '• SQLite: Local database engine',
@@ -88,7 +88,7 @@ class PrivacyPolicyScreen extends StatelessWidget {
 
             _buildSection(
               'Data Retention',
-              'Your data is retained locally on your device as long as you use the app. If you uninstall Maximize:\n\n'
+              'Your data is retained locally on your device as long as you use the app. If you uninstall Kinetic:\n\n'
               '• Local data is permanently deleted\n'
               '• Cloud data persists in Firebase until you manually delete your account',
             ),
@@ -96,7 +96,7 @@ class PrivacyPolicyScreen extends StatelessWidget {
             _buildSection(
               'Contact Us',
               'If you have questions about this Privacy Policy, please contact us at:\n\n'
-              'Email: privacy@maximize.app\n'
+              'Email: privacy@kinetic.app\n'
               'GitHub: github.com/srinjoychinargoswami/Maximize',
             ),
 

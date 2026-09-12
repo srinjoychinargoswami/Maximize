@@ -1,6 +1,6 @@
-import 'package:maximize/models/energy_model.dart';
-import 'package:maximize/services/energy_service.dart';
-import 'package:maximize/config/app_config.dart';
+import 'package:kinetic/models/energy_model.dart';
+import 'package:kinetic/services/energy_service.dart';
+import 'package:kinetic/config/app_config.dart';
 
 class EnergyAnalyticsService {
   final EnergyService _energyService;

@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:maximize/main.dart';
-import 'package:maximize/providers/theme_notifier.dart';
-import 'package:maximize/database/app_database.dart';
+import 'package:kinetic/main.dart';
+import 'package:kinetic/providers/theme_notifier.dart';
+import 'package:kinetic/database/app_database.dart';
 
 void main() {
   testWidgets('Counter increments smoke test', (WidgetTester tester) async {

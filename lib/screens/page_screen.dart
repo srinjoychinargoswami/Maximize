@@ -1,6 +1,6 @@
 // page_screen.dart
 import 'package:flutter/material.dart';
-import 'package:maximize/models/page_model.dart' as page_model;
+import 'package:kinetic/models/page_model.dart' as page_model;
 
 
 class PageScreen extends StatefulWidget {

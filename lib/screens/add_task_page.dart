@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:maximize/models/subtask_model.dart';
-import 'package:maximize/utils/task_utils.dart';
+import 'package:kinetic/models/subtask_model.dart';
+import 'package:kinetic/utils/task_utils.dart';
 import 'package:uuid/uuid.dart';
-import 'package:maximize/models/task_model.dart';
-import 'package:maximize/services/task_service.dart';
+import 'package:kinetic/models/task_model.dart';
+import 'package:kinetic/services/task_service.dart';
 import 'package:provider/provider.dart';
 
 class AddTaskPage extends StatefulWidget {

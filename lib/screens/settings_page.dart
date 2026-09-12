@@ -3,12 +3,12 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:provider/provider.dart';
-import 'package:maximize/config/app_config.dart';
-import 'package:maximize/providers/theme_notifier.dart';
-import 'package:maximize/services/completion_log_service.dart';
-import 'package:maximize/services/database_encryption_service.dart';
-import 'package:maximize/screens/privacy_policy_screen.dart';
-import 'package:maximize/screens/terms_conditions_screen.dart';
+import 'package:kinetic/config/app_config.dart';
+import 'package:kinetic/providers/theme_notifier.dart';
+import 'package:kinetic/services/completion_log_service.dart';
+import 'package:kinetic/services/database_encryption_service.dart';
+import 'package:kinetic/screens/privacy_policy_screen.dart';
+import 'package:kinetic/screens/terms_conditions_screen.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});

@@ -1,5 +1,5 @@
-import 'package:maximize/models/task_model.dart';
-import 'package:maximize/models/database.dart';
+import 'package:kinetic/models/task_model.dart';
+import 'package:kinetic/models/database.dart';
 
 // Conversion utilities for TaskModel
 

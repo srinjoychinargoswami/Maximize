@@ -1,5 +1,5 @@
-import 'package:maximize/database/app_database.dart';
-import 'package:maximize/services/completion_log_service.dart';
+import 'package:kinetic/database/app_database.dart';
+import 'package:kinetic/services/completion_log_service.dart';
 
 class MetricsService {
   final AppDatabase _database;

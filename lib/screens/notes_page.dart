@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:maximize/models/note_model.dart';
-import 'package:maximize/services/note_service.dart';
+import 'package:kinetic/models/note_model.dart';
+import 'package:kinetic/services/note_service.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 

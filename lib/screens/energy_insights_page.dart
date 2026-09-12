@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:fl_chart/fl_chart.dart';
-import 'package:maximize/services/energy_analytics_service.dart';
-import 'package:maximize/database/app_database.dart';
+import 'package:kinetic/services/energy_analytics_service.dart';
+import 'package:kinetic/database/app_database.dart';
 
 class EnergyInsightsPage extends StatefulWidget {
   final AppDatabase database;

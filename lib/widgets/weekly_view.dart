@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:maximize/providers/provider.dart';
+import 'package:kinetic/providers/provider.dart';
 
 class WeeklyView extends StatelessWidget {
   @override

@@ -1,9 +1,9 @@
-import 'package:maximize/database/app_database.dart';
-import 'package:maximize/models/task_model.dart';
-import 'package:maximize/models/subtask_model.dart';
-import 'package:maximize/models/reminder_model.dart';
-import 'package:maximize/services/completion_log_service.dart';
-import 'package:maximize/services/energy_service.dart';
+import 'package:kinetic/database/app_database.dart';
+import 'package:kinetic/models/task_model.dart';
+import 'package:kinetic/models/subtask_model.dart';
+import 'package:kinetic/models/reminder_model.dart';
+import 'package:kinetic/services/completion_log_service.dart';
+import 'package:kinetic/services/energy_service.dart';
 import 'package:uuid/uuid.dart';
 import 'package:flutter/material.dart';
 import 'package:drift/drift.dart';

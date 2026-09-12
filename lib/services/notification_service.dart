@@ -1,4 +1,4 @@
-import 'package:maximize/models/reminder_model.dart';
+import 'package:kinetic/models/reminder_model.dart';
 import 'package:flutter/material.dart';
 
 class NotificationService {

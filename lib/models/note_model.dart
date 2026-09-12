@@ -1,4 +1,4 @@
-import 'package:maximize/models/database.dart';
+import 'package:kinetic/models/database.dart';
 import 'package:uuid/uuid.dart';
 
 class NoteModel {

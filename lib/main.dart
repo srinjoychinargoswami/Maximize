@@ -4,23 +4,23 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/data/latest.dart' as tz_data;
 import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
-import 'package:maximize/firebase_options.dart';
-import 'package:maximize/database/app_database.dart';
-import 'package:maximize/screens/home_page.dart';
-import 'package:maximize/services/task_service.dart';
-import 'package:maximize/services/calendar_service.dart';
-import 'package:maximize/services/event_service.dart';
-import 'package:maximize/services/reminder_service.dart';
-import 'package:maximize/services/note_service.dart';
-import 'package:maximize/services/energy_service.dart';
-import 'package:maximize/services/completion_log_service.dart';
-import 'package:maximize/services/firebase_realtime_sync_service.dart';
-import 'package:maximize/services/encryption_service.dart';
-import 'package:maximize/services/metrics_service.dart';
-import 'package:maximize/services/energy_analytics_service.dart';
-import 'package:maximize/config/theme_config.dart';
-import 'package:maximize/providers/theme_notifier.dart';
-import 'package:maximize/services/database_encryption_service.dart';
+import 'package:kinetic/firebase_options.dart';
+import 'package:kinetic/database/app_database.dart';
+import 'package:kinetic/screens/home_page.dart';
+import 'package:kinetic/services/task_service.dart';
+import 'package:kinetic/services/calendar_service.dart';
+import 'package:kinetic/services/event_service.dart';
+import 'package:kinetic/services/reminder_service.dart';
+import 'package:kinetic/services/note_service.dart';
+import 'package:kinetic/services/energy_service.dart';
+import 'package:kinetic/services/completion_log_service.dart';
+import 'package:kinetic/services/firebase_realtime_sync_service.dart';
+import 'package:kinetic/services/encryption_service.dart';
+import 'package:kinetic/services/metrics_service.dart';
+import 'package:kinetic/services/energy_analytics_service.dart';
+import 'package:kinetic/config/theme_config.dart';
+import 'package:kinetic/providers/theme_notifier.dart';
+import 'package:kinetic/services/database_encryption_service.dart';
 import 'package:flutter/foundation.dart';
 
 void main() async {
@@ -134,7 +134,7 @@ class MyApp extends StatelessWidget {
       child: Consumer<ThemeNotifier>(
         builder: (context, themeNotifier, _) {
           return MaterialApp(
-            title: 'Maximize',
+            title: 'Kinetic',
             theme: ThemeConfig.buildLightTheme(context),
             darkTheme: ThemeConfig.buildDarkTheme(context),
             themeMode: themeNotifier.themeMode,

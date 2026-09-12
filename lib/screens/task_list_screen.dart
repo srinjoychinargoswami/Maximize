@@ -3,19 +3,19 @@ import 'package:flutter/material.dart';
 import "package:provider/provider.dart";
 import 'package:flutter/gestures.dart';
 import "package:provider/provider.dart";
-import 'package:maximize/models/task_model.dart';
+import 'package:kinetic/models/task_model.dart';
 import "package:provider/provider.dart";
-import 'package:maximize/models/subtask_model.dart';
+import 'package:kinetic/models/subtask_model.dart';
 import "package:provider/provider.dart";
-import 'package:maximize/services/task_service.dart';
+import 'package:kinetic/services/task_service.dart';
 import "package:provider/provider.dart";
-import 'package:maximize/services/firebase_realtime_sync_service.dart';
+import 'package:kinetic/services/firebase_realtime_sync_service.dart';
 import "package:provider/provider.dart";
-import 'package:maximize/screens/add_task_page.dart';
+import 'package:kinetic/screens/add_task_page.dart';
 import "package:provider/provider.dart";
-import 'package:maximize/utils/task_utils.dart';
+import 'package:kinetic/utils/task_utils.dart';
 import "package:provider/provider.dart";
-import 'package:maximize/database/app_database.dart';
+import 'package:kinetic/database/app_database.dart';
 import 'package:intl/intl.dart';
 
 // CustomScrollBehavior to fix RefreshIndicator on Windows desktop

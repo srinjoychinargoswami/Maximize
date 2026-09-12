@@ -1,5 +1,5 @@
-import 'package:maximize/models/database.dart'; // Import your database file
-import 'package:maximize/models/subtask_model.dart'; // Import SubtaskModel from separate file
+import 'package:kinetic/models/database.dart'; // Import your database file
+import 'package:kinetic/models/subtask_model.dart'; // Import SubtaskModel from separate file
 import 'package:json_annotation/json_annotation.dart';
 
 part 'task_model.g.dart'; 

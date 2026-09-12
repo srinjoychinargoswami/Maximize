@@ -1,4 +1,4 @@
-import 'package:maximize/models/task_model.dart';
+import 'package:kinetic/models/task_model.dart';
 
 class PageModel {
   final int id;

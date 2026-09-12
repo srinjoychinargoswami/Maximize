@@ -1,5 +1,5 @@
 import 'package:flutter/foundation.dart';
-import 'package:maximize/services/encryption_service.dart';
+import 'package:kinetic/services/encryption_service.dart';
 
 /// Platform-specific encryption configuration for database sync
 /// - Web: Uses EncryptionService (AES-256) before uploading to Firebase

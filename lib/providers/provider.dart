@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:maximize/models/task_model.dart';
+import 'package:kinetic/models/task_model.dart';
 
 class TaskProvider with ChangeNotifier {
   List<TaskModel> _tasks = [];

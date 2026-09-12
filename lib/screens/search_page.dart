@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
-import 'package:maximize/models/task_model.dart';
-import 'package:maximize/models/event_model.dart' as event_model;
-import 'package:maximize/models/note_model.dart';
-import 'package:maximize/models/reminder_model.dart';
-import 'package:maximize/services/task_service.dart';
-import 'package:maximize/services/event_service.dart';
-import 'package:maximize/services/note_service.dart';
-import 'package:maximize/services/reminder_service.dart';
+import 'package:kinetic/models/task_model.dart';
+import 'package:kinetic/models/event_model.dart' as event_model;
+import 'package:kinetic/models/note_model.dart';
+import 'package:kinetic/models/reminder_model.dart';
+import 'package:kinetic/services/task_service.dart';
+import 'package:kinetic/services/event_service.dart';
+import 'package:kinetic/services/note_service.dart';
+import 'package:kinetic/services/reminder_service.dart';
 
 class SearchPage extends StatefulWidget {
   const SearchPage({Key? key}) : super(key: key);

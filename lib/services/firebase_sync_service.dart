@@ -1,11 +1,11 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:maximize/database/app_database.dart';
-import 'package:maximize/services/settings_service.dart';
-import 'package:maximize/services/task_service.dart';
-import 'package:maximize/services/event_service.dart';
-import 'package:maximize/services/reminder_service.dart';
-import 'package:maximize/services/note_service.dart';
+import 'package:kinetic/database/app_database.dart';
+import 'package:kinetic/services/settings_service.dart';
+import 'package:kinetic/services/task_service.dart';
+import 'package:kinetic/services/event_service.dart';
+import 'package:kinetic/services/reminder_service.dart';
+import 'package:kinetic/services/note_service.dart';
 
 class FirebaseSyncService {
   final AppDatabase db;
