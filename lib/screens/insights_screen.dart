@@ -15,6 +15,8 @@ class InsightsScreen extends StatefulWidget {
 }
 
 class _InsightsScreenState extends State<InsightsScreen> {
+  late Future<void> _refreshKey;
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -22,9 +24,15 @@ class _InsightsScreenState extends State<InsightsScreen> {
         title: const Text('Insights'),
         centerTitle: true,
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
+      body: RefreshIndicator(
+        onRefresh: () async {
+          setState(() {});
+          await Future.delayed(const Duration(milliseconds: 500));
+        },
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.all(16),
+          child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // === 1. YOUR PEAK ENERGY WINDOW (MOST IMPORTANT) ===
@@ -58,6 +66,7 @@ class _InsightsScreenState extends State<InsightsScreen> {
             // === 8. ACTIONABLE RECOMMENDATIONS ===
             _buildRecommendations(),
           ],
+          ),
         ),
       ),
     );

@@ -7,6 +7,13 @@ import 'package:kinetic/config/app_config.dart';
 import 'package:kinetic/providers/theme_notifier.dart';
 import 'package:kinetic/services/completion_log_service.dart';
 import 'package:kinetic/services/database_encryption_service.dart';
+import 'package:kinetic/services/task_service.dart';
+import 'package:kinetic/services/calendar_service.dart';
+import 'package:kinetic/services/event_service.dart';
+import 'package:kinetic/services/reminder_service.dart';
+import 'package:kinetic/services/note_service.dart';
+import 'package:kinetic/services/energy_service.dart';
+import 'package:kinetic/database/app_database.dart' as db;
 import 'package:kinetic/screens/privacy_policy_screen.dart';
 import 'package:kinetic/screens/terms_conditions_screen.dart';
 
@@ -249,11 +256,12 @@ class _SettingsPageState extends State<SettingsPage> {
     }
   }
 
-  Future<void> _showClearAllDialog() async {
+  // Clear only completion logs and metrics
+  Future<void> _showClearLogsDialog() async {
     showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Clear All Data?'),
+        title: const Text('Clear Completion Logs?'),
         content: const Text(
           "This will delete:\n"
           "• All completion logs\n"
@@ -274,7 +282,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 if (mounted) {
                   Navigator.pop(ctx);
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text("All logs cleared. Metrics reset to 0.")),
+                    const SnackBar(content: Text("Completion logs cleared. Metrics reset to 0.")),
                   );
                   // Pop settings page and return true to trigger refresh
                   if (mounted) {
@@ -290,7 +298,71 @@ class _SettingsPageState extends State<SettingsPage> {
                 }
               }
             },
-            child: const Text("Clear All", style: TextStyle(color: Colors.red)),
+            child: const Text("Clear Logs", style: TextStyle(color: Colors.orange)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Clear ALL data from database
+  Future<void> _showClearAllDataDialog() async {
+    showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Everything?'),
+        content: const Text(
+          "⚠️ This will permanently delete:\n"
+          "• All tasks\n"
+          "• All events\n"
+          "• All reminders\n"
+          "• All notes\n"
+          "• All energy logs\n"
+          "• All completion logs\n\n"
+          "This action CANNOT be undone!"
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text("Cancel"),
+          ),
+          TextButton(
+            onPressed: () async {
+              try {
+                final database = context.read<db.AppDatabase>();
+
+                // Delete all data from all tables
+                await database.delete(database.completionLogs).go();
+                await database.delete(database.tasks).go();
+                await database.delete(database.subtasks).go();
+                await database.delete(database.events).go();
+                await database.delete(database.reminders).go();
+                await database.delete(database.notes).go();
+                await database.delete(database.energyEntries).go();
+
+                if (mounted) {
+                  Navigator.pop(ctx);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text("✅ All data deleted. App reset to empty state."),
+                      duration: Duration(seconds: 2),
+                    ),
+                  );
+                  // Pop settings and return true to trigger refresh
+                  if (mounted) {
+                    Navigator.pop(context, true);
+                  }
+                }
+              } catch (e) {
+                if (mounted) {
+                  Navigator.pop(ctx);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text("Error: $e")),
+                  );
+                }
+              }
+            },
+            child: const Text("Delete All", style: TextStyle(color: Colors.red)),
           ),
         ],
       ),
@@ -491,12 +563,24 @@ class _SettingsPageState extends State<SettingsPage> {
                   ),
                   const Divider(height: 0),
                   ListTile(
-                    title: const Text('Clear All Metrics & Logs'),
-                    subtitle: const Text('Reset completion logs and metrics'),
+                    title: const Text('Clear Completion Logs'),
+                    subtitle: const Text('Reset all metrics and task history'),
                     trailing: ElevatedButton(
-                      onPressed: _showClearAllDialog,
+                      onPressed: _showClearLogsDialog,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.red[700],
+                        backgroundColor: Colors.orange[700],
+                      ),
+                      child: const Text('Clear Logs', style: TextStyle(fontSize: 12)),
+                    ),
+                  ),
+                  const Divider(height: 0),
+                  ListTile(
+                    title: const Text('Clear All Data'),
+                    subtitle: const Text('Delete everything (tasks, events, reminders, notes, energy logs)'),
+                    trailing: ElevatedButton(
+                      onPressed: _showClearAllDataDialog,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.red[900],
                       ),
                       child: const Text('Clear All', style: TextStyle(fontSize: 12)),
                     ),

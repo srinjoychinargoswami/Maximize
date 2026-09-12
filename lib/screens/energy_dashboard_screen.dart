@@ -53,8 +53,57 @@ class _EnergyDashboardScreenState extends State<EnergyDashboardScreen> {
   }
 
   Widget _buildCurrentEnergyCard(EnergyEntryModel? latest) {
-    final level = latest?.energyLevel ?? 5;
-    final timestamp = latest?.timestamp;
+    // Show "Not logged yet" if no energy entry exists
+    if (latest == null) {
+      return Card(
+        elevation: 4,
+        child: Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            gradient: LinearGradient(
+              colors: [
+                Colors.grey.withOpacity(0.1),
+                Colors.grey.withOpacity(0.05),
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            border: Border.all(color: Colors.grey.withOpacity(0.3)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Your Current Energy',
+                style: TextStyle(fontSize: 14, color: Colors.grey),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Not logged yet',
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey,
+                ),
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'Tap "Log Energy Level" below to record your energy and get personalized insights.',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: Colors.grey,
+                  height: 1.6,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final level = latest.energyLevel;
+    final timestamp = latest.timestamp;
 
     return Card(
       elevation: 4,
@@ -105,13 +154,11 @@ class _EnergyDashboardScreenState extends State<EnergyDashboardScreen> {
                 fontWeight: FontWeight.w600,
               ),
             ),
-            if (timestamp != null) ...[
-              const SizedBox(height: 8),
-              Text(
-                'Last updated: ${DateFormat('h:mm a').format(timestamp)}',
-                style: const TextStyle(fontSize: 12, color: Colors.grey),
-              ),
-            ],
+            const SizedBox(height: 8),
+            Text(
+              'Logged at ${DateFormat('h:mm a').format(timestamp)}',
+              style: const TextStyle(fontSize: 12, color: Colors.grey),
+            ),
           ],
         ),
       ),
