@@ -42,6 +42,9 @@ class TaskModel {
   final DateTime? reminderTime; // When to show the reminder notification
   final String? reminderPreset; // Preset type: 'at_time', '15min', '30min', '1hour', '1day', 'custom'
 
+  // NEW: Energy requirement field
+  final int energyRequired; // 1-10 scale: 1=admin, 5=medium, 10=deep focus
+
   TaskModel({
     required this.id,
     required this.title,
@@ -70,6 +73,7 @@ class TaskModel {
     this.reminderEnabled,
     this.reminderTime,
     this.reminderPreset,
+    this.energyRequired = 5, // Default to medium energy
   }) {
     // Initialize timestamps
     this.createdAt = createdAt ?? DateTime.now();
@@ -102,6 +106,7 @@ class TaskModel {
       reminderEnabled: data.reminderEnabled, // : Map reminder enabled
       reminderTime: data.reminderTime, //  Map reminder time
       reminderPreset: data.reminderPreset, //  Map reminder preset
+      energyRequired: 5, // Default to medium energy - new field
       // Note: subtasks will be loaded separately via service layer
     );
   }
@@ -136,6 +141,7 @@ class TaskModel {
       'reminderEnabled': reminderEnabled, // Include reminder enabled
       'reminderTime': reminderTime?.toIso8601String(), //Include reminder time
       'reminderPreset': reminderPreset, // Include reminder preset
+      'energyRequired': energyRequired, // Include energy requirement
     };
   }
 
@@ -174,6 +180,7 @@ class TaskModel {
           ? DateTime.parse(map['reminderTime'])
           : null,
       reminderPreset: map['reminderPreset'], // Parse reminder preset
+      energyRequired: map['energyRequired'] ?? 5, // Parse energy requirement with default
     );
   }
 
@@ -205,6 +212,7 @@ class TaskModel {
     bool? reminderEnabled, // Allow updating reminder enabled
     DateTime? reminderTime, //  Allow updating reminder time
     String? reminderPreset, //Allow updating reminder preset
+    int? energyRequired, // Allow updating energy requirement
   }) {
     return TaskModel(
       id: id ?? this.id,
@@ -234,6 +242,7 @@ class TaskModel {
       reminderEnabled: reminderEnabled ?? this.reminderEnabled, // Update reminder enabled
       reminderTime: reminderTime ?? this.reminderTime, // Update reminder time
       reminderPreset: reminderPreset ?? this.reminderPreset, // Update reminder preset
+      energyRequired: energyRequired ?? this.energyRequired, // Update energy requirement
     );
   }
 

@@ -7,6 +7,8 @@ import 'package:provider/provider.dart';
 import 'package:kinetic/firebase_options.dart';
 import 'package:kinetic/database/app_database.dart';
 import 'package:kinetic/screens/home_page.dart';
+import 'package:kinetic/screens/onboarding_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:kinetic/services/task_service.dart';
 import 'package:kinetic/services/calendar_service.dart';
 import 'package:kinetic/services/event_service.dart';
@@ -88,6 +90,17 @@ class MyApp extends StatelessWidget {
   final AppDatabase database;
   const MyApp({super.key, required this.themeNotifier, required this.database});
 
+  Future<bool> _isFirstLaunch() async {
+    final prefs = await SharedPreferences.getInstance();
+    final isFirstLaunch = prefs.getBool('isFirstLaunch') ?? true;
+
+    if (isFirstLaunch) {
+      await prefs.setBool('isFirstLaunch', false);
+    }
+
+    return isFirstLaunch;
+  }
+
   @override
   Widget build(BuildContext context) {
     return MultiProvider(
@@ -138,7 +151,18 @@ class MyApp extends StatelessWidget {
             theme: ThemeConfig.buildLightTheme(context),
             darkTheme: ThemeConfig.buildDarkTheme(context),
             themeMode: themeNotifier.themeMode,
-            home: const MyHomePage(),
+            home: FutureBuilder<bool>(
+              future: _isFirstLaunch(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Scaffold(body: Center(child: CircularProgressIndicator()));
+                }
+
+                return snapshot.data == true
+                    ? const OnboardingScreen()
+                    : const MyHomePage();
+              },
+            ),
           );
         },
       ),

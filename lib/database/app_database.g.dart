@@ -157,6 +157,14 @@ class $TasksTable extends Tasks with TableInfo<$TasksTable, Task> {
   late final GeneratedColumn<String> reminderPreset = GeneratedColumn<String>(
       'reminder_preset', aliasedName, true,
       type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _energyRequiredMeta =
+      const VerificationMeta('energyRequired');
+  @override
+  late final GeneratedColumn<int> energyRequired = GeneratedColumn<int>(
+      'energy_required', aliasedName, false,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(5));
   static const VerificationMeta _pageIdMeta = const VerificationMeta('pageId');
   @override
   late final GeneratedColumn<String> pageId = GeneratedColumn<String>(
@@ -198,6 +206,7 @@ class $TasksTable extends Tasks with TableInfo<$TasksTable, Task> {
         reminderEnabled,
         reminderTime,
         reminderPreset,
+        energyRequired,
         pageId,
         createdAt,
         updatedAt
@@ -335,6 +344,12 @@ class $TasksTable extends Tasks with TableInfo<$TasksTable, Task> {
           reminderPreset.isAcceptableOrUnknown(
               data['reminder_preset']!, _reminderPresetMeta));
     }
+    if (data.containsKey('energy_required')) {
+      context.handle(
+          _energyRequiredMeta,
+          energyRequired.isAcceptableOrUnknown(
+              data['energy_required']!, _energyRequiredMeta));
+    }
     if (data.containsKey('page_id')) {
       context.handle(_pageIdMeta,
           pageId.isAcceptableOrUnknown(data['page_id']!, _pageIdMeta));
@@ -404,6 +419,8 @@ class $TasksTable extends Tasks with TableInfo<$TasksTable, Task> {
           .read(DriftSqlType.dateTime, data['${effectivePrefix}reminder_time']),
       reminderPreset: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}reminder_preset']),
+      energyRequired: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}energy_required'])!,
       pageId: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}page_id']),
       createdAt: attachedDatabase.typeMapping
@@ -442,6 +459,7 @@ class Task extends DataClass implements Insertable<Task> {
   final bool reminderEnabled;
   final DateTime? reminderTime;
   final String? reminderPreset;
+  final int energyRequired;
   final String? pageId;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -468,6 +486,7 @@ class Task extends DataClass implements Insertable<Task> {
       required this.reminderEnabled,
       this.reminderTime,
       this.reminderPreset,
+      required this.energyRequired,
       this.pageId,
       required this.createdAt,
       required this.updatedAt});
@@ -522,6 +541,7 @@ class Task extends DataClass implements Insertable<Task> {
     if (!nullToAbsent || reminderPreset != null) {
       map['reminder_preset'] = Variable<String>(reminderPreset);
     }
+    map['energy_required'] = Variable<int>(energyRequired);
     if (!nullToAbsent || pageId != null) {
       map['page_id'] = Variable<String>(pageId);
     }
@@ -580,6 +600,7 @@ class Task extends DataClass implements Insertable<Task> {
       reminderPreset: reminderPreset == null && nullToAbsent
           ? const Value.absent()
           : Value(reminderPreset),
+      energyRequired: Value(energyRequired),
       pageId:
           pageId == null && nullToAbsent ? const Value.absent() : Value(pageId),
       createdAt: Value(createdAt),
@@ -614,6 +635,7 @@ class Task extends DataClass implements Insertable<Task> {
       reminderEnabled: serializer.fromJson<bool>(json['reminderEnabled']),
       reminderTime: serializer.fromJson<DateTime?>(json['reminderTime']),
       reminderPreset: serializer.fromJson<String?>(json['reminderPreset']),
+      energyRequired: serializer.fromJson<int>(json['energyRequired']),
       pageId: serializer.fromJson<String?>(json['pageId']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
@@ -645,6 +667,7 @@ class Task extends DataClass implements Insertable<Task> {
       'reminderEnabled': serializer.toJson<bool>(reminderEnabled),
       'reminderTime': serializer.toJson<DateTime?>(reminderTime),
       'reminderPreset': serializer.toJson<String?>(reminderPreset),
+      'energyRequired': serializer.toJson<int>(energyRequired),
       'pageId': serializer.toJson<String?>(pageId),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
@@ -674,6 +697,7 @@ class Task extends DataClass implements Insertable<Task> {
           bool? reminderEnabled,
           Value<DateTime?> reminderTime = const Value.absent(),
           Value<String?> reminderPreset = const Value.absent(),
+          int? energyRequired,
           Value<String?> pageId = const Value.absent(),
           DateTime? createdAt,
           DateTime? updatedAt}) =>
@@ -707,6 +731,7 @@ class Task extends DataClass implements Insertable<Task> {
             reminderTime.present ? reminderTime.value : this.reminderTime,
         reminderPreset:
             reminderPreset.present ? reminderPreset.value : this.reminderPreset,
+        energyRequired: energyRequired ?? this.energyRequired,
         pageId: pageId.present ? pageId.value : this.pageId,
         createdAt: createdAt ?? this.createdAt,
         updatedAt: updatedAt ?? this.updatedAt,
@@ -759,6 +784,9 @@ class Task extends DataClass implements Insertable<Task> {
       reminderPreset: data.reminderPreset.present
           ? data.reminderPreset.value
           : this.reminderPreset,
+      energyRequired: data.energyRequired.present
+          ? data.energyRequired.value
+          : this.energyRequired,
       pageId: data.pageId.present ? data.pageId.value : this.pageId,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
@@ -790,6 +818,7 @@ class Task extends DataClass implements Insertable<Task> {
           ..write('reminderEnabled: $reminderEnabled, ')
           ..write('reminderTime: $reminderTime, ')
           ..write('reminderPreset: $reminderPreset, ')
+          ..write('energyRequired: $energyRequired, ')
           ..write('pageId: $pageId, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
@@ -821,6 +850,7 @@ class Task extends DataClass implements Insertable<Task> {
         reminderEnabled,
         reminderTime,
         reminderPreset,
+        energyRequired,
         pageId,
         createdAt,
         updatedAt
@@ -851,6 +881,7 @@ class Task extends DataClass implements Insertable<Task> {
           other.reminderEnabled == this.reminderEnabled &&
           other.reminderTime == this.reminderTime &&
           other.reminderPreset == this.reminderPreset &&
+          other.energyRequired == this.energyRequired &&
           other.pageId == this.pageId &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt);
@@ -879,6 +910,7 @@ class TasksCompanion extends UpdateCompanion<Task> {
   final Value<bool> reminderEnabled;
   final Value<DateTime?> reminderTime;
   final Value<String?> reminderPreset;
+  final Value<int> energyRequired;
   final Value<String?> pageId;
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
@@ -906,6 +938,7 @@ class TasksCompanion extends UpdateCompanion<Task> {
     this.reminderEnabled = const Value.absent(),
     this.reminderTime = const Value.absent(),
     this.reminderPreset = const Value.absent(),
+    this.energyRequired = const Value.absent(),
     this.pageId = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
@@ -934,6 +967,7 @@ class TasksCompanion extends UpdateCompanion<Task> {
     this.reminderEnabled = const Value.absent(),
     this.reminderTime = const Value.absent(),
     this.reminderPreset = const Value.absent(),
+    this.energyRequired = const Value.absent(),
     this.pageId = const Value.absent(),
     required DateTime createdAt,
     required DateTime updatedAt,
@@ -966,6 +1000,7 @@ class TasksCompanion extends UpdateCompanion<Task> {
     Expression<bool>? reminderEnabled,
     Expression<DateTime>? reminderTime,
     Expression<String>? reminderPreset,
+    Expression<int>? energyRequired,
     Expression<String>? pageId,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
@@ -994,6 +1029,7 @@ class TasksCompanion extends UpdateCompanion<Task> {
       if (reminderEnabled != null) 'reminder_enabled': reminderEnabled,
       if (reminderTime != null) 'reminder_time': reminderTime,
       if (reminderPreset != null) 'reminder_preset': reminderPreset,
+      if (energyRequired != null) 'energy_required': energyRequired,
       if (pageId != null) 'page_id': pageId,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
@@ -1024,6 +1060,7 @@ class TasksCompanion extends UpdateCompanion<Task> {
       Value<bool>? reminderEnabled,
       Value<DateTime?>? reminderTime,
       Value<String?>? reminderPreset,
+      Value<int>? energyRequired,
       Value<String?>? pageId,
       Value<DateTime>? createdAt,
       Value<DateTime>? updatedAt,
@@ -1051,6 +1088,7 @@ class TasksCompanion extends UpdateCompanion<Task> {
       reminderEnabled: reminderEnabled ?? this.reminderEnabled,
       reminderTime: reminderTime ?? this.reminderTime,
       reminderPreset: reminderPreset ?? this.reminderPreset,
+      energyRequired: energyRequired ?? this.energyRequired,
       pageId: pageId ?? this.pageId,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
@@ -1127,6 +1165,9 @@ class TasksCompanion extends UpdateCompanion<Task> {
     if (reminderPreset.present) {
       map['reminder_preset'] = Variable<String>(reminderPreset.value);
     }
+    if (energyRequired.present) {
+      map['energy_required'] = Variable<int>(energyRequired.value);
+    }
     if (pageId.present) {
       map['page_id'] = Variable<String>(pageId.value);
     }
@@ -1167,6 +1208,7 @@ class TasksCompanion extends UpdateCompanion<Task> {
           ..write('reminderEnabled: $reminderEnabled, ')
           ..write('reminderTime: $reminderTime, ')
           ..write('reminderPreset: $reminderPreset, ')
+          ..write('energyRequired: $energyRequired, ')
           ..write('pageId: $pageId, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
@@ -5081,6 +5123,7 @@ typedef $$TasksTableCreateCompanionBuilder = TasksCompanion Function({
   Value<bool> reminderEnabled,
   Value<DateTime?> reminderTime,
   Value<String?> reminderPreset,
+  Value<int> energyRequired,
   Value<String?> pageId,
   required DateTime createdAt,
   required DateTime updatedAt,
@@ -5109,6 +5152,7 @@ typedef $$TasksTableUpdateCompanionBuilder = TasksCompanion Function({
   Value<bool> reminderEnabled,
   Value<DateTime?> reminderTime,
   Value<String?> reminderPreset,
+  Value<int> energyRequired,
   Value<String?> pageId,
   Value<DateTime> createdAt,
   Value<DateTime> updatedAt,
@@ -5193,6 +5237,10 @@ class $$TasksTableFilterComposer extends Composer<_$AppDatabase, $TasksTable> {
 
   ColumnFilters<String> get reminderPreset => $composableBuilder(
       column: $table.reminderPreset,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get energyRequired => $composableBuilder(
+      column: $table.energyRequired,
       builder: (column) => ColumnFilters(column));
 
   ColumnFilters<String> get pageId => $composableBuilder(
@@ -5289,6 +5337,10 @@ class $$TasksTableOrderingComposer
       column: $table.reminderPreset,
       builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<int> get energyRequired => $composableBuilder(
+      column: $table.energyRequired,
+      builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<String> get pageId => $composableBuilder(
       column: $table.pageId, builder: (column) => ColumnOrderings(column));
 
@@ -5374,6 +5426,9 @@ class $$TasksTableAnnotationComposer
   GeneratedColumn<String> get reminderPreset => $composableBuilder(
       column: $table.reminderPreset, builder: (column) => column);
 
+  GeneratedColumn<int> get energyRequired => $composableBuilder(
+      column: $table.energyRequired, builder: (column) => column);
+
   GeneratedColumn<String> get pageId =>
       $composableBuilder(column: $table.pageId, builder: (column) => column);
 
@@ -5429,6 +5484,7 @@ class $$TasksTableTableManager extends RootTableManager<
             Value<bool> reminderEnabled = const Value.absent(),
             Value<DateTime?> reminderTime = const Value.absent(),
             Value<String?> reminderPreset = const Value.absent(),
+            Value<int> energyRequired = const Value.absent(),
             Value<String?> pageId = const Value.absent(),
             Value<DateTime> createdAt = const Value.absent(),
             Value<DateTime> updatedAt = const Value.absent(),
@@ -5457,6 +5513,7 @@ class $$TasksTableTableManager extends RootTableManager<
             reminderEnabled: reminderEnabled,
             reminderTime: reminderTime,
             reminderPreset: reminderPreset,
+            energyRequired: energyRequired,
             pageId: pageId,
             createdAt: createdAt,
             updatedAt: updatedAt,
@@ -5485,6 +5542,7 @@ class $$TasksTableTableManager extends RootTableManager<
             Value<bool> reminderEnabled = const Value.absent(),
             Value<DateTime?> reminderTime = const Value.absent(),
             Value<String?> reminderPreset = const Value.absent(),
+            Value<int> energyRequired = const Value.absent(),
             Value<String?> pageId = const Value.absent(),
             required DateTime createdAt,
             required DateTime updatedAt,
@@ -5513,6 +5571,7 @@ class $$TasksTableTableManager extends RootTableManager<
             reminderEnabled: reminderEnabled,
             reminderTime: reminderTime,
             reminderPreset: reminderPreset,
+            energyRequired: energyRequired,
             pageId: pageId,
             createdAt: createdAt,
             updatedAt: updatedAt,

@@ -48,6 +48,7 @@ TaskModel _$TaskModelFromJson(Map<String, dynamic> json) => TaskModel(
           ? null
           : DateTime.parse(json['reminderTime'] as String),
       reminderPreset: json['reminderPreset'] as String?,
+      energyRequired: (json['energyRequired'] as num?)?.toInt() ?? 5,
     );
 
 Map<String, dynamic> _$TaskModelToJson(TaskModel instance) => <String, dynamic>{
@@ -78,4 +79,5 @@ Map<String, dynamic> _$TaskModelToJson(TaskModel instance) => <String, dynamic>{
       'reminderEnabled': instance.reminderEnabled,
       'reminderTime': instance.reminderTime?.toIso8601String(),
       'reminderPreset': instance.reminderPreset,
+      'energyRequired': instance.energyRequired,
     };

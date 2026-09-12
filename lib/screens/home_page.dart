@@ -9,6 +9,8 @@ import 'package:kinetic/screens/notes_page.dart';
 import 'package:kinetic/screens/energy_page.dart';
 import 'package:kinetic/screens/energy_insights_page.dart';
 import 'package:kinetic/screens/settings_page.dart';
+import 'package:kinetic/screens/energy_dashboard_screen.dart';
+import 'package:kinetic/screens/insights_screen.dart';
 import 'package:kinetic/services/calendar_service.dart';
 import 'package:kinetic/services/task_service.dart';
 import 'package:kinetic/services/reminder_service.dart';
@@ -112,12 +114,13 @@ class _MyHomePageState extends State<MyHomePage> {
     final calendarService = context.read<CalendarService>();
     final noteService = context.read<NoteService>();
     _screens = [
-      OverviewPage(key: _overviewKey),
-      TaskListScreen(key: _tasksKey, database: database),
-      CalendarPage(key: _calendarKey, calendarService: calendarService),
-      NotesPage(key: _notesKey, noteService: noteService),
-      ReminderPage(key: _remindersKey, database: database),
-      EnergyInsightsPage(database: database),
+      const EnergyDashboardScreen(),           // Tab 0 - PRIMARY: Energy
+      const InsightsScreen(),                  // Tab 1 - PRIMARY: Insights
+      OverviewPage(key: _overviewKey),        // Tab 2 - SECONDARY: Home
+      TaskListScreen(key: _tasksKey, database: database),  // Tab 3: Tasks
+      CalendarPage(key: _calendarKey, calendarService: calendarService),  // Tab 4: Calendar
+      ReminderPage(key: _remindersKey, database: database),  // Tab 5: Reminders
+      NotesPage(key: _notesKey, noteService: noteService),   // Tab 6: Notes
     ];
   }
 
@@ -131,23 +134,26 @@ class _MyHomePageState extends State<MyHomePage> {
   Future<void> _refreshCurrentPage() async {
     try {
       switch (_currentIndex) {
-        case 0: // Overview
+        case 0: // Energy Dashboard
+          setState(() {}); // Trigger rebuild
+          break;
+        case 1: // Insights
+          setState(() {}); // Trigger rebuild
+          break;
+        case 2: // Overview (Home)
           await _overviewKey.currentState?._refreshData();
           break;
-        case 1: // Tasks
+        case 3: // Tasks
           (_tasksKey.currentState as dynamic)?.refreshTasks();
           break;
-        case 2: // Calendar
+        case 4: // Calendar
           (_calendarKey.currentState as dynamic)?._loadEvents();
           break;
-        case 3: // Notes
-          (_notesKey.currentState as dynamic)?._loadNotes();
-          break;
-        case 4: // Reminders
+        case 5: // Reminders
           (_remindersKey.currentState as dynamic)?._loadReminders();
           break;
-        case 5: // Energy
-          // Energy page refresh is handled internally
+        case 6: // Notes
+          (_notesKey.currentState as dynamic)?._loadNotes();
           break;
       }
     } catch (e) {
@@ -186,30 +192,160 @@ class _MyHomePageState extends State<MyHomePage> {
       /*  DRAWER  */
       drawer: Drawer(
         child: ListView(
+          padding: EdgeInsets.zero,
           children: [
-            const DrawerHeader(
-              decoration: BoxDecoration(color: Colors.blue),
-              child: Text('Kinetic', style: TextStyle(color: Colors.white, fontSize: 24)),
+            // === DRAWER HEADER ===
+            DrawerHeader(
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Colors.amber, Colors.amber],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+              ),
+              child: const Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  Icon(Icons.electric_bolt, size: 32, color: Colors.white),
+                  SizedBox(height: 8),
+                  Text(
+                    'Kinetic',
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                  Text(
+                    'Energy Operating System',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.white70,
+                    ),
+                  ),
+                ],
+              ),
             ),
-            _drawerTile(title: 'Home', icon: Icons.home, index: 0),
-            _drawerTile(title: 'Tasks', icon: Icons.list, index: 1),
-            _drawerTile(title: 'Calendar', icon: Icons.calendar_today, index: 2),
-            _drawerTile(title: 'Notes', icon: Icons.note, index: 3),
-            _drawerTile(title: 'Reminders', icon: Icons.notifications, index: 4),
-            _drawerTile(title: 'Energy', icon: Icons.energy_savings_leaf, index: 5),
-            const Divider(),
+
+            const SizedBox(height: 8),
+
+            // === TAB 0: ENERGY ===
+            ListTile(
+              leading: const Icon(Icons.bolt, color: Colors.amber),
+              title: const Text('Energy'),
+              subtitle: const Text('Your Current Energy Level'),
+              selected: _currentIndex == 0,
+              onTap: () {
+                Navigator.pop(context);
+                _jumpTo(0);
+              },
+            ),
+
+            // === TAB 1: INSIGHTS ===
+            ListTile(
+              leading: const Icon(Icons.insights, color: Colors.blue),
+              title: const Text('Insights'),
+              subtitle: const Text('Energy Patterns & Analytics'),
+              selected: _currentIndex == 1,
+              onTap: () {
+                Navigator.pop(context);
+                _jumpTo(1);
+              },
+            ),
+
+            // === TAB 2: HOME ===
+            ListTile(
+              leading: const Icon(Icons.home, color: Colors.green),
+              title: const Text('Home'),
+              subtitle: const Text('Energy Operating System'),
+              selected: _currentIndex == 2,
+              onTap: () {
+                Navigator.pop(context);
+                _jumpTo(2);
+              },
+            ),
+
+            // === TAB 3: TASKS ===
+            ListTile(
+              leading: const Icon(Icons.check_circle, color: Colors.purple),
+              title: const Text('Tasks'),
+              subtitle: const Text('Energy-Matched Task List'),
+              selected: _currentIndex == 3,
+              onTap: () {
+                Navigator.pop(context);
+                _jumpTo(3);
+              },
+            ),
+
+            // === TAB 4: CALENDAR ===
+            ListTile(
+              leading: const Icon(Icons.calendar_today, color: Colors.red),
+              title: const Text('Calendar'),
+              subtitle: const Text('Events & Schedule'),
+              selected: _currentIndex == 4,
+              onTap: () {
+                Navigator.pop(context);
+                _jumpTo(4);
+              },
+            ),
+
+            // === TAB 5: REMINDERS ===
+            ListTile(
+              leading: const Icon(Icons.notifications, color: Colors.orange),
+              title: const Text('Reminders'),
+              subtitle: const Text('Alerts & Notifications'),
+              selected: _currentIndex == 5,
+              onTap: () {
+                Navigator.pop(context);
+                _jumpTo(5);
+              },
+            ),
+
+            // === TAB 6: NOTES ===
+            ListTile(
+              leading: const Icon(Icons.note, color: Colors.teal),
+              title: const Text('Notes'),
+              subtitle: const Text('Quick Notes'),
+              selected: _currentIndex == 6,
+              onTap: () {
+                Navigator.pop(context);
+                _jumpTo(6);
+              },
+            ),
+
+            const Divider(height: 24),
+
+            // === SETTINGS (NOT A TAB) ===
             ListTile(
               leading: const Icon(Icons.settings),
               title: const Text('Settings'),
+              onTap: () async {
+                Navigator.pop(context);
+                final shouldRefresh = await Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const SettingsPage()),
+                );
+
+                // If settings returned true (metrics cleared), refresh the current page
+                if (shouldRefresh == true && mounted) {
+                  await _refreshCurrentPage();
+                }
+              },
+            ),
+
+            // === ABOUT (NOT A TAB) ===
+            ListTile(
+              leading: const Icon(Icons.info),
+              title: const Text('About'),
               onTap: () {
                 Navigator.pop(context);
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => const SettingsPage()),
+                  MaterialPageRoute(builder: (context) => const AboutPage()),
                 );
               },
             ),
-            _drawerTile(title: 'About', icon: Icons.info, index: 6),
           ],
         ),
       ),
@@ -226,35 +362,18 @@ class _MyHomePageState extends State<MyHomePage> {
         selectedItemColor: Colors.white,
         unselectedItemColor: Colors.grey,
         items: const [
+          BottomNavigationBarItem(icon: Icon(Icons.bolt), label: 'Energy'),
+          BottomNavigationBarItem(icon: Icon(Icons.insights), label: 'Insights'),
           BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
-          BottomNavigationBarItem(icon: Icon(Icons.list), label: 'Tasks'),
+          BottomNavigationBarItem(icon: Icon(Icons.check_circle), label: 'Tasks'),
           BottomNavigationBarItem(icon: Icon(Icons.calendar_today), label: 'Calendar'),
-          BottomNavigationBarItem(icon: Icon(Icons.note), label: 'Notes'),
           BottomNavigationBarItem(icon: Icon(Icons.notifications), label: 'Reminders'),
-          BottomNavigationBarItem(icon: Icon(Icons.energy_savings_leaf), label: 'Energy'),
+          BottomNavigationBarItem(icon: Icon(Icons.note), label: 'Notes'),
         ],
       ),
     );
   }
 
-  ListTile _drawerTile({required String title, required IconData icon, required int index}) {
-    return ListTile(
-      leading: Icon(icon),
-      title: Text(title),
-      selected: _currentIndex == index,
-      onTap: () {
-        Navigator.pop(context);
-        if (index < _screens.length) {
-          _jumpTo(index);
-        } else if (index == 6) {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => AboutPage()),
-          );
-        }
-      },
-    );
-  }
 }
 
 /* OVERVIEW PAGE */
@@ -473,7 +592,7 @@ class _OverviewPageState extends State<OverviewPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // ADDED: Dashboard Header
+              // ===== HEADER: Greeting + Date =====
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(24),
@@ -488,7 +607,7 @@ class _OverviewPageState extends State<OverviewPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Dashboard',
+                      'Your Energy Today',
                       style: TextStyle(
                         color: Colors.white,
                         fontSize: 32,
@@ -506,16 +625,31 @@ class _OverviewPageState extends State<OverviewPage> {
                   ],
                 ),
               ),
-              _statsSection(),
+
+              // ===== PRIMARY: Energy Status Widget =====
               _EnergyStatusWidget(
                 energyService: _energyService,
               ),
-              _sectionHeader('Today\'s Tasks'),
+
+              // ===== SECONDARY: Suggested Actions =====
+              _suggestedActionsSection(),
+
+              // ===== SECONDARY: Today's Tasks =====
+              _sectionHeader('Optimize Your Day - Tasks for Your Energy'),
               _taskSection(today),
-              _sectionHeader('Today\'s Events'),
+
+              // ===== SECONDARY: Today's Events =====
+              _sectionHeader('Today\'s Commitments'),
               _eventSection(today),
-              _sectionHeader('Today\'s Reminders'),
+
+              // ===== SECONDARY: Today's Reminders =====
+              _sectionHeader('Today\'s Alerts'),
               _reminderSection(today),
+
+              // ===== STATS (moved to bottom) =====
+              const SizedBox(height: 12),
+              _sectionHeader('Your Energy Metrics'),
+              _statsSection(),
             ],
           ),
         ),
@@ -531,6 +665,164 @@ class _OverviewPageState extends State<OverviewPage> {
       fontSize: 18,
     )),
   );
+
+  /// Suggested Actions based on current energy level
+  Widget _suggestedActionsSection() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: FutureBuilder<List<TaskModel>>(
+        future: _taskService.getTasksFiltered(completed: false),
+        builder: (context, taskSnapshot) {
+          if (taskSnapshot.connectionState == ConnectionState.waiting) {
+            return const SizedBox.shrink();
+          }
+
+          final tasks = taskSnapshot.data ?? [];
+          if (tasks.isEmpty) {
+            return const SizedBox.shrink();
+          }
+
+          // Get today's uncompleted tasks
+          final today = DateTime.now();
+          final todayTasks = tasks
+              .where((t) =>
+                  t.dueDate?.isBefore(today.add(const Duration(days: 1))) == true &&
+                  t.dueDate?.isAfter(today.subtract(const Duration(days: 1))) == true)
+              .toList();
+
+          if (todayTasks.isEmpty) {
+            return const SizedBox.shrink();
+          }
+
+          // Get current energy level
+          return FutureBuilder<EnergyEntryModel?>(
+            future: _energyService.getTodaysEntry(),
+            builder: (context, energySnapshot) {
+              final currentEnergy = energySnapshot.data?.energyLevel ?? 5;
+
+              // Filter tasks by current energy level and energyRequired
+              List<TaskModel> suggestedTasks = [];
+
+              // Match task energy requirement to current energy level
+              suggestedTasks = todayTasks.where((task) {
+                final taskEnergy = task.energyRequired;
+
+                if (currentEnergy >= 8 && taskEnergy >= 7) {
+                  // Peak energy: suggest tasks requiring high energy
+                  return true;
+                } else if (currentEnergy >= 5 && currentEnergy < 8 && taskEnergy >= 4 && taskEnergy < 7) {
+                  // Medium energy: suggest tasks requiring medium energy
+                  return true;
+                } else if (currentEnergy < 5 && taskEnergy <= 3) {
+                  // Low energy: suggest admin/routine tasks
+                  return true;
+                }
+                return false;
+              }).take(3).toList();
+
+              // If no perfect matches, show any incomplete tasks
+              if (suggestedTasks.isEmpty) {
+                suggestedTasks = todayTasks.take(2).toList();
+              }
+
+              if (suggestedTasks.isEmpty) {
+                return const SizedBox.shrink();
+              }
+
+              return Card(
+                color: Colors.grey[800],
+                margin: const EdgeInsets.only(bottom: 16),
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.lightbulb, color: Colors.amber, size: 20),
+                          const SizedBox(width: 8),
+                          const Text(
+                            'Suggested For Your Energy',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      ListView.separated(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: suggestedTasks.length,
+                        separatorBuilder: (_, __) => const Divider(height: 16),
+                        itemBuilder: (context, index) {
+                          final task = suggestedTasks[index];
+                          return Row(
+                            children: [
+                              Checkbox(
+                                value: task.completed,
+                                onChanged: (value) => _toggleTaskCompletion(task.id, value),
+                                activeColor: Colors.green,
+                              ),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      task.title,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Row(
+                                      children: [
+                                        Text(
+                                          'Priority: ${task.priority}',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: Colors.grey[400],
+                                          ),
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: _getEnergyColor(task.energyRequired).withOpacity(0.2),
+                                            borderRadius: BorderRadius.circular(4),
+                                          ),
+                                          child: Text(
+                                            'Energy: ${task.energyRequired}/10',
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              color: _getEnergyColor(task.energyRequired),
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              _buildPriorityIndicator(task.priority),
+                            ],
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
 
   SizedBox _taskSection(DateTime today) {
     return SizedBox(
@@ -804,7 +1096,7 @@ class _OverviewPageState extends State<OverviewPage> {
       default:
         color = Colors.grey;
     }
-    
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
@@ -816,6 +1108,12 @@ class _OverviewPageState extends State<OverviewPage> {
         style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.bold),
       ),
     );
+  }
+
+  Color _getEnergyColor(int level) {
+    if (level >= 8) return Colors.green;
+    if (level >= 5) return Colors.amber;
+    return Colors.red;
   }
 
   Future<void> _toggleTaskCompletion(String taskId, bool? isCompleted) async {

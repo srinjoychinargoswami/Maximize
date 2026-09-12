@@ -28,6 +28,7 @@ class Tasks extends Table {
   BoolColumn get reminderEnabled => boolean().withDefault(const Constant(false))();
   DateTimeColumn get reminderTime => dateTime().nullable()();
   TextColumn get reminderPreset => text().nullable()();
+  IntColumn get energyRequired => integer().withDefault(const Constant(5))();
   TextColumn get pageId => text().nullable()();
   DateTimeColumn get createdAt => dateTime()();
   DateTimeColumn get updatedAt => dateTime()();
@@ -161,7 +162,30 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
+
+  @override
+  MigrationStrategy get migration {
+    return MigrationStrategy(
+      onUpgrade: (m, from, to) async {
+        // For development: recreate all tables on schema version bump
+        // This clears old data but ensures compatibility
+        await m.deleteTable('tasks');
+        await m.deleteTable('subtasks');
+        await m.deleteTable('events');
+        await m.deleteTable('reminders');
+        await m.deleteTable('notes');
+        await m.deleteTable('energy_entries');
+        await m.deleteTable('completion_logs');
+
+        // Recreate all tables
+        await m.createAll();
+      },
+      onCreate: (m) async {
+        await m.createAll();
+      },
+    );
+  }
 
   /// Platform-specific database connection
   /// - Web: IndexedDB (bigger storage, ~500MB-1GB quota) via SQLite WASM

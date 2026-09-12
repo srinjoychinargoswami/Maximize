@@ -73,6 +73,7 @@ class TaskService {
     bool reminderEnabled = false,
     DateTime? reminderTime,
     String? reminderPreset,
+    int energyRequired = 5,
   }) async {
     final taskId = const Uuid().v1();
     final now = DateTime.now();
@@ -101,6 +102,7 @@ class TaskService {
       reminderEnabled: reminderEnabled,
       reminderTime: reminderTime,
       reminderPreset: reminderPreset,
+      energyRequired: energyRequired,
       createdAt: now,
       updatedAt: now,
     );

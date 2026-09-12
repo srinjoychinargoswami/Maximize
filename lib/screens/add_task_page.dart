@@ -5,6 +5,8 @@ import 'package:kinetic/utils/task_utils.dart';
 import 'package:uuid/uuid.dart';
 import 'package:kinetic/models/task_model.dart';
 import 'package:kinetic/services/task_service.dart';
+import 'package:kinetic/services/energy_service.dart';
+import 'package:kinetic/screens/task_scheduling_suggestion_screen.dart';
 import 'package:provider/provider.dart';
 
 class AddTaskPage extends StatefulWidget {
@@ -44,6 +46,10 @@ class _AddTaskPageState extends State<AddTaskPage> {
   bool _reminderEnabled = false;
   DateTime? _reminderTime;
   String _reminderPreset = 'at_time';
+
+  // Energy requirement field
+  int _energyRequired = 5; // Default to medium energy
+
   final List<Map<String, String>> _reminderPresets = [
     {'value': 'at_time', 'label': 'At time of task'},
     {'value': '15min', 'label': '15 minutes before'},
@@ -84,7 +90,10 @@ class _AddTaskPageState extends State<AddTaskPage> {
       _reminderEnabled = widget.task!.reminderEnabled ?? false;
       _reminderTime = widget.task!.reminderTime;
       _reminderPreset = widget.task!.reminderPreset ?? 'at_time';
-      
+
+      // Initialize energy requirement field
+      _energyRequired = widget.task!.energyRequired;
+
       // Load existing subtasks for edit mode
       _loadExistingSubtasks();
     }
@@ -123,7 +132,7 @@ class _AddTaskPageState extends State<AddTaskPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.task != null ? 'Edit Task' : 'Add Task'),
+        title: Text(widget.task != null ? 'Edit Energy-Matched Task' : 'Create Energy-Matched Task'),
       ),
       body: Form(
         key: _formKey,
@@ -133,16 +142,16 @@ class _AddTaskPageState extends State<AddTaskPage> {
             child: Column(
               children: [
                 _buildTextField(
-                  label: 'Task Title',
+                  label: 'What do you need to accomplish?',
                   onSaved: (value) => _taskTitle = value!,
                   initialValue: _taskTitle,
-                  validator: (value) => value == null || value.isEmpty ? 'Please enter a task title' : null,
+                  validator: (value) => value == null || value.isEmpty ? 'Please describe what you need to do' : null,
                 ),
                 _buildTextField(
-                  label: 'Task Description',
+                  label: 'Task Details (What\'s involved?)',
                   onSaved: (value) => _taskDescription = value!,
                   initialValue: _taskDescription,
-                  validator: (value) => value == null || value.isEmpty ? 'Please enter a task description' : null,
+                  validator: (value) => value == null || value.isEmpty ? 'Please add details about what this involves' : null,
                 ),
                 _buildCategoriesField(),
                 _buildPriorityDropdown(),
@@ -151,6 +160,8 @@ class _AddTaskPageState extends State<AddTaskPage> {
                 _buildRecurringSection(),
                 const SizedBox(height: 16),
                 _buildReminderSection(), //NEW: Reminder section
+                const SizedBox(height: 16),
+                _buildEnergyRequiredSection(), // NEW: Energy requirement section
                 const SizedBox(height: 16),
                 _buildSubtaskField(),
                 const SizedBox(height: 24),
@@ -236,7 +247,7 @@ class _AddTaskPageState extends State<AddTaskPage> {
       padding: const EdgeInsets.only(bottom: 16.0),
       child: Row(
         children: [
-          const Text('Priority:', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          const Text('Priority Level:', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
           const SizedBox(width: 16),
           Expanded(
             child: DropdownButton<String>(
@@ -757,6 +768,77 @@ class _AddTaskPageState extends State<AddTaskPage> {
     }
   }
 
+  Widget _buildEnergyRequiredSection() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Energy Required',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+                Chip(
+                  label: Text('$_energyRequired/10'),
+                  backgroundColor: _getEnergyColor(_energyRequired).withOpacity(0.2),
+                  labelStyle: TextStyle(
+                    color: _getEnergyColor(_energyRequired),
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Slider(
+              value: _energyRequired.toDouble(),
+              min: 1,
+              max: 10,
+              divisions: 9,
+              label: '$_energyRequired',
+              onChanged: (value) {
+                setState(() => _energyRequired = value.toInt());
+              },
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: _getEnergyColor(_energyRequired).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                _getEnergyDescription(_energyRequired),
+                style: TextStyle(
+                  fontSize: 12,
+                  color: _getEnergyColor(_energyRequired),
+                  height: 1.6,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Color _getEnergyColor(int level) {
+    if (level >= 8) return Colors.green;
+    if (level >= 5) return Colors.amber;
+    return Colors.red;
+  }
+
+  String _getEnergyDescription(int level) {
+    if (level >= 9) return '🔥 Requires peak energy (9-10) — deep focus, complex problem-solving';
+    if (level >= 7) return '⚡ Requires good energy (7-8) — focused work, strategic thinking';
+    if (level >= 5) return '🔄 Requires moderate energy (5-6) — regular tasks, coordination';
+    if (level >= 3) return '📋 Low energy OK (3-4) — routine, administrative work';
+    return '😴 Can do when tired (1-2) — passive, minimal effort';
+  }
+
   Widget _buildSubmitButton() {
     return SizedBox(
       width: double.infinity,
@@ -808,6 +890,7 @@ class _AddTaskPageState extends State<AddTaskPage> {
                 reminderEnabled: _reminderEnabled,
                 reminderTime: _reminderEnabled ? _reminderTime : null,
                 reminderPreset: _reminderEnabled ? _reminderPreset : null,
+                energyRequired: _energyRequired,
               );
 
               if (widget.task != null) {
@@ -848,6 +931,7 @@ class _AddTaskPageState extends State<AddTaskPage> {
                   reminderEnabled: taskModel.reminderEnabled ?? false,
                   reminderTime: taskModel.reminderTime,
                   reminderPreset: taskModel.reminderPreset,
+                  energyRequired: taskModel.energyRequired,
                 );
               }
 
@@ -859,7 +943,25 @@ class _AddTaskPageState extends State<AddTaskPage> {
               }
 
               if (mounted) {
-                Navigator.pop(context, taskModel);
+                // Show scheduling suggestion for new tasks only
+                if (widget.task == null) {
+                  final energyService = context.read<EnergyService>();
+                  final currentEnergy = (await energyService.getTodayLatestEnergy())?.energyLevel ?? 5;
+
+                  showDialog(
+                    context: context,
+                    builder: (context) => TaskSchedulingSuggestionScreen(
+                      task: taskModel,
+                      currentEnergy: currentEnergy,
+                    ),
+                  ).then((_) {
+                    if (mounted) {
+                      Navigator.pop(context, taskModel);
+                    }
+                  });
+                } else {
+                  Navigator.pop(context, taskModel);
+                }
               }
             } catch (e) {
               if (mounted) {
@@ -874,7 +976,7 @@ class _AddTaskPageState extends State<AddTaskPage> {
           padding: const EdgeInsets.symmetric(vertical: 16),
         ),
         child: Text(
-          widget.task != null ? 'Update Task' : 'Save Task',
+          widget.task != null ? 'Update Task' : 'Create & Get Timing Suggestion',
           style: const TextStyle(fontSize: 16),
         ),
       ),

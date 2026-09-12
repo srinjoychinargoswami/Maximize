@@ -58,6 +58,27 @@ class EnergyService {
     }
   }
 
+  Future<EnergyEntryModel?> getTodayLatestEnergy() async {
+    try {
+      final now = DateTime.now();
+      final rows = await _database.select(_database.energyEntries).get();
+      final todayEntries = rows
+          .where((e) =>
+            e.timestamp.year == now.year &&
+            e.timestamp.month == now.month &&
+            e.timestamp.day == now.day)
+          .toList();
+
+      if (todayEntries.isEmpty) return null;
+
+      todayEntries.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+      return _rowToModel(todayEntries.first);
+    } catch (e) {
+      debugPrint('Error fetching today\'s latest energy entry: $e');
+      return null;
+    }
+  }
+
   Future<List<EnergyEntryModel>> getEntriesPast30Days() async {
     try {
       final now = DateTime.now();
@@ -119,6 +140,72 @@ class EnergyService {
           .go();
     } catch (e) {
       debugPrint('Error deleting energy entry: $e');
+    }
+  }
+
+  Future<List<EnergyEntryModel>> getLastSevenDaysEnergy() async {
+    try {
+      final now = DateTime.now();
+      final sevenDaysAgo = now.subtract(const Duration(days: 7));
+      final rows = await _database.select(_database.energyEntries).get();
+      return rows
+          .where((e) => e.timestamp.isAfter(sevenDaysAgo) && e.timestamp.isBefore(now))
+          .map(_rowToModel)
+          .toList();
+    } catch (e) {
+      debugPrint('Error fetching past 7 days entries: $e');
+      return [];
+    }
+  }
+
+  Future<double> getAverageEnergyLevel() async {
+    try {
+      final entries = await getLastSevenDaysEnergy();
+      if (entries.isEmpty) return 0.0;
+      final sum = entries.fold<double>(0, (acc, e) => acc + e.energyLevel);
+      return sum / entries.length;
+    } catch (e) {
+      debugPrint('Error calculating average energy level: $e');
+      return 0.0;
+    }
+  }
+
+  Future<({TimeOfDay start, TimeOfDay end})> getPeakEnergyWindow() async {
+    try {
+      final entries = await getLastSevenDaysEnergy();
+      if (entries.isEmpty) {
+        return (start: const TimeOfDay(hour: 10, minute: 0), end: const TimeOfDay(hour: 13, minute: 0));
+      }
+
+      // Group entries by hour and calculate average energy for each hour
+      Map<int, List<int>> hourlyEnergy = {};
+      for (var entry in entries) {
+        final hour = entry.timestamp.hour;
+        hourlyEnergy.putIfAbsent(hour, () => []).add(entry.energyLevel);
+      }
+
+      // Find hour with highest average energy
+      int peakHour = 22; // Default to 10 PM
+      double maxAvgEnergy = 0;
+      hourlyEnergy.forEach((hour, energyLevels) {
+        final avg = energyLevels.fold<double>(0, (a, b) => a + b) / energyLevels.length;
+        if (avg > maxAvgEnergy) {
+          maxAvgEnergy = avg;
+          peakHour = hour;
+        }
+      });
+
+      // Return 3-hour window centered on peak hour
+      final startHour = (peakHour - 1) % 24;
+      final endHour = (peakHour + 2) % 24;
+
+      return (
+        start: TimeOfDay(hour: startHour, minute: 0),
+        end: TimeOfDay(hour: endHour, minute: 0),
+      );
+    } catch (e) {
+      debugPrint('Error calculating peak energy window: $e');
+      return (start: const TimeOfDay(hour: 22, minute: 0), end: const TimeOfDay(hour: 1, minute: 0));
     }
   }
 

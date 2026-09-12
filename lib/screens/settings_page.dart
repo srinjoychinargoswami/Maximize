@@ -276,8 +276,10 @@ class _SettingsPageState extends State<SettingsPage> {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text("All logs cleared. Metrics reset to 0.")),
                   );
-                  // Pop back to home page to trigger refresh
-                  Navigator.pop(context);
+                  // Pop settings page and return true to trigger refresh
+                  if (mounted) {
+                    Navigator.pop(context, true);
+                  }
                 }
               } catch (e) {
                 if (mounted) {
