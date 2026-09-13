@@ -42,6 +42,8 @@ class _MyHomePageState extends State<MyHomePage> {
 
   // ADDED: Keys to access refresh methods in child pages
   final GlobalKey<_OverviewPageState> _overviewKey = GlobalKey<_OverviewPageState>();
+  final GlobalKey _energyKey = GlobalKey();
+  final GlobalKey _insightsKey = GlobalKey();
   final GlobalKey<TaskListScreenState> _tasksKey = GlobalKey<TaskListScreenState>();
   final GlobalKey<CalendarPageState> _calendarKey = GlobalKey<CalendarPageState>();
   final GlobalKey<NotesPageState> _notesKey = GlobalKey<NotesPageState>();
@@ -114,8 +116,8 @@ class _MyHomePageState extends State<MyHomePage> {
     final calendarService = context.read<CalendarService>();
     final noteService = context.read<NoteService>();
     _screens = [
-      const EnergyDashboardScreen(),           // Tab 0 - PRIMARY: Energy
-      const InsightsScreen(),                  // Tab 1 - PRIMARY: Insights
+      EnergyDashboardScreen(key: _energyKey),           // Tab 0 - PRIMARY: Energy
+      InsightsScreen(key: _insightsKey),                  // Tab 1 - PRIMARY: Insights
       OverviewPage(key: _overviewKey),        // Tab 2 - SECONDARY: Home
       TaskListScreen(key: _tasksKey, database: database),  // Tab 3: Tasks
       CalendarPage(key: _calendarKey, calendarService: calendarService),  // Tab 4: Calendar
@@ -135,32 +137,35 @@ class _MyHomePageState extends State<MyHomePage> {
     try {
       switch (_currentIndex) {
         case 0: // Energy Dashboard
-          setState(() {}); // Trigger rebuild
+          final energyState = _energyKey.currentState as dynamic;
+          if (energyState != null) await energyState.refreshPage();
           break;
         case 1: // Insights
-          setState(() {}); // Trigger rebuild
+          final insightsState = _insightsKey.currentState as dynamic;
+          if (insightsState != null) await insightsState.refreshPage();
           break;
         case 2: // Overview (Home)
           await _overviewKey.currentState?._refreshData();
           break;
         case 3: // Tasks
-          (_tasksKey.currentState as dynamic)?.refreshTasks();
+          final tasksState = _tasksKey.currentState as dynamic;
+          if (tasksState != null) await tasksState.refreshTasks();
           break;
         case 4: // Calendar
-          (_calendarKey.currentState as dynamic)?._loadEvents();
+          final calendarState = _calendarKey.currentState as dynamic;
+          if (calendarState != null) await calendarState._refreshEventsWithIndicator();
           break;
         case 5: // Reminders
-          (_remindersKey.currentState as dynamic)?._loadReminders();
+          final remindersState = _remindersKey.currentState as dynamic;
+          if (remindersState != null) await remindersState._loadReminders();
           break;
         case 6: // Notes
-          (_notesKey.currentState as dynamic)?._loadNotes();
+          final notesState = _notesKey.currentState as dynamic;
+          if (notesState != null) await notesState._loadNotes();
           break;
       }
     } catch (e) {
-      print('Error refreshing page: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Refresh complete!')),
-      );
+      debugPrint('Error refreshing page: $e');
     }
   }
 

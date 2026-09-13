@@ -1,5 +1,6 @@
 import 'package:kinetic/database/app_database.dart';
 import 'package:kinetic/models/energy_model.dart';
+import 'package:kinetic/utils/web_persistence_helper.dart';
 import 'package:uuid/uuid.dart';
 import 'package:flutter/material.dart';
 import 'package:drift/drift.dart';
@@ -20,20 +21,24 @@ class EnergyService {
     final now = DateTime.now();
 
     try {
-      await _database.into(_database.energyEntries).insert(
-        EnergyEntriesCompanion(
-          id: Value(entryId),
-          entryId: Value(entryId),
-          timestamp: Value(now),
-          energyLevel: Value(energyLevel.clamp(1, 10)),
-          moodTags: Value(moodTags.join(',')),
-          privacyContext: Value(privacyContext),
-          location: Value(location),
-          notes: Value(notes),
-          createdAt: Value(now),
-          updatedAt: Value(now),
-        ),
-      );
+      await _database.transaction(() async {
+        await _database.into(_database.energyEntries).insert(
+          EnergyEntriesCompanion(
+            id: Value(entryId),
+            entryId: Value(entryId),
+            timestamp: Value(now),
+            energyLevel: Value(energyLevel.clamp(1, 10)),
+            moodTags: Value(moodTags.join(',')),
+            privacyContext: Value(privacyContext),
+            location: Value(location),
+            notes: Value(notes),
+            createdAt: Value(now),
+            updatedAt: Value(now),
+          ),
+        );
+      });
+      await WebPersistenceHelper.flush();
+      WebPersistenceHelper.logPersistence('[EnergyService] Energy entry created: $entryId (persisted to IndexedDB)');
     } catch (e) {
       debugPrint('Error creating energy entry: $e');
     }
@@ -43,15 +48,15 @@ class EnergyService {
     try {
       final now = DateTime.now();
       final rows = await _database.select(_database.energyEntries).get();
-      final entry = rows.firstWhere(
-        (e) =>
-          e.timestamp.year == now.year &&
-          e.timestamp.month == now.month &&
-          e.timestamp.day == now.day,
-        orElse: () => null as EnergyEntry,
-      );
-      if (entry == null) return null;
-      return _rowToModel(entry);
+      final todayEntries = rows
+          .where((e) =>
+            e.timestamp.year == now.year &&
+            e.timestamp.month == now.month &&
+            e.timestamp.day == now.day)
+          .toList();
+
+      if (todayEntries.isEmpty) return null;
+      return _rowToModel(todayEntries.first);
     } catch (e) {
       debugPrint('Error fetching today\'s energy entry: $e');
       return null;
@@ -118,16 +123,20 @@ class EnergyService {
     String? notes,
   }) async {
     try {
-      await (_database.update(_database.energyEntries)
-            ..where((e) => e.entryId.equals(entryId)))
-          .write(EnergyEntriesCompanion(
-            energyLevel: Value(energyLevel.clamp(1, 10)),
-            moodTags: moodTags != null ? Value(moodTags.join(',')) : const Value.absent(),
-            privacyContext: privacyContext != null ? Value(privacyContext) : const Value.absent(),
-            location: location != null ? Value(location) : const Value.absent(),
-            notes: notes != null ? Value(notes) : const Value.absent(),
-            updatedAt: Value(DateTime.now()),
-          ));
+      await _database.transaction(() async {
+        await (_database.update(_database.energyEntries)
+              ..where((e) => e.entryId.equals(entryId)))
+            .write(EnergyEntriesCompanion(
+              energyLevel: Value(energyLevel.clamp(1, 10)),
+              moodTags: moodTags != null ? Value(moodTags.join(',')) : const Value.absent(),
+              privacyContext: privacyContext != null ? Value(privacyContext) : const Value.absent(),
+              location: location != null ? Value(location) : const Value.absent(),
+              notes: notes != null ? Value(notes) : const Value.absent(),
+              updatedAt: Value(DateTime.now()),
+            ));
+      });
+      await WebPersistenceHelper.flush();
+      WebPersistenceHelper.logPersistence('[EnergyService] Energy entry updated: $entryId');
     } catch (e) {
       debugPrint('Error updating energy entry: $e');
     }
@@ -135,9 +144,13 @@ class EnergyService {
 
   Future<void> deleteEnergyEntry(String entryId) async {
     try {
-      await (_database.delete(_database.energyEntries)
-            ..where((e) => e.entryId.equals(entryId)))
-          .go();
+      await _database.transaction(() async {
+        await (_database.delete(_database.energyEntries)
+              ..where((e) => e.entryId.equals(entryId)))
+            .go();
+      });
+      await WebPersistenceHelper.flush();
+      WebPersistenceHelper.logPersistence('[EnergyService] Energy entry deleted: $entryId');
     } catch (e) {
       debugPrint('Error deleting energy entry: $e');
     }

@@ -1,8 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 import 'package:kinetic/models/note_model.dart';
 import 'package:kinetic/services/note_service.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
+
+class CustomScrollBehavior extends ScrollBehavior {
+  @override
+  Set<PointerDeviceKind> get dragDevices => {
+    PointerDeviceKind.touch,
+    PointerDeviceKind.mouse,
+    PointerDeviceKind.trackpad,
+  };
+}
 
 class NotesPage extends StatefulWidget {
   final NoteService noteService;
@@ -18,6 +28,7 @@ class NotesPageState extends State<NotesPage> {
   List<NoteModel> _filteredNotes = [];
   bool _isLoading = true;
   bool _isGridView = true;
+  bool _isRefreshing = false;
   final TextEditingController _searchController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   String? _selectedCategory;
@@ -47,6 +58,21 @@ class NotesPageState extends State<NotesPage> {
     } catch (e) {
       print('Error loading notes: $e');
       setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _refresh() async {
+    if (_isRefreshing) return;
+    setState(() => _isRefreshing = true);
+    await _loadNotes();
+    setState(() => _isRefreshing = false);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Notes refreshed!'),
+          duration: Duration(seconds: 1),
+        ),
+      );
     }
   }
 
@@ -317,14 +343,30 @@ class NotesPageState extends State<NotesPage> {
             onPressed: () => setState(() => _isGridView = !_isGridView),
           ),
           IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _refreshNotes,
+            icon: _isRefreshing
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    ),
+                  )
+                : const Icon(Icons.refresh),
+            onPressed: _isRefreshing ? null : _refresh,
+            tooltip: 'Refresh',
           ),
         ],
       ),
-      body: RefreshIndicator(
-        onRefresh: _refreshNotes,
-        child: Column(
+      body: ScrollConfiguration(
+        behavior: CustomScrollBehavior(),
+        child: RefreshIndicator(
+          onRefresh: _refreshNotes,
+          color: Colors.blue,
+          backgroundColor: Colors.white,
+          strokeWidth: 2.0,
+          displacement: 40.0,
+          child: Column(
           children: [
             Padding(
               padding: const EdgeInsets.all(8.0),
@@ -376,6 +418,7 @@ class NotesPageState extends State<NotesPage> {
                           : _buildListView(),
             ),
           ],
+          ),
         ),
       ),
       floatingActionButton: FloatingActionButton(

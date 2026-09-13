@@ -168,20 +168,12 @@ class AppDatabase extends _$AppDatabase {
   MigrationStrategy get migration {
     return MigrationStrategy(
       onUpgrade: (m, from, to) async {
-        // For development: recreate all tables on schema version bump
-        // This clears old data but ensures compatibility
-        await m.deleteTable('tasks');
-        await m.deleteTable('subtasks');
-        await m.deleteTable('events');
-        await m.deleteTable('reminders');
-        await m.deleteTable('notes');
-        await m.deleteTable('energy_entries');
-        await m.deleteTable('completion_logs');
-
-        // Recreate all tables
-        await m.createAll();
+        debugPrint('[Database] Upgrading schema from $from to $to - preserving existing data');
+        // Don't delete tables - preserve existing data on web
+        // Only create new tables if they don't exist
       },
       onCreate: (m) async {
+        debugPrint('[Database] Creating new database');
         await m.createAll();
       },
     );

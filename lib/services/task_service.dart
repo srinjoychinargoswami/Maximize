@@ -4,6 +4,7 @@ import 'package:kinetic/models/subtask_model.dart';
 import 'package:kinetic/models/reminder_model.dart';
 import 'package:kinetic/services/completion_log_service.dart';
 import 'package:kinetic/services/energy_service.dart';
+import 'package:kinetic/utils/web_persistence_helper.dart';
 import 'package:uuid/uuid.dart';
 import 'package:flutter/material.dart';
 import 'package:drift/drift.dart';
@@ -108,9 +109,13 @@ class TaskService {
     );
 
     try {
-      await _database.into(_database.tasks).insert(
-        _modelToCompanion(task),
-      );
+      await _database.transaction(() async {
+        await _database.into(_database.tasks).insert(
+          _modelToCompanion(task),
+        );
+      });
+      await WebPersistenceHelper.flush();
+      WebPersistenceHelper.logPersistence('[TaskService] Task added: $taskId');
       await _scheduleTaskNotification(task);
       return 1;
     } catch (e) {
@@ -128,9 +133,13 @@ class TaskService {
     try {
       await _cancelTaskNotification(task.id);
       task.updatedAt = DateTime.now();
-      await (_database.update(_database.tasks)
-            ..where((t) => t.taskId.equals(task.id)))
-          .write(_modelToCompanion(task, skipPrimaryKey: true));
+      await _database.transaction(() async {
+        await (_database.update(_database.tasks)
+              ..where((t) => t.taskId.equals(task.id)))
+            .write(_modelToCompanion(task, skipPrimaryKey: true));
+      });
+      await WebPersistenceHelper.flush();
+      WebPersistenceHelper.logPersistence('[TaskService] Task updated: ${task.id}');
       await _scheduleTaskNotification(task);
     } catch (e) {
       debugPrint('Error updating task: $e');
@@ -315,9 +324,13 @@ class TaskService {
       for (final subtask in subtasks) {
         await deleteSubtask(subtask.id);
       }
-      await (_database.delete(_database.tasks)
-            ..where((t) => t.taskId.equals(taskId)))
-          .go();
+      await _database.transaction(() async {
+        await (_database.delete(_database.tasks)
+              ..where((t) => t.taskId.equals(taskId)))
+            .go();
+      });
+      await WebPersistenceHelper.flush();
+      WebPersistenceHelper.logPersistence('[TaskService] Task deleted: $taskId');
     } catch (e) {
       debugPrint('Error deleting task: $e');
     }
@@ -325,18 +338,21 @@ class TaskService {
 
   Future<void> insertSubtask(SubtaskModel subtask) async {
     try {
-      await _database.into(_database.subtasks).insert(
-        SubtasksCompanion(
-          id: Value(subtask.id),
-          subtaskId: Value(subtask.id),
-          taskId: Value(subtask.taskId),
-          title: Value(subtask.title),
-          completed: Value(subtask.completed),
-          completedAt: Value(subtask.completedAt),
-          createdAt: Value(subtask.createdAt),
-          updatedAt: Value(subtask.updatedAt),
-        ),
-      );
+      await _database.transaction(() async {
+        await _database.into(_database.subtasks).insert(
+          SubtasksCompanion(
+            id: Value(subtask.id),
+            subtaskId: Value(subtask.id),
+            taskId: Value(subtask.taskId),
+            title: Value(subtask.title),
+            completed: Value(subtask.completed),
+            completedAt: Value(subtask.completedAt),
+            createdAt: Value(subtask.createdAt),
+            updatedAt: Value(subtask.updatedAt),
+          ),
+        );
+      });
+      await WebPersistenceHelper.flush();
       debugPrint('[TaskService] Subtask restored: ${subtask.title}');
     } catch (e) {
       debugPrint('Error inserting subtask: $e');
@@ -347,9 +363,12 @@ class TaskService {
   Future<void> insertTask(TaskModel task) async {
     try {
       await _cancelTaskNotification(task.id);
-      await _database.into(_database.tasks).insert(
-        _modelToCompanion(task),
-      );
+      await _database.transaction(() async {
+        await _database.into(_database.tasks).insert(
+          _modelToCompanion(task),
+        );
+      });
+      await WebPersistenceHelper.flush();
       await _scheduleTaskNotification(task);
       debugPrint('[TaskService] Task restored: ${task.title}');
     } catch (e) {
@@ -491,18 +510,22 @@ class TaskService {
     }
 
     try {
-      await (_database.update(_database.subtasks)
-            ..where((s) => s.subtaskId.equals(subtask.id)))
-          .write(SubtasksCompanion(
-            id: Value(subtask.id),
-            subtaskId: Value(subtask.id),
-            taskId: Value(subtask.taskId),
-            title: Value(subtask.title),
-            completed: Value(subtask.completed),
-            completedAt: Value(subtask.completedAt),
-            createdAt: Value(subtask.createdAt),
-            updatedAt: Value(DateTime.now()),
-          ));
+      await _database.transaction(() async {
+        await (_database.update(_database.subtasks)
+              ..where((s) => s.subtaskId.equals(subtask.id)))
+            .write(SubtasksCompanion(
+              id: Value(subtask.id),
+              subtaskId: Value(subtask.id),
+              taskId: Value(subtask.taskId),
+              title: Value(subtask.title),
+              completed: Value(subtask.completed),
+              completedAt: Value(subtask.completedAt),
+              createdAt: Value(subtask.createdAt),
+              updatedAt: Value(DateTime.now()),
+            ));
+      });
+      await WebPersistenceHelper.flush();
+      WebPersistenceHelper.logPersistence('[TaskService] Subtask updated: ${subtask.id}');
     } catch (e) {
       debugPrint('Error updating subtask: $e');
     }
@@ -611,9 +634,13 @@ class TaskService {
 
   Future<void> deleteSubtask(String subtaskId) async {
     try {
-      await (_database.delete(_database.subtasks)
-            ..where((s) => s.subtaskId.equals(subtaskId)))
-          .go();
+      await _database.transaction(() async {
+        await (_database.delete(_database.subtasks)
+              ..where((s) => s.subtaskId.equals(subtaskId)))
+            .go();
+      });
+      await WebPersistenceHelper.flush();
+      WebPersistenceHelper.logPersistence('[TaskService] Subtask deleted: $subtaskId');
     } catch (e) {
       debugPrint('Error deleting subtask: $e');
     }

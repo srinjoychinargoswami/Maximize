@@ -1,5 +1,6 @@
 import 'package:kinetic/database/app_database.dart';
 import 'package:kinetic/models/note_model.dart';
+import 'package:kinetic/utils/web_persistence_helper.dart';
 import 'package:uuid/uuid.dart';
 import 'package:flutter/material.dart';
 import 'package:drift/drift.dart';
@@ -66,17 +67,20 @@ class NoteService {
       final id = const Uuid().v4();
       final now = DateTime.now();
 
-      await _database.into(_database.notes).insert(
-        NotesCompanion(
-          id: Value(id),
-          noteId: Value(id),
-          title: Value(title),
-          content: Value(content),
-          createdAt: Value(now),
-          updatedAt: Value(now),
-        ),
-      );
-      debugPrint('[NoteService] Note added successfully: $id');
+      await _database.transaction(() async {
+        await _database.into(_database.notes).insert(
+          NotesCompanion(
+            id: Value(id),
+            noteId: Value(id),
+            title: Value(title),
+            content: Value(content),
+            createdAt: Value(now),
+            updatedAt: Value(now),
+          ),
+        );
+      });
+      await WebPersistenceHelper.flush();
+      WebPersistenceHelper.logPersistence('[NoteService] Note added successfully: $id');
       return id;
     } catch (e) {
       debugPrint('Error adding note: $e');
@@ -86,14 +90,17 @@ class NoteService {
 
   Future<bool> updateNote(NoteModel note) async {
     try {
-      await (_database.update(_database.notes)
-            ..where((n) => n.noteId.equals(note.id)))
-          .write(NotesCompanion(
-            title: Value(note.title),
-            content: Value(note.content),
-            updatedAt: Value(DateTime.now()),
-          ));
-      debugPrint('[NoteService] Note updated successfully: ${note.id}');
+      await _database.transaction(() async {
+        await (_database.update(_database.notes)
+              ..where((n) => n.noteId.equals(note.id)))
+            .write(NotesCompanion(
+              title: Value(note.title),
+              content: Value(note.content),
+              updatedAt: Value(DateTime.now()),
+            ));
+      });
+      await WebPersistenceHelper.flush();
+      WebPersistenceHelper.logPersistence('[NoteService] Note updated successfully: ${note.id}');
       return true;
     } catch (e) {
       debugPrint('Error updating note: $e');
@@ -103,10 +110,13 @@ class NoteService {
 
   Future<bool> deleteNote(String noteId) async {
     try {
-      await (_database.delete(_database.notes)
-            ..where((n) => n.noteId.equals(noteId)))
-          .go();
-      debugPrint('[NoteService] Note deleted successfully: $noteId');
+      await _database.transaction(() async {
+        await (_database.delete(_database.notes)
+              ..where((n) => n.noteId.equals(noteId)))
+            .go();
+      });
+      await WebPersistenceHelper.flush();
+      WebPersistenceHelper.logPersistence('[NoteService] Note deleted successfully: $noteId');
       return true;
     } catch (e) {
       debugPrint('Error deleting note: $e');

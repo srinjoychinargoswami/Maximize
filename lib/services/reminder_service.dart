@@ -1,5 +1,6 @@
 import 'package:kinetic/database/app_database.dart';
 import 'package:kinetic/models/reminder_model.dart';
+import 'package:kinetic/utils/web_persistence_helper.dart';
 import 'package:uuid/uuid.dart';
 import 'package:flutter/material.dart';
 import 'package:drift/drift.dart';
@@ -78,23 +79,27 @@ class ReminderService {
 
   Future<void> addReminder(ReminderModel reminder) async {
     try {
-      await _database.into(_database.reminders).insert(
-        RemindersCompanion(
-          id: Value(reminder.id),
-          reminderId: Value(reminder.id),
-          title: Value(reminder.title),
-          description: Value(reminder.body),
-          reminderTime: Value(reminder.scheduledTime),
-          isRecurring: Value(reminder.isRecurring),
-          recurrenceRule: Value(reminder.recurrenceRule),
-          recurrenceInterval: Value(reminder.recurrenceInterval ?? 1),
-          daysOfWeek: Value(reminder.daysOfWeek?.join(',')),
-          recurrenceEndDate: Value(reminder.recurrenceEndDate),
-          maxOccurrences: Value(reminder.maxOccurrences),
-          createdAt: Value(DateTime.now()),
-          updatedAt: Value(DateTime.now()),
-        ),
-      );
+      await _database.transaction(() async {
+        await _database.into(_database.reminders).insert(
+          RemindersCompanion(
+            id: Value(reminder.id),
+            reminderId: Value(reminder.id),
+            title: Value(reminder.title),
+            description: Value(reminder.body),
+            reminderTime: Value(reminder.scheduledTime),
+            isRecurring: Value(reminder.isRecurring),
+            recurrenceRule: Value(reminder.recurrenceRule),
+            recurrenceInterval: Value(reminder.recurrenceInterval ?? 1),
+            daysOfWeek: Value(reminder.daysOfWeek?.join(',')),
+            recurrenceEndDate: Value(reminder.recurrenceEndDate),
+            maxOccurrences: Value(reminder.maxOccurrences),
+            createdAt: Value(DateTime.now()),
+            updatedAt: Value(DateTime.now()),
+          ),
+        );
+      });
+      await WebPersistenceHelper.flush();
+      WebPersistenceHelper.logPersistence('[ReminderService] Reminder added: ${reminder.id}');
     } catch (e) {
       debugPrint('Error adding reminder: $e');
     }
@@ -112,14 +117,18 @@ class ReminderService {
 
   Future<void> updateReminder(ReminderModel reminder) async {
     try {
-      await (_database.update(_database.reminders)
-            ..where((r) => r.reminderId.equals(reminder.id)))
-          .write(RemindersCompanion(
-            title: Value(reminder.title),
-            description: Value(reminder.body),
-            reminderTime: Value(reminder.scheduledTime),
-            updatedAt: Value(DateTime.now()),
-          ));
+      await _database.transaction(() async {
+        await (_database.update(_database.reminders)
+              ..where((r) => r.reminderId.equals(reminder.id)))
+            .write(RemindersCompanion(
+              title: Value(reminder.title),
+              description: Value(reminder.body),
+              reminderTime: Value(reminder.scheduledTime),
+              updatedAt: Value(DateTime.now()),
+            ));
+      });
+      await WebPersistenceHelper.flush();
+      WebPersistenceHelper.logPersistence('[ReminderService] Reminder updated: ${reminder.id}');
     } catch (e) {
       debugPrint('Error updating reminder: $e');
     }
@@ -181,9 +190,13 @@ class ReminderService {
 
   Future<void> deleteReminder(String reminderId) async {
     try {
-      await (_database.delete(_database.reminders)
-            ..where((r) => r.reminderId.equals(reminderId)))
-          .go();
+      await _database.transaction(() async {
+        await (_database.delete(_database.reminders)
+              ..where((r) => r.reminderId.equals(reminderId)))
+            .go();
+      });
+      await WebPersistenceHelper.flush();
+      WebPersistenceHelper.logPersistence('[ReminderService] Reminder deleted: $reminderId');
     } catch (e) {
       debugPrint('Error deleting reminder: $e');
     }

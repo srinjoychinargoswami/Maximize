@@ -1,8 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 import 'package:provider/provider.dart';
 import 'package:kinetic/services/energy_service.dart';
 import 'package:kinetic/models/energy_model.dart';
 import 'package:intl/intl.dart';
+
+class CustomScrollBehavior extends ScrollBehavior {
+  @override
+  Set<PointerDeviceKind> get dragDevices => {
+    PointerDeviceKind.touch,
+    PointerDeviceKind.mouse,
+    PointerDeviceKind.trackpad,
+  };
+}
 
 class EnergyDashboardScreen extends StatefulWidget {
   const EnergyDashboardScreen({Key? key}) : super(key: key);
@@ -12,17 +22,111 @@ class EnergyDashboardScreen extends StatefulWidget {
 }
 
 class _EnergyDashboardScreenState extends State<EnergyDashboardScreen> {
+  bool _isRefreshing = false;
+  late Future<EnergyEntryModel?> _todaysEntryFuture;
+  late Future<List<EnergyEntryModel>> _past30DaysFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeFutures();
+  }
+
+  void _initializeFutures() {
+    final energyService = context.read<EnergyService>();
+    _todaysEntryFuture = energyService.getTodaysEntry();
+    _past30DaysFuture = energyService.getEntriesPast30Days();
+  }
+
+  @override
+  void dispose() {
+    super.dispose();
+  }
+
+  Future<void> _loadEnergyData() async {
+    final energyService = context.read<EnergyService>();
+    setState(() {
+      _todaysEntryFuture = energyService.getTodaysEntry();
+      _past30DaysFuture = energyService.getEntriesPast30Days();
+    });
+    // Add a small delay to ensure FutureBuilder rebuilds
+    await Future.delayed(const Duration(milliseconds: 100));
+  }
+
+  // Public method for parent to call via GlobalKey
+  Future<void> refreshPage() async {
+    return _refresh();
+  }
+
+  Future<void> _refresh() async {
+    if (_isRefreshing) return;
+    if (!mounted) return;
+
+    setState(() => _isRefreshing = true);
+    try {
+      await _loadEnergyData();
+      if (mounted) {
+        setState(() => _isRefreshing = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Energy dashboard refreshed!'),
+            duration: Duration(seconds: 1),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isRefreshing = false);
+      }
+      debugPrint('Error refreshing energy dashboard: $e');
+    }
+  }
+
+  Future<void> _refreshEnergy() async {
+    await _loadEnergyData();
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Energy dashboard refreshed!'),
+          duration: Duration(seconds: 1),
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Energy Dashboard'),
         centerTitle: true,
+        actions: [
+          IconButton(
+            icon: _isRefreshing
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    ),
+                  )
+                : const Icon(Icons.refresh),
+            onPressed: _isRefreshing ? null : _refresh,
+            tooltip: 'Refresh',
+          ),
+        ],
       ),
-      body: Consumer<EnergyService>(
-        builder: (context, energyService, _) {
-          return FutureBuilder<EnergyEntryModel?>(
-            future: energyService.getTodaysEntry(),
+      body: ScrollConfiguration(
+        behavior: CustomScrollBehavior(),
+        child: RefreshIndicator(
+          onRefresh: _refreshEnergy,
+          color: Colors.blue,
+          backgroundColor: Colors.white,
+          strokeWidth: 2.0,
+          displacement: 40.0,
+          child: FutureBuilder<EnergyEntryModel?>(
+            future: _todaysEntryFuture,
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
                 return const Center(child: CircularProgressIndicator());
@@ -31,13 +135,14 @@ class _EnergyDashboardScreenState extends State<EnergyDashboardScreen> {
               final entry = snapshot.data;
 
               return SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
                 padding: const EdgeInsets.all(16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     _buildCurrentEnergyCard(entry),
                     const SizedBox(height: 24),
-                    _buildWeeklyTrendCard(energyService),
+                    _buildWeeklyTrendCard(),
                     const SizedBox(height: 24),
                     _buildInsightsSection(entry),
                     const SizedBox(height: 24),
@@ -46,8 +151,8 @@ class _EnergyDashboardScreenState extends State<EnergyDashboardScreen> {
                 ),
               );
             },
-          );
-        },
+          ),
+        ),
       ),
     );
   }
@@ -165,9 +270,9 @@ class _EnergyDashboardScreenState extends State<EnergyDashboardScreen> {
     );
   }
 
-  Widget _buildWeeklyTrendCard(EnergyService energyService) {
+  Widget _buildWeeklyTrendCard() {
     return FutureBuilder<List<EnergyEntryModel>>(
-      future: energyService.getEntriesPast30Days(),
+      future: _past30DaysFuture,
       builder: (context, snapshot) {
         if (!snapshot.hasData || snapshot.data!.isEmpty) {
           return Card(
@@ -304,6 +409,11 @@ class _EnergyDashboardScreenState extends State<EnergyDashboardScreen> {
 
   void _showEnergyLogDialog() {
     int selectedLevel = 5;
+    String selectedMood = 'Neutral';
+    String selectedLocation = 'Home';
+
+    final moods = ['Very Bad', 'Bad', 'Neutral', 'Good', 'Excellent'];
+    final locations = ['Home', 'Work', 'Cafe', 'Outdoors', 'Other'];
 
     showDialog(
       context: context,
@@ -312,29 +422,100 @@ class _EnergyDashboardScreenState extends State<EnergyDashboardScreen> {
           builder: (context, setState) {
             return AlertDialog(
               title: const Text('How\'s Your Energy?'),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Slider(
-                    value: selectedLevel.toDouble(),
-                    min: 1,
-                    max: 10,
-                    divisions: 9,
-                    label: '$selectedLevel',
-                    onChanged: (value) {
-                      setState(() => selectedLevel = value.toInt());
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    _getEnergyStatus(selectedLevel),
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: _getEnergyStatusColor(selectedLevel),
-                      fontWeight: FontWeight.w600,
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // === ENERGY SLIDER ===
+                    const Text(
+                      'Energy Level',
+                      style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 8),
+                    Slider(
+                      value: selectedLevel.toDouble(),
+                      min: 1,
+                      max: 10,
+                      divisions: 9,
+                      label: '$selectedLevel',
+                      onChanged: (value) {
+                        setState(() => selectedLevel = value.toInt());
+                      },
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      _getEnergyStatus(selectedLevel),
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: _getEnergyStatusColor(selectedLevel),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // === MOOD DROPDOWN ===
+                    const Text(
+                      'Your Mood',
+                      style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.grey.withOpacity(0.3)),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: DropdownButton<String>(
+                        value: selectedMood,
+                        isExpanded: true,
+                        underline: const SizedBox(),
+                        items: moods.map((mood) {
+                          return DropdownMenuItem(
+                            value: mood,
+                            child: Text(mood),
+                          );
+                        }).toList(),
+                        onChanged: (value) {
+                          if (value != null) {
+                            setState(() => selectedMood = value);
+                          }
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // === LOCATION DROPDOWN ===
+                    const Text(
+                      'Location',
+                      style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.grey.withOpacity(0.3)),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: DropdownButton<String>(
+                        value: selectedLocation,
+                        isExpanded: true,
+                        underline: const SizedBox(),
+                        items: locations.map((location) {
+                          return DropdownMenuItem(
+                            value: location,
+                            child: Text(location),
+                          );
+                        }).toList(),
+                        onChanged: (value) {
+                          if (value != null) {
+                            setState(() => selectedLocation = value);
+                          }
+                        },
+                      ),
+                    ),
+                  ],
+                ),
               ),
               actions: [
                 TextButton(
@@ -345,13 +526,13 @@ class _EnergyDashboardScreenState extends State<EnergyDashboardScreen> {
                   onPressed: () {
                     context.read<EnergyService>().createEnergyEntry(
                       energyLevel: selectedLevel,
-                      moodTags: [],
+                      moodTags: [selectedMood],
                       privacyContext: 'Dashboard',
-                      location: 'Home',
+                      location: selectedLocation,
                     );
                     Navigator.pop(context);
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Energy logged!')),
+                      const SnackBar(content: Text('Energy logged with mood & location!')),
                     );
                     setState(() {});
                   },

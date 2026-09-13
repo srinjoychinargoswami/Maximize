@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 import 'package:provider/provider.dart';
 import 'package:kinetic/services/energy_service.dart';
 import 'package:kinetic/services/completion_log_service.dart';
@@ -6,6 +7,15 @@ import 'package:kinetic/services/metrics_service.dart';
 import 'package:kinetic/models/energy_model.dart';
 import 'package:kinetic/models/completion_log_model.dart';
 import 'package:intl/intl.dart';
+
+class CustomScrollBehavior extends ScrollBehavior {
+  @override
+  Set<PointerDeviceKind> get dragDevices => {
+    PointerDeviceKind.touch,
+    PointerDeviceKind.mouse,
+    PointerDeviceKind.trackpad,
+  };
+}
 
 class InsightsScreen extends StatefulWidget {
   const InsightsScreen({Key? key}) : super(key: key);
@@ -15,7 +25,84 @@ class InsightsScreen extends StatefulWidget {
 }
 
 class _InsightsScreenState extends State<InsightsScreen> {
-  late Future<void> _refreshKey;
+  bool _isRefreshing = false;
+  late Future<List<EnergyEntryModel>> _energyEntriesFuture;
+  late Future<List<CompletionLogModel>> _completionLogsFuture;
+  late Future<int> _completedTasksFuture;
+  late Future<int> _totalTasksFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeFutures();
+  }
+
+  void _initializeFutures() {
+    final energyService = context.read<EnergyService>();
+    final completionLogService = context.read<CompletionLogService>();
+    final metricsService = context.read<MetricsService>();
+
+    _energyEntriesFuture = energyService.getEntriesPast30Days();
+    _completionLogsFuture = completionLogService.getAllCompletions();
+    _completedTasksFuture = metricsService.getCompletedTasks();
+    _totalTasksFuture = metricsService.getTotalTasks();
+  }
+
+  Future<void> _loadInsights() async {
+    final energyService = context.read<EnergyService>();
+    final completionLogService = context.read<CompletionLogService>();
+    final metricsService = context.read<MetricsService>();
+
+    setState(() {
+      _energyEntriesFuture = energyService.getEntriesPast30Days();
+      _completionLogsFuture = completionLogService.getAllCompletions();
+      _completedTasksFuture = metricsService.getCompletedTasks();
+      _totalTasksFuture = metricsService.getTotalTasks();
+    });
+    // Add a small delay to ensure FutureBuilder rebuilds
+    await Future.delayed(const Duration(milliseconds: 100));
+  }
+
+  // Public method for parent to call via GlobalKey
+  Future<void> refreshPage() async {
+    return _refresh();
+  }
+
+  Future<void> _refresh() async {
+    if (_isRefreshing) return;
+    if (!mounted) return;
+
+    setState(() => _isRefreshing = true);
+    try {
+      await _loadInsights();
+      if (mounted) {
+        setState(() => _isRefreshing = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Insights refreshed!'),
+            duration: Duration(seconds: 1),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isRefreshing = false);
+      }
+      debugPrint('Error refreshing insights: $e');
+    }
+  }
+
+  Future<void> _refreshInsights() async {
+    await _loadInsights();
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Insights refreshed!'),
+          duration: Duration(seconds: 1),
+        ),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -23,49 +110,69 @@ class _InsightsScreenState extends State<InsightsScreen> {
       appBar: AppBar(
         title: const Text('Insights'),
         centerTitle: true,
+        actions: [
+          IconButton(
+            icon: _isRefreshing
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    ),
+                  )
+                : const Icon(Icons.refresh),
+            onPressed: _isRefreshing ? null : _refresh,
+            tooltip: 'Refresh',
+          ),
+        ],
       ),
-      body: RefreshIndicator(
-        onRefresh: () async {
-          setState(() {});
-          await Future.delayed(const Duration(milliseconds: 500));
-        },
-        child: SingleChildScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.all(16),
-          child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // === 1. YOUR PEAK ENERGY WINDOW (MOST IMPORTANT) ===
-            _buildPeakEnergyWindow(),
-            const SizedBox(height: 24),
+      body: ScrollConfiguration(
+        behavior: CustomScrollBehavior(),
+        child: RefreshIndicator(
+          onRefresh: _refreshInsights,
+          color: Colors.blue,
+          backgroundColor: Colors.white,
+          strokeWidth: 2.0,
+          displacement: 40.0,
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.all(16),
+            child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // === 1. YOUR PEAK ENERGY WINDOW (MOST IMPORTANT) ===
+              _buildPeakEnergyWindow(),
+              const SizedBox(height: 24),
 
-            // === 2. ENERGY × PRODUCTIVITY CORRELATION ===
-            _buildEnergyProductivityCorrelation(),
-            const SizedBox(height: 24),
+              // === 2. ENERGY × PRODUCTIVITY CORRELATION ===
+              _buildEnergyProductivityCorrelation(),
+              const SizedBox(height: 24),
 
-            // === 3. WHEN YOU WORK BEST ===
-            _buildBestWorkTimes(),
-            const SizedBox(height: 24),
+              // === 3. WHEN YOU WORK BEST ===
+              _buildBestWorkTimes(),
+              const SizedBox(height: 24),
 
-            // === 4. MOOD & ENVIRONMENT PATTERNS ===
-            _buildMoodEnvironmentPatterns(),
-            const SizedBox(height: 24),
+              // === 4. MOOD & ENVIRONMENT PATTERNS ===
+              _buildMoodEnvironmentPatterns(),
+              const SizedBox(height: 24),
 
-            // === 5. RECOVERY TIME TRACKING ===
-            _buildRecoveryTimeTracking(),
-            const SizedBox(height: 24),
+              // === 5. RECOVERY TIME TRACKING ===
+              _buildRecoveryTimeTracking(),
+              const SizedBox(height: 24),
 
-            // === 6. COMPLETION RATES BY ENERGY LEVEL ===
-            _buildCompletionByEnergy(),
-            const SizedBox(height: 24),
+              // === 6. COMPLETION RATES BY ENERGY LEVEL ===
+              _buildCompletionByEnergy(),
+              const SizedBox(height: 24),
 
-            // === 7. PROCRASTINATION PATTERNS ===
-            _buildProcrastinationPatterns(),
-            const SizedBox(height: 24),
+              // === 7. PROCRASTINATION PATTERNS ===
+              _buildProcrastinationPatterns(),
+              const SizedBox(height: 24),
 
-            // === 8. ACTIONABLE RECOMMENDATIONS ===
-            _buildRecommendations(),
-          ],
+              // === 8. ACTIONABLE RECOMMENDATIONS ===
+              _buildRecommendations(),
+            ],
+            ),
           ),
         ),
       ),
@@ -74,10 +181,8 @@ class _InsightsScreenState extends State<InsightsScreen> {
 
   // === 1. YOUR PEAK ENERGY WINDOW (HERO SECTION) ===
   Widget _buildPeakEnergyWindow() {
-    final energyService = context.read<EnergyService>();
-
     return FutureBuilder<List<EnergyEntryModel>>(
-      future: energyService.getEntriesPast30Days(),
+      future: _energyEntriesFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return Card(
@@ -206,11 +311,8 @@ class _InsightsScreenState extends State<InsightsScreen> {
 
   // === 2. ENERGY × PRODUCTIVITY CORRELATION ===
   Widget _buildEnergyProductivityCorrelation() {
-    final completionLogService = context.read<CompletionLogService>();
-    final energyService = context.read<EnergyService>();
-
     return FutureBuilder<List<CompletionLogModel>>(
-      future: completionLogService.getAllCompletions(),
+      future: _completionLogsFuture,
       builder: (context, logSnapshot) {
         if (logSnapshot.connectionState == ConnectionState.waiting) {
           return Card(
@@ -224,7 +326,7 @@ class _InsightsScreenState extends State<InsightsScreen> {
         final logs = logSnapshot.data ?? [];
 
         return FutureBuilder<List<EnergyEntryModel>>(
-          future: energyService.getEntriesPast30Days(),
+          future: _energyEntriesFuture,
           builder: (context, energySnapshot) {
             final energyEntries = energySnapshot.data ?? [];
 
@@ -399,10 +501,8 @@ class _InsightsScreenState extends State<InsightsScreen> {
 
   // === 3. WHEN YOU WORK BEST ===
   Widget _buildBestWorkTimes() {
-    final energyService = context.read<EnergyService>();
-
     return FutureBuilder<List<EnergyEntryModel>>(
-      future: energyService.getEntriesPast30Days(),
+      future: _energyEntriesFuture,
       builder: (context, snapshot) {
         final entries = snapshot.data ?? [];
 
@@ -525,10 +625,8 @@ class _InsightsScreenState extends State<InsightsScreen> {
 
   // === 4. MOOD & ENVIRONMENT PATTERNS ===
   Widget _buildMoodEnvironmentPatterns() {
-    final energyService = context.read<EnergyService>();
-
     return FutureBuilder<List<EnergyEntryModel>>(
-      future: energyService.getEntriesPast30Days(),
+      future: _energyEntriesFuture,
       builder: (context, snapshot) {
         final entries = snapshot.data ?? [];
 
