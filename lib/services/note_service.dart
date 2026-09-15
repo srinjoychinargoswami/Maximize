@@ -1,5 +1,6 @@
 import 'package:kinetic/database/app_database.dart';
 import 'package:kinetic/models/note_model.dart';
+import 'package:kinetic/services/sync_service.dart';
 import 'package:kinetic/utils/web_persistence_helper.dart';
 import 'package:uuid/uuid.dart';
 import 'package:flutter/material.dart';
@@ -7,6 +8,7 @@ import 'package:drift/drift.dart';
 
 class NoteService {
   final AppDatabase _database;
+  final SyncService _sync = SyncService();
 
   NoteService(this._database);
 
@@ -81,6 +83,14 @@ class NoteService {
       });
       await WebPersistenceHelper.flush();
       WebPersistenceHelper.logPersistence('[NoteService] Note added successfully: $id');
+
+      await _sync.insert('notes', id, {
+        'title': title,
+        'content': content,
+        'createdAt': now.millisecondsSinceEpoch,
+        'updatedAt': now.millisecondsSinceEpoch,
+      });
+
       return id;
     } catch (e) {
       debugPrint('Error adding note: $e');
@@ -101,6 +111,13 @@ class NoteService {
       });
       await WebPersistenceHelper.flush();
       WebPersistenceHelper.logPersistence('[NoteService] Note updated successfully: ${note.id}');
+
+      await _sync.update('notes', note.id, {
+        'title': note.title,
+        'content': note.content,
+        'updatedAt': DateTime.now().millisecondsSinceEpoch,
+      });
+
       return true;
     } catch (e) {
       debugPrint('Error updating note: $e');
@@ -117,6 +134,9 @@ class NoteService {
       });
       await WebPersistenceHelper.flush();
       WebPersistenceHelper.logPersistence('[NoteService] Note deleted successfully: $noteId');
+
+      await _sync.delete('notes', noteId);
+
       return true;
     } catch (e) {
       debugPrint('Error deleting note: $e');

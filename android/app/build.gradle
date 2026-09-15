@@ -7,10 +7,11 @@ plugins {
 
 android {
     namespace = "com.example.maximize"
-    compileSdk = 35
+    compileSdk = 36
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
+        coreLibraryDesugaringEnabled true 
         sourceCompatibility = JavaVersion.VERSION_1_8
         targetCompatibility = JavaVersion.VERSION_1_8
     }
@@ -28,7 +29,6 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
-        namespace = "com.example.maximize"
     }
 
     buildTypes {
@@ -44,4 +44,9 @@ android {
 
 flutter {
     source = "../.."
+}
+
+dependencies {
+    // Core library desugaring framework for Java 8+ API support on older engines
+    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.0.3'
 }

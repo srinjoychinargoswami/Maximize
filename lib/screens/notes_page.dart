@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
+import 'package:provider/provider.dart';
 import 'package:kinetic/models/note_model.dart';
 import 'package:kinetic/services/note_service.dart';
+import 'package:kinetic/services/sync_service.dart';
+import 'package:kinetic/database/app_database.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 
@@ -70,17 +73,26 @@ class NotesPageState extends State<NotesPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Notes refreshed!'),
-          duration: Duration(seconds: 1),
+          duration: Duration(seconds: 8),
         ),
       );
     }
   }
 
   Future<void> _refreshNotes() async {
+    debugPrint('[NotesPage] User pulled to refresh, syncing from Supabase...');
+    try {
+      await SyncService().syncDown(context.read<AppDatabase>());
+      debugPrint('[NotesPage] syncDown completed, reloading notes...');
+    } catch (e) {
+      debugPrint('[NotesPage] Sync error: $e');
+    }
     await _loadNotes();
+    debugPrint('[NotesPage] Notes loaded, forcing UI rebuild...');
+    setState(() {}); // Force UI rebuild after sync
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Notes refreshed!'), duration: Duration(seconds: 1)),
+        const SnackBar(content: Text('Notes refreshed!'), duration: Duration(seconds: 8)),
       );
     }
   }

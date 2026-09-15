@@ -345,7 +345,7 @@ class _SettingsPageState extends State<SettingsPage> {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
                       content: Text("✅ All data deleted. App reset to empty state."),
-                      duration: Duration(seconds: 2),
+                      duration: Duration(seconds: 8),
                     ),
                   );
                   // Pop settings and return true to trigger refresh
@@ -398,21 +398,29 @@ class _SettingsPageState extends State<SettingsPage> {
             Card(
               color: Colors.grey[800],
               child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                child: ListTile(
-                  title: const Text('Theme'),
-                  subtitle: Text(_currentTheme.capitalize()),
-                  trailing: SegmentedButton<String>(
-                    segments: const [
-                      ButtonSegment(value: 'light', label: Text('Light')),
-                      ButtonSegment(value: 'dark', label: Text('Dark')),
-                      ButtonSegment(value: 'system', label: Text('System')),
-                    ],
-                    selected: {_currentTheme},
-                    onSelectionChanged: (Set<String> newSelection) {
-                      _saveThemePreference(newSelection.first);
-                    },
-                  ),
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Theme', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 8),
+                    Text(_currentTheme.capitalize(), style: TextStyle(color: Colors.grey[400], fontSize: 14)),
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      width: double.infinity,
+                      child: SegmentedButton<String>(
+                        segments: const [
+                          ButtonSegment(value: 'light', label: Text('Light')),
+                          ButtonSegment(value: 'dark', label: Text('Dark')),
+                          ButtonSegment(value: 'system', label: Text('System')),
+                        ],
+                        selected: {_currentTheme},
+                        onSelectionChanged: (Set<String> newSelection) {
+                          _saveThemePreference(newSelection.first);
+                        },
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -499,7 +507,7 @@ class _SettingsPageState extends State<SettingsPage> {
                     // Encryption info
                     ListTile(
                       title: const Text('Encryption'),
-                      subtitle: const Text('AES-256 (Firebase sync only)'),
+                      subtitle: const Text('AES-256 Encryption'),
                       leading: const Icon(Icons.lock),
                       contentPadding: EdgeInsets.zero,
                     ),

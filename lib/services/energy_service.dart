@@ -1,5 +1,6 @@
 import 'package:kinetic/database/app_database.dart';
 import 'package:kinetic/models/energy_model.dart';
+import 'package:kinetic/services/sync_service.dart';
 import 'package:kinetic/utils/web_persistence_helper.dart';
 import 'package:uuid/uuid.dart';
 import 'package:flutter/material.dart';
@@ -7,6 +8,7 @@ import 'package:drift/drift.dart';
 
 class EnergyService {
   final AppDatabase _database;
+  final SyncService _sync = SyncService();
 
   EnergyService(this._database);
 
@@ -39,6 +41,17 @@ class EnergyService {
       });
       await WebPersistenceHelper.flush();
       WebPersistenceHelper.logPersistence('[EnergyService] Energy entry created: $entryId (persisted to IndexedDB)');
+
+      await _sync.insert('energy_entries', entryId, {
+        'timestamp': now.millisecondsSinceEpoch,
+        'energyLevel': energyLevel.clamp(1, 10),
+        'moodTags': moodTags.join(','),
+        'privacyContext': privacyContext,
+        'location': location,
+        'notes': notes,
+        'createdAt': now.millisecondsSinceEpoch,
+        'updatedAt': now.millisecondsSinceEpoch,
+      });
     } catch (e) {
       debugPrint('Error creating energy entry: $e');
     }
@@ -137,6 +150,17 @@ class EnergyService {
       });
       await WebPersistenceHelper.flush();
       WebPersistenceHelper.logPersistence('[EnergyService] Energy entry updated: $entryId');
+
+      final updates = <String, dynamic>{
+        'energyLevel': energyLevel.clamp(1, 10),
+        'updatedAt': DateTime.now().millisecondsSinceEpoch,
+      };
+      if (moodTags != null) updates['moodTags'] = moodTags.join(',');
+      if (privacyContext != null) updates['privacyContext'] = privacyContext;
+      if (location != null) updates['location'] = location;
+      if (notes != null) updates['notes'] = notes;
+
+      await _sync.update('energy_entries', entryId, updates);
     } catch (e) {
       debugPrint('Error updating energy entry: $e');
     }
@@ -150,6 +174,8 @@ class EnergyService {
             .go();
       });
       await WebPersistenceHelper.flush();
+
+      await _sync.delete('energy_entries', entryId);
       WebPersistenceHelper.logPersistence('[EnergyService] Energy entry deleted: $entryId');
     } catch (e) {
       debugPrint('Error deleting energy entry: $e');

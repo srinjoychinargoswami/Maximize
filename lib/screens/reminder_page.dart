@@ -5,7 +5,7 @@ import 'package:timezone/data/latest.dart' as tz;
 import 'package:kinetic/models/reminder_model.dart';
 import 'package:kinetic/services/reminder_service.dart';
 import 'package:kinetic/services/notification_service.dart';
-import 'package:kinetic/services/firebase_realtime_sync_service.dart';
+import 'package:kinetic/services/sync_service.dart';
 import 'package:kinetic/database/app_database.dart';
 
 // CustomScrollBehavior to fix RefreshIndicator on Windows desktop
@@ -53,34 +53,7 @@ class ReminderPageState extends State<ReminderPage> {
     _loadRemindersFromDatabase();
 
     // CRITICAL FIX: Listen to Firebase for synced reminders from other devices
-    _setupFirebaseReminderListener();
-  }
-
-  Future<void> _setupFirebaseReminderListener() async {
-    try {
-      final firebaseService = FirebaseRealtimeSyncService.instance;
-
-      // Wait briefly for Firebase to initialize if needed
-      if (!firebaseService.isInitialized) {
-        await Future.delayed(const Duration(milliseconds: 500));
-      }
-
-      // Listen for real-time reminder updates from Firebase
-      if (firebaseService.isInitialized) {
-        firebaseService.listenToReminders((syncedReminders) {
-          // Update local list with synced reminders
-          if (mounted) {
-            setState(() {
-              _reminders = syncedReminders;
-              _expandedReminders = _expandRecurringReminders(_reminders);
-            });
-            print('[ReminderPage] Synced ${syncedReminders.length} reminders from Firebase');
-          }
-        });
-      }
-    } catch (e) {
-      print('[ReminderPage] Error setting up Firebase listener: $e');
-    }
+    // PowerSync automatically syncs reminders - no need for manual listeners
   }
 
   @override
@@ -116,7 +89,7 @@ class ReminderPageState extends State<ReminderPage> {
     } catch (e) {
       print('[ReminderPage] Error loading reminders: $e');
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error loading reminders: $e')),
+        SnackBar(content: Text('Error loading reminders: $e'), duration: Duration(seconds: 8)),
       );
     }
   }
@@ -133,7 +106,7 @@ class ReminderPageState extends State<ReminderPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Reminders refreshed!'),
-          duration: Duration(seconds: 1),
+          duration: Duration(seconds: 8),
         ),
       );
     }
@@ -161,9 +134,18 @@ void scrollToItem(String id) {
 
   // Refresh method for pull-to-refresh functionality
   Future<void> _refreshReminders() async {
+    debugPrint('[ReminderPage] User pulled to refresh, syncing from Supabase...');
+    try {
+      await SyncService().syncDown(widget.database);
+      debugPrint('[ReminderPage] syncDown completed, reloading reminders...');
+    } catch (e) {
+      debugPrint('[ReminderPage] Sync error: $e');
+    }
     await _loadRemindersFromDatabase();
+    debugPrint('[ReminderPage] Reminders loaded, forcing UI rebuild...');
+    setState(() {}); // Force UI rebuild after sync
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Reminders refreshed!')),
+      const SnackBar(content: Text('Reminders refreshed!'), duration: Duration(seconds: 8)),
     );
   }
 
@@ -179,7 +161,7 @@ void scrollToItem(String id) {
       await _loadRemindersFromDatabase();
     } catch (error) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to update reminder: $error')),
+        SnackBar(content: Text('Failed to update reminder: $error'), duration: Duration(seconds: 8)),
       );
     }
   }
@@ -618,12 +600,12 @@ void scrollToItem(String id) {
       await _loadRemindersFromDatabase();
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Reminder added successfully!')),
+        const SnackBar(content: Text('Reminder added successfully!'), duration: Duration(seconds: 8)),
       );
     } catch (e) {
       print('[ReminderPage] Error adding reminder: $e');
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error adding reminder: $e')),
+        SnackBar(content: Text('Error adding reminder: $e'), duration: Duration(seconds: 8)),
       );
     }
   }
@@ -657,7 +639,7 @@ void scrollToItem(String id) {
 
     if (!_isNotificationServiceReady) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Notification service is initializing, please wait...')),
+        const SnackBar(content: Text('Notification service is initializing, please wait...'), duration: Duration(seconds: 8)),
       );
       return;
     }
@@ -679,12 +661,12 @@ void scrollToItem(String id) {
       FocusScope.of(context).unfocus();
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Reminder added successfully!')),
+        const SnackBar(content: Text('Reminder added successfully!'), duration: Duration(seconds: 8)),
       );
     } catch (e) {
       print('[ReminderPage] Error adding reminder: $e');
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error adding reminder: $e')),
+        SnackBar(content: Text('Error adding reminder: $e'), duration: Duration(seconds: 8)),
       );
     }
   }
@@ -850,7 +832,7 @@ void scrollToItem(String id) {
                     } catch (e) {
                       print('[ReminderPage] Error updating reminder: $e');
                       ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Error updating reminder: $e')),
+                        SnackBar(content: Text('Error updating reminder: $e'), duration: Duration(seconds: 8)),
                       );
                     }
                   },

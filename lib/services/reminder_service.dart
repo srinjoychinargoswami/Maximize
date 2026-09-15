@@ -1,5 +1,6 @@
 import 'package:kinetic/database/app_database.dart';
 import 'package:kinetic/models/reminder_model.dart';
+import 'package:kinetic/services/sync_service.dart';
 import 'package:kinetic/utils/web_persistence_helper.dart';
 import 'package:uuid/uuid.dart';
 import 'package:flutter/material.dart';
@@ -7,6 +8,7 @@ import 'package:drift/drift.dart';
 
 class ReminderService {
   final AppDatabase _database;
+  final SyncService _sync = SyncService();
 
   ReminderService(this._database);
 
@@ -79,6 +81,7 @@ class ReminderService {
 
   Future<void> addReminder(ReminderModel reminder) async {
     try {
+      final now = DateTime.now();
       await _database.transaction(() async {
         await _database.into(_database.reminders).insert(
           RemindersCompanion(
@@ -100,6 +103,20 @@ class ReminderService {
       });
       await WebPersistenceHelper.flush();
       WebPersistenceHelper.logPersistence('[ReminderService] Reminder added: ${reminder.id}');
+
+      await _sync.insert('reminders', reminder.id, {
+        'title': reminder.title,
+        'description': reminder.body,
+        'reminderTime': reminder.scheduledTime.millisecondsSinceEpoch,
+        'isRecurring': reminder.isRecurring ? 1 : 0,
+        'recurrenceRule': reminder.recurrenceRule,
+        'recurrenceInterval': reminder.recurrenceInterval ?? 1,
+        'daysOfWeek': reminder.daysOfWeek?.join(','),
+        'recurrenceEndDate': reminder.recurrenceEndDate?.millisecondsSinceEpoch,
+        'maxOccurrences': reminder.maxOccurrences,
+        'createdAt': now.millisecondsSinceEpoch,
+        'updatedAt': now.millisecondsSinceEpoch,
+      });
     } catch (e) {
       debugPrint('Error adding reminder: $e');
     }
@@ -129,6 +146,13 @@ class ReminderService {
       });
       await WebPersistenceHelper.flush();
       WebPersistenceHelper.logPersistence('[ReminderService] Reminder updated: ${reminder.id}');
+
+      await _sync.update('reminders', reminder.id, {
+        'title': reminder.title,
+        'description': reminder.body,
+        'reminderTime': reminder.scheduledTime.millisecondsSinceEpoch,
+        'updatedAt': DateTime.now().millisecondsSinceEpoch,
+      });
     } catch (e) {
       debugPrint('Error updating reminder: $e');
     }
@@ -197,6 +221,8 @@ class ReminderService {
       });
       await WebPersistenceHelper.flush();
       WebPersistenceHelper.logPersistence('[ReminderService] Reminder deleted: $reminderId');
+
+      await _sync.delete('reminders', reminderId);
     } catch (e) {
       debugPrint('Error deleting reminder: $e');
     }

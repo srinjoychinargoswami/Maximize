@@ -2,13 +2,14 @@ import 'package:uuid/uuid.dart';
 
 // Mood tags constants
 class MoodTags {
+  static const String excellent = 'Excellent';
   static const String focused = 'Focused';
   static const String energetic = 'Energetic';
   static const String distracted = 'Distracted';
   static const String drained = 'Drained';
   static const String stressed = 'Stressed';
 
-  static const List<String> all = [focused, energetic, distracted, drained, stressed];
+  static const List<String> all = [excellent, focused, energetic, distracted, drained, stressed];
 }
 
 // Privacy context constants

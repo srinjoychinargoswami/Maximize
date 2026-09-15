@@ -20,7 +20,7 @@ dependencies:
   json_serializable: ^6.8.0
   provider: ^6.0.1
   shared_preferences: ^2.0.0
-  uuid: ^3.0.7
+  uuid: ^4.2.0
   flutter_colorpicker: ^1.1.0
   timezone: ^0.9.4
   flutter_timezone: ^4.1.1
@@ -33,10 +33,9 @@ dependencies:
   crypto: ^3.0.3
   encrypt: ^5.0.3
   gestures: ^1.0.0
-  firebase_core: ^3.0.0
-  firebase_auth: ^5.0.0
-  cloud_firestore: ^5.0.0
-  firebase_database: ^11.0.0
+  # Supabase for backend REST API
+  supabase_flutter: ^2.17.2
+
   fl_chart: ^0.63.0
 
   # Flutter Gemma dependencies

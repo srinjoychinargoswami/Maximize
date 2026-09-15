@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
 import 'package:provider/provider.dart';
 import 'package:kinetic/services/energy_service.dart';
+import 'package:kinetic/services/sync_service.dart';
+import 'package:kinetic/database/app_database.dart';
 import 'package:kinetic/models/energy_model.dart';
 import 'package:intl/intl.dart';
 
@@ -70,7 +72,7 @@ class _EnergyDashboardScreenState extends State<EnergyDashboardScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Energy dashboard refreshed!'),
-            duration: Duration(seconds: 1),
+            duration: Duration(seconds: 8),
           ),
         );
       }
@@ -83,12 +85,21 @@ class _EnergyDashboardScreenState extends State<EnergyDashboardScreen> {
   }
 
   Future<void> _refreshEnergy() async {
+    debugPrint('[EnergyDashboard] User pulled to refresh, syncing from Supabase...');
+    try {
+      await SyncService().syncDown(context.read<AppDatabase>());
+      debugPrint('[EnergyDashboard] syncDown completed, reloading energy data...');
+    } catch (e) {
+      debugPrint('[EnergyDashboard] Sync error: $e');
+    }
     await _loadEnergyData();
+    debugPrint('[EnergyDashboard] Energy data loaded, forcing UI rebuild...');
+    setState(() {}); // Force UI rebuild after sync
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Energy dashboard refreshed!'),
-          duration: Duration(seconds: 1),
+          duration: Duration(seconds: 8),
         ),
       );
     }
@@ -527,7 +538,7 @@ class _EnergyDashboardScreenState extends State<EnergyDashboardScreen> {
                     context.read<EnergyService>().createEnergyEntry(
                       energyLevel: selectedLevel,
                       moodTags: [selectedMood],
-                      privacyContext: 'Dashboard',
+                      privacyContext: 'Home',
                       location: selectedLocation,
                     );
                     Navigator.pop(context);

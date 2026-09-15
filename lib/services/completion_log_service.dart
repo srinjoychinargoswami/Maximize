@@ -1,11 +1,13 @@
 import 'package:kinetic/database/app_database.dart';
 import 'package:kinetic/models/completion_log_model.dart';
+import 'package:kinetic/services/sync_service.dart';
 import 'package:uuid/uuid.dart';
 import 'package:flutter/material.dart';
 import 'package:drift/drift.dart';
 
 class CompletionLogService {
   final AppDatabase _database;
+  final SyncService _sync = SyncService();
 
   CompletionLogService(this._database);
 
@@ -45,6 +47,22 @@ class CompletionLogService {
           createdAt: Value(now),
         ),
       );
+
+      await _sync.insert('completion_logs', logId, {
+        'taskId': taskId,
+        'taskTitle': taskTitle,
+        'description': description,
+        'category': category,
+        'priority': priority,
+        'completedAt': now.millisecondsSinceEpoch,
+        'isSubtask': isSubtask ? 1 : 0,
+        'parentTaskTitle': parentTaskTitle,
+        'energyLevel': energyLevel,
+        'moodTags': moodTags,
+        'privacyContext': privacyContext,
+        'location': location,
+        'createdAt': now.millisecondsSinceEpoch,
+      });
     } catch (e) {
       debugPrint('Error logging completion: $e');
     }

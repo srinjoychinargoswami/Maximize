@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 import 'package:kinetic/models/energy_model.dart';
 import 'package:kinetic/models/energy_entry.dart';
 import 'package:kinetic/services/energy_service.dart';
-import 'package:kinetic/services/firebase_realtime_sync_service.dart';
 import 'package:kinetic/database/app_database.dart' hide EnergyEntry;
 import 'package:intl/intl.dart';
 
@@ -25,8 +24,8 @@ class _EnergyPageState extends State<EnergyPage> with TickerProviderStateMixin {
   int _energyLevel = 5;
   DateTime _selectedTime = DateTime.now();
   List<String> _selectedMoods = [];
-  String? _selectedContext;
-  String? _selectedLocation;
+  String? _selectedContext = 'Home'; // Default to 'Home' (valid context)
+  String? _selectedLocation = 'Home'; // Default to 'Home' (valid location)
   String? _notes;
   bool _isLoading = false;
   EnergyEntryModel? _todaysEntry;
@@ -61,7 +60,10 @@ class _EnergyPageState extends State<EnergyPage> with TickerProviderStateMixin {
           _energyLevel = entry.energyLevel;
           _selectedTime = entry.timestamp;
           _selectedMoods = List<String>.from(entry.moodTags);
-          _selectedContext = entry.privacyContext;
+          // Validate privacy context - use 'Home' if invalid
+          _selectedContext = PrivacyContexts.all.contains(entry.privacyContext)
+              ? entry.privacyContext
+              : 'Home';
           _selectedLocation = entry.location;
           _notes = entry.notes;
           _notesController.text = entry.notes ?? '';
@@ -132,7 +134,7 @@ class _EnergyPageState extends State<EnergyPage> with TickerProviderStateMixin {
           createdAt: updated.createdAt,
           updatedAt: updated.updatedAt,
         );
-        await FirebaseRealtimeSyncService.instance.syncEnergyEntry(energyEntry);
+        // PowerSync automatically syncs energy entries to cloud
 
         if (mounted) {
           setState(() => _isLoading = false);
@@ -170,7 +172,7 @@ class _EnergyPageState extends State<EnergyPage> with TickerProviderStateMixin {
               createdAt: _todaysEntry!.createdAt,
               updatedAt: _todaysEntry!.updatedAt,
             );
-            await FirebaseRealtimeSyncService.instance.syncEnergyEntry(energyEntry);
+            // PowerSync automatically syncs energy entries to cloud
           }
 
           setState(() => _isLoading = false);
@@ -225,8 +227,7 @@ class _EnergyPageState extends State<EnergyPage> with TickerProviderStateMixin {
 
       await _energyService.deleteEnergyEntry(entryId);
 
-      // Sync deletion to Firebase
-      await FirebaseRealtimeSyncService.instance.deleteEnergyEntry(entryId);
+      // PowerSync automatically syncs deletions to cloud
 
       if (mounted) {
         setState(() {

@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'package:crypto/crypto.dart';
 
 class EncryptionHelper {
-  static const String _secretKey = 'ProductivityApp2024SecretKey!!'; // Exactly 32 characters
+  static const String _secretKey = ''; // Exactly 32 characters
   
   static String encrypt(String plainText) {
     try {

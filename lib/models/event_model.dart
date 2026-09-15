@@ -70,7 +70,7 @@ class Event {
       comments: eventData.comments,
       startDateTime: eventData.startDateTime, // Use DateTime directly
       endDateTime: eventData.endDateTime, // Use DateTime directly
-      date: eventData.startDateTime, // Use eventDateTime as the date
+      date: eventData.startDateTime, // Use scheduledDateTime as the date
       customCategory: eventData.customCategory, // Keep nullable
       color: eventData.color ?? '#FFFFFF', // Map color from EventData (default to white)
       completed: eventData.completed ?? false, // ADDED: Map completion status from database

@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
+import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'package:kinetic/models/event_model.dart';
 import 'package:kinetic/services/calendar_service.dart';
+import 'package:kinetic/services/sync_service.dart';
+import 'package:kinetic/database/app_database.dart' hide Event;
 import 'package:uuid/uuid.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 
@@ -45,11 +48,11 @@ class CalendarPageState extends State<CalendarPage> {
   {'value': '1hour', 'label': '1 hour before'},
   {'value': '1day', 'label': '1 day before'},
   {'value': 'custom', 'label': 'Custom time'},
-];
+  ];
 
-String _searchQuery = ''; 
-final TextEditingController _searchController = TextEditingController();
-final ScrollController _scrollController = ScrollController();
+  String _searchQuery = '';
+  final TextEditingController _searchController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
 
   @override
   void initState() {
@@ -86,9 +89,18 @@ final ScrollController _scrollController = ScrollController();
 
   // ENHANCED: Refresh events method for RefreshIndicator
   Future<void> _refreshEvents() async {
+    debugPrint('[CalendarPage] User pulled to refresh, syncing from Supabase...');
+    try {
+      await SyncService().syncDown(context.read<AppDatabase>());
+      debugPrint('[CalendarPage] syncDown completed, reloading events...');
+    } catch (e) {
+      debugPrint('[CalendarPage] Sync error: $e');
+    }
     await _loadEvents();
+    debugPrint('[CalendarPage] Events loaded, forcing UI rebuild...');
+    setState(() {}); // Force UI rebuild after sync
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Calendar refreshed!')),
+      SnackBar(content: Text('Calendar refreshed!'), duration: Duration(seconds: 8)),
     );
   }
 
@@ -104,13 +116,13 @@ final ScrollController _scrollController = ScrollController();
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Calendar refreshed!'),
-          duration: Duration(seconds: 1),
+          duration: Duration(seconds: 8),
        ),
       );
     }
   }
 
-List<Event> _filterEvents() {
+  List<Event> _filterEvents() {
     if (_searchQuery.isEmpty) return _expandedEvents;
     final q = _searchQuery.toLowerCase();
     return _expandedEvents.where((event) =>
@@ -416,9 +428,9 @@ List<Event> _filterEvents() {
                     ),
                     SizedBox(height: 16), 
                     _buildReminderSection(
-                      reminderEnabled, reminderTime, reminderPreset, setDialogState, 
-                      (enabled) =>reminderEnabled = enabled, 
-                      (time) => reminderTime = time, 
+                      reminderEnabled, reminderTime, reminderPreset, setDialogState,
+                      (enabled) => reminderEnabled = enabled,
+                      (time) => reminderTime = time,
                       (preset) => reminderPreset = preset,
                       startDate,
                       ),
@@ -2060,194 +2072,194 @@ Widget _buildAllEventsList(List<Event> visibleEvents) { //  Added parameter
     );
   }
 
- Widget _buildBodyContent() {
-  final visibleEvents = _filterEvents(); // Compute filtered list here
+  Widget _buildBodyContent() {
+    final visibleEvents = _filterEvents(); // Compute filtered list here
 
-  if (_currentView == 'calendar') {
-    return Column(
-      children: [
-        TableCalendar<Event>(
-          firstDay: DateTime.utc(2020, 1, 1),
-          lastDay: DateTime.utc(2030, 12, 31),
-          focusedDay: _focusedDay,
-          selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
-          onDaySelected: (selectedDay, focusedDay) {
-            setState(() {
-              _selectedDay = selectedDay;
-              _focusedDay = focusedDay;
-            });
-          },
-          calendarFormat: _calendarFormat,
-          onFormatChanged: (format) {
-            setState(() {
-              _calendarFormat = format;
-            });
-          },
-          eventLoader: _getEventsForDay,
-          rowHeight: 90,
-          daysOfWeekHeight: 40,
-          headerStyle: HeaderStyle(
-            formatButtonVisible: false,
-            titleCentered: true,
-            leftChevronIcon: Icon(Icons.chevron_left, color: Colors.white),
-            rightChevronIcon: Icon(Icons.chevron_right, color: Colors.white),
-          ),
-          calendarStyle: CalendarStyle(
-            selectedDecoration: BoxDecoration(
-              color: Colors.blue,
-              shape: BoxShape.circle,
-            ),
-            todayDecoration: BoxDecoration(
-              color: Colors.orange,
-              shape: BoxShape.circle,
-            ),
-            markerDecoration: BoxDecoration(
-              color: Colors.transparent,
-            ),
-            cellPadding: EdgeInsets.all(4),
-          ),
-          calendarBuilders: CalendarBuilders<Event>(
-            markerBuilder: (context, day, events) {
-              return _buildMonthEventMarkers(day);
+    if (_currentView == 'calendar') {
+      return Column(
+        children: [
+          TableCalendar<Event>(
+            firstDay: DateTime.utc(2020, 1, 1),
+            lastDay: DateTime.utc(2030, 12, 31),
+            focusedDay: _focusedDay,
+            selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
+            onDaySelected: (selectedDay, focusedDay) {
+              setState(() {
+                _selectedDay = selectedDay;
+                _focusedDay = focusedDay;
+              });
             },
+            calendarFormat: _calendarFormat,
+            onFormatChanged: (format) {
+              setState(() {
+                _calendarFormat = format;
+              });
+            },
+            eventLoader: _getEventsForDay,
+            rowHeight: 90,
+            daysOfWeekHeight: 40,
+            headerStyle: HeaderStyle(
+              formatButtonVisible: false,
+              titleCentered: true,
+              leftChevronIcon: Icon(Icons.chevron_left, color: Colors.white),
+              rightChevronIcon: Icon(Icons.chevron_right, color: Colors.white),
+            ),
+            calendarStyle: CalendarStyle(
+              selectedDecoration: BoxDecoration(
+                color: Colors.blue,
+                shape: BoxShape.circle,
+              ),
+              todayDecoration: BoxDecoration(
+                color: Colors.orange,
+                shape: BoxShape.circle,
+              ),
+              markerDecoration: BoxDecoration(
+                color: Colors.transparent,
+              ),
+              cellPadding: EdgeInsets.all(4),
+            ),
+            calendarBuilders: CalendarBuilders<Event>(
+              markerBuilder: (context, day, events) {
+                return _buildMonthEventMarkers(day);
+              },
+            ),
           ),
-        ),
-        Container(
-          height: 350,
-          child: _buildEventList(visibleEvents), // Pass visibleEvents
-        ),
-      ],
-    );
-  } else if (_currentView == 'week') {
-    return Container(
-      height: 600,
-      child: _buildWeekView(),
-    );
-  } else if (_currentView == 'day') {
-    return Container(
-      height: 600,
-      child: _buildDayView(),
-    );
-  } else {
-    return Container(
-      height: 600,
-      child: _buildAllEventsList(visibleEvents), // Pass visibleEvents
-    );
-  }
+          Container(
+            height: 350,
+            child: _buildEventList(visibleEvents), // Pass visibleEvents
+          ),
+        ],
+      );
+    } else if (_currentView == 'week') {
+      return Container(
+        height: 600,
+        child: _buildWeekView(),
+      );
+    } else if (_currentView == 'day') {
+      return Container(
+        height: 600,
+        child: _buildDayView(),
+      );
+    } else {
+      return Container(
+        height: 600,
+        child: _buildAllEventsList(visibleEvents), // Pass visibleEvents
+      );
+    }
 }
 
 
   @override
-Widget build(BuildContext context) {
-  final visibleEvents = _filterEvents(); // Added
+  Widget build(BuildContext context) {
+    final visibleEvents = _filterEvents(); // Added
 
-  return Scaffold(
-    backgroundColor: Colors.grey[850],
-    appBar: AppBar(
-      backgroundColor: Colors.grey[900],
-      title: Text('Calendar', style: TextStyle(color: Colors.white)),
-      actions: [
-        IconButton(
-          icon: _isRefreshing
-              ? const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+    return Scaffold(
+      backgroundColor: Colors.grey[850],
+      appBar: AppBar(
+        backgroundColor: Colors.grey[900],
+        title: Text('Calendar', style: TextStyle(color: Colors.white)),
+        actions: [
+          IconButton(
+            icon: _isRefreshing
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    ),
+                  )
+                : const Icon(Icons.refresh),
+            onPressed: _isRefreshing ? null : _refreshEventsWithIndicator,
+            tooltip: 'Refresh',
+          ),
+          IconButton(
+            icon: Icon(Icons.list, color: Colors.white),
+            onPressed: () {
+              setState(() {
+                _currentView = 'list';
+              });
+            },
+          ),
+          IconButton(
+            icon: Icon(Icons.calendar_today, color: Colors.white),
+            onPressed: () {
+              setState(() {
+                _currentView = 'calendar';
+              });
+            },
+          ),
+          IconButton(
+            icon: Icon(Icons.view_week, color: Colors.white),
+            onPressed: () {
+              setState(() {
+                _currentView = 'week';
+              });
+            },
+          ),
+          IconButton(
+            icon: Icon(Icons.access_time, color: Colors.white),
+            onPressed: () {
+              setState(() {
+                _currentView = 'day';
+              });
+            },
+          ),
+        ],
+      ),
+      // Search bar + body wrapped in Column
+      body: ScrollConfiguration(
+        behavior: CustomScrollBehavior(),
+        child: RefreshIndicator(
+          onRefresh: _refreshEvents,
+          color: Colors.blue,
+          backgroundColor: Colors.white,
+          strokeWidth: 2.0,
+          displacement: 40.0,
+          child: SingleChildScrollView(
+            physics: AlwaysScrollableScrollPhysics(),
+            child: Column(
+              children: [
+                // Search bar
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
+                  child: TextField(
+                    controller: _searchController,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: InputDecoration(
+                      hintText: 'Search events...',
+                      hintStyle: TextStyle(color: Colors.grey[400]),
+                      prefixIcon: Icon(Icons.search, color: Colors.grey[400]),
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8)),
+                      filled: true,
+                      fillColor: Colors.grey[800],
+                      suffixIcon: _searchQuery.isNotEmpty
+                          ? IconButton(
+                              icon: Icon(Icons.clear, color: Colors.grey[400]),
+                              onPressed: () {
+                                _searchController.clear();
+                                setState(() => _searchQuery = '');
+                              },
+                            )
+                          : null,
+                    ),
+                    onChanged: (value) => setState(() => _searchQuery = value),
                   ),
-                )
-              : const Icon(Icons.refresh),
-          onPressed: _isRefreshing ? null : _refreshEventsWithIndicator,
-          tooltip: 'Refresh',
-        ),
-        IconButton(
-          icon: Icon(Icons.list, color: Colors.white),
-          onPressed: () {
-            setState(() {
-              _currentView = 'list';
-            });
-          },
-        ),
-        IconButton(
-          icon: Icon(Icons.calendar_today, color: Colors.white),
-          onPressed: () {
-            setState(() {
-              _currentView = 'calendar';
-            });
-          },
-        ),
-        IconButton(
-          icon: Icon(Icons.view_week, color: Colors.white),
-          onPressed: () {
-            setState(() {
-              _currentView = 'week';
-            });
-          },
-        ),
-        IconButton(
-          icon: Icon(Icons.access_time, color: Colors.white),
-          onPressed: () {
-            setState(() {
-              _currentView = 'day';
-            });
-          },
-        ),
-      ],
-    ),
-    // Search bar + body wrapped in Column
-    body: ScrollConfiguration(
-      behavior: CustomScrollBehavior(),
-      child: RefreshIndicator(
-        onRefresh: _refreshEvents,
-        color: Colors.blue,
-        backgroundColor: Colors.white,
-        strokeWidth: 2.0,
-        displacement: 40.0,
-        child: SingleChildScrollView(
-          physics: AlwaysScrollableScrollPhysics(),
-          child: Column(
-            children: [
-              // Search bar
-              Padding(
-                padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
-                child: TextField(
-                  controller: _searchController,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: InputDecoration(
-                    hintText: 'Search events...',
-                    hintStyle: TextStyle(color: Colors.grey[400]),
-                    prefixIcon: Icon(Icons.search, color: Colors.grey[400]),
-                    border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8)),
-                    filled: true,
-                    fillColor: Colors.grey[800],
-                    suffixIcon: _searchQuery.isNotEmpty
-                        ? IconButton(
-                            icon: Icon(Icons.clear, color: Colors.grey[400]),
-                            onPressed: () {
-                              _searchController.clear();
-                              setState(() => _searchQuery = '');
-                            },
-                          )
-                        : null,
-                  ),
-                  onChanged: (value) => setState(() => _searchQuery = value),
                 ),
-              ),
-              // Existing body content
-              _buildBodyContent(),
-            ],
+                // Existing body content
+                _buildBodyContent(),
+              ],
+            ),
           ),
         ),
       ),
-    ),
-    floatingActionButton: FloatingActionButton(
-      heroTag: "calendar_fab",
-      onPressed: _showAddEventDialog,
-      child: Icon(Icons.add),
-      backgroundColor: Colors.blue,
-    ),
-  );
+      floatingActionButton: FloatingActionButton(
+        heroTag: "calendar_fab",
+        onPressed: _showAddEventDialog,
+        child: Icon(Icons.add),
+        backgroundColor: Colors.blue,
+      ),
+    );
 }
 }

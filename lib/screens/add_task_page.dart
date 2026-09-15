@@ -66,15 +66,16 @@ class _AddTaskPageState extends State<AddTaskPage> {
   @override
   void initState() {
     super.initState();
-    
+
     if (widget.task != null) {
+
       _taskTitle = widget.task!.title;
       _taskDescription = widget.task!.description ?? '';
       _dueDate = widget.task!.dueDate;
       _completed = widget.task!.completed;
       _selectedPriority = widget.task!.priority;
       _categories = widget.task!.category?.split(', ') ?? [];
-      
+
       // Initialize recurring fields
       _isRecurring = widget.task!.isRecurring ?? false;
       _recurrenceRule = widget.task!.recurrenceRule ?? 'daily';
@@ -85,7 +86,7 @@ class _AddTaskPageState extends State<AddTaskPage> {
       _skipWeekends = widget.task!.skipWeekends ?? false;
       _dayOfMonth = widget.task!.dayOfMonth;
       _weekOfMonth = widget.task!.weekOfMonth;
-      
+
       //  Initialize reminder fields
       _reminderEnabled = widget.task!.reminderEnabled ?? false;
       _reminderTime = widget.task!.reminderTime;
@@ -94,8 +95,12 @@ class _AddTaskPageState extends State<AddTaskPage> {
       // Initialize energy requirement field
       _energyRequired = widget.task!.energyRequired;
 
-      // Load existing subtasks for edit mode
-      _loadExistingSubtasks();
+      // Use subtasks if already loaded, otherwise fetch them
+      if (widget.task!.subtasks != null && widget.task!.subtasks!.isNotEmpty) {
+        _subtasks = widget.task!.subtasks!;
+      } else {
+        _loadExistingSubtasks();
+      }
     }
   }
 
@@ -104,26 +109,14 @@ class _AddTaskPageState extends State<AddTaskPage> {
       final taskService = Provider.of<TaskService>(context, listen: false);
       final existingSubtasks = await taskService.getSubtasks(widget.task!.id);
 
-      final subtaskModels = existingSubtasks.map((subtaskData) {
-        return SubtaskModel(
-          id: subtaskData.id,
-          taskId: subtaskData.taskId,
-          title: subtaskData.title,
-          completed: subtaskData.completed,
-          completedAt: subtaskData.completedAt,
-        );
-      }).toList();
-      
       if (mounted) {
         setState(() {
-          _subtasks = subtaskModels;
+          _subtasks = existingSubtasks;
         });
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error loading subtasks: $e')),
-        );
+        debugPrint('Error loading subtasks: $e');
       }
     }
   }
@@ -851,7 +844,7 @@ class _AddTaskPageState extends State<AddTaskPage> {
             if (_isRecurring) {
               if (_recurrenceRule == 'weekly' && _selectedDaysOfWeek.isEmpty) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Please select at least one day for weekly recurrence')),
+                  const SnackBar(content: Text('Please select at least one day for weekly recurrence'), duration: Duration(seconds: 8)),
                 );
                 return;
               }
@@ -860,7 +853,7 @@ class _AddTaskPageState extends State<AddTaskPage> {
             // Validate reminder settings
             if (_reminderEnabled && _reminderTime == null) {
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Please set a reminder time')),
+                const SnackBar(content: Text('Please set a reminder time'), duration: Duration(seconds: 8)),
               );
               return;
             }
@@ -966,7 +959,7 @@ class _AddTaskPageState extends State<AddTaskPage> {
             } catch (e) {
               if (mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Error saving task: $e')),
+                  SnackBar(content: Text('Error saving task: $e'), duration: Duration(seconds: 8)),
                 );
               }
             }

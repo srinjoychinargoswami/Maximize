@@ -1,11 +1,13 @@
 import 'package:kinetic/database/app_database.dart';
 import 'package:kinetic/models/event_model.dart' as models;
 import 'package:kinetic/models/reminder_model.dart';
+import 'package:kinetic/services/sync_service.dart';
 import 'package:kinetic/utils/web_persistence_helper.dart';
 import 'package:drift/drift.dart' as drift;
 
 class CalendarService {
   final AppDatabase _database;
+  final SyncService _sync = SyncService();
 
   CalendarService(this._database);
 
@@ -191,6 +193,33 @@ class CalendarService {
 
       await WebPersistenceHelper.flush();
       WebPersistenceHelper.logPersistence('[CalendarService] Event added: ${event.id}');
+
+      await _sync.insert('events', event.id, {
+        'title': event.title,
+        'description': event.description,
+        'startDateTime': event.startDateTime.millisecondsSinceEpoch,
+        'endDateTime': event.endDateTime.millisecondsSinceEpoch,
+        'scheduledDate': event.date.millisecondsSinceEpoch,
+        'customCategory': event.customCategory,
+        'color': event.color,
+        'completed': event.completed ? 1 : 0,
+        'completedAt': event.completedAt?.millisecondsSinceEpoch,
+        'isRecurring': event.isRecurring ? 1 : 0,
+        'recurrencePattern': event.recurrencePattern?.toString(),
+        'recurrenceRule': event.recurrenceRule,
+        'recurrenceCount': event.recurrenceCount,
+        'recurrenceEndDate': event.recurrenceEndDate?.millisecondsSinceEpoch,
+        'reminderEnabled': (event.reminderEnabled ?? false) ? 1 : 0,
+        'reminderTime': event.reminderTime?.millisecondsSinceEpoch,
+        'reminderPreset': event.reminderPreset,
+        'parentEventId': event.parentEventId,
+        'recurrenceExceptionDates': event.recurrenceExceptionDates?.isEmpty ?? true
+          ? null
+          : event.recurrenceExceptionDates!.map((d) => d.toIso8601String()).join(','),
+        'createdAt': event.createdAt.millisecondsSinceEpoch,
+        'updatedAt': event.updatedAt.millisecondsSinceEpoch,
+      });
+
       await _scheduleEventNotification(event);
 
       return 1;
@@ -247,11 +276,30 @@ class CalendarService {
 
         await WebPersistenceHelper.flush();
         WebPersistenceHelper.logPersistence('[CalendarService] Event series updated: ${updatedParent.id}');
+
+        await _sync.update('events', updatedParent.id, {
+          'title': updatedParent.title,
+          'description': updatedParent.description,
+          'customCategory': updatedParent.customCategory,
+          'color': updatedParent.color,
+          'completed': updatedParent.completed ? 1 : 0,
+          'completedAt': updatedParent.completedAt?.millisecondsSinceEpoch,
+          'isRecurring': updatedParent.isRecurring ? 1 : 0,
+          'recurrencePattern': updatedParent.recurrencePattern?.toString(),
+          'recurrenceRule': updatedParent.recurrenceRule,
+          'recurrenceCount': updatedParent.recurrenceCount,
+          'recurrenceEndDate': updatedParent.recurrenceEndDate?.millisecondsSinceEpoch,
+          'reminderEnabled': (updatedParent.reminderEnabled ?? false) ? 1 : 0,
+          'reminderTime': updatedParent.reminderTime?.millisecondsSinceEpoch,
+          'reminderPreset': updatedParent.reminderPreset,
+        });
+
         await _scheduleEventNotification(updatedParent);
       } else {
         if (event.isRecurring && event.recurrencePattern != null) {
           event.recurrenceRule = event.generateRRule();
         }
+
         final companion = _eventModelToCompanion(event);
         await _database.transaction(() async {
           await (_database.update(_database.events)
@@ -261,6 +309,24 @@ class CalendarService {
 
         await WebPersistenceHelper.flush();
         WebPersistenceHelper.logPersistence('[CalendarService] Event updated: ${event.id}');
+
+        await _sync.update('events', event.id, {
+          'title': event.title,
+          'description': event.description,
+          'customCategory': event.customCategory,
+          'color': event.color,
+          'completed': event.completed ? 1 : 0,
+          'completedAt': event.completedAt?.millisecondsSinceEpoch,
+          'isRecurring': event.isRecurring ? 1 : 0,
+          'recurrencePattern': event.recurrencePattern?.toString(),
+          'recurrenceRule': event.recurrenceRule,
+          'recurrenceCount': event.recurrenceCount,
+          'recurrenceEndDate': event.recurrenceEndDate?.millisecondsSinceEpoch,
+          'reminderEnabled': (event.reminderEnabled ?? false) ? 1 : 0,
+          'reminderTime': event.reminderTime?.millisecondsSinceEpoch,
+          'reminderPreset': event.reminderPreset,
+        });
+
         await _scheduleEventNotification(event);
       }
     } catch (e) {
@@ -289,6 +355,7 @@ class CalendarService {
           completed: true,
           completedAt: DateTime.now(),
         );
+
         final companion = _eventModelToCompanion(updatedEvent);
         await _database.transaction(() async {
           await (_database.update(_database.events)
@@ -298,6 +365,12 @@ class CalendarService {
 
         await WebPersistenceHelper.flush();
         WebPersistenceHelper.logPersistence('[CalendarService] Event marked completed: $eventId');
+
+        await _sync.update('events', eventId, {
+          'completed': 1,
+          'completedAt': updatedEvent.completedAt!.millisecondsSinceEpoch,
+        });
+
         await _cancelEventNotification(eventId);
       }
     } catch (e) {
@@ -313,11 +386,17 @@ class CalendarService {
           completed: false,
           completedAt: null,
         );
+
         final companion = _eventModelToCompanion(updatedEvent);
         await _database.transaction(() async {
           await (_database.update(_database.events)
             ..where((t) => t.eventId.equals(eventId)))
             .write(companion);
+        });
+
+        await _sync.update('events', eventId, {
+          'completed': 0,
+          'completedAt': null,
         });
 
         await WebPersistenceHelper.flush();
@@ -367,10 +446,15 @@ class CalendarService {
             if (event.parentEventId == parentId && event.id != parentId) {
               print('Deleting instance: ${event.id}');
               await _cancelEventNotification(event.id);
+
               await (_database.delete(_database.events)
                 ..where((t) => t.eventId.equals(event.id))).go();
+
+              await _sync.delete('events', event.id);
             }
           }
+
+          await _sync.delete('events', parentId);
         });
 
         await WebPersistenceHelper.flush();
@@ -378,12 +462,16 @@ class CalendarService {
         print('Successfully deleted entire series');
       } else {
         print('Deleting single event with ID: $id');
+
         await _database.transaction(() async {
           await (_database.delete(_database.events)
             ..where((t) => t.eventId.equals(id))).go();
         });
         await WebPersistenceHelper.flush();
         WebPersistenceHelper.logPersistence('[CalendarService] Event deleted: $id');
+
+        await _sync.delete('events', id);
+
         print('Successfully deleted single event');
       }
     } catch (e) {
@@ -643,7 +731,7 @@ class CalendarService {
       description: dbEvent.description,
       startDateTime: dbEvent.startDateTime,
       endDateTime: dbEvent.endDateTime,
-      date: dbEvent.date,
+      date: dbEvent.scheduledDate,
       customCategory: dbEvent.customCategory,
       color: dbEvent.color,
       completed: dbEvent.completed,
@@ -671,7 +759,7 @@ class CalendarService {
       description: drift.Value(event.description),
       startDateTime: drift.Value(event.startDateTime),
       endDateTime: drift.Value(event.endDateTime),
-      date: drift.Value(event.date),
+      scheduledDate: drift.Value(event.date),
       customCategory: drift.Value(event.customCategory),
       color: drift.Value(event.color),
       completed: drift.Value(event.completed),

@@ -3,7 +3,9 @@ import 'package:flutter/gestures.dart';
 import 'package:provider/provider.dart';
 import 'package:kinetic/services/energy_service.dart';
 import 'package:kinetic/services/completion_log_service.dart';
+import 'package:kinetic/services/sync_service.dart';
 import 'package:kinetic/services/metrics_service.dart';
+import 'package:kinetic/database/app_database.dart';
 import 'package:kinetic/models/energy_model.dart';
 import 'package:kinetic/models/completion_log_model.dart';
 import 'package:intl/intl.dart';
@@ -80,7 +82,7 @@ class _InsightsScreenState extends State<InsightsScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Insights refreshed!'),
-            duration: Duration(seconds: 1),
+            duration: Duration(seconds: 8),
           ),
         );
       }
@@ -93,12 +95,21 @@ class _InsightsScreenState extends State<InsightsScreen> {
   }
 
   Future<void> _refreshInsights() async {
+    debugPrint('[InsightsScreen] User pulled to refresh, syncing from Supabase...');
+    try {
+      await SyncService().syncDown(context.read<AppDatabase>());
+      debugPrint('[InsightsScreen] syncDown completed, reloading insights...');
+    } catch (e) {
+      debugPrint('[InsightsScreen] Sync error: $e');
+    }
     await _loadInsights();
+    debugPrint('[InsightsScreen] Insights loaded, forcing UI rebuild...');
+    setState(() {}); // Force UI rebuild after sync
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Insights refreshed!'),
-          duration: Duration(seconds: 1),
+          duration: Duration(seconds: 8),
         ),
       );
     }

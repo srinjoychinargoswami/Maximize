@@ -1688,11 +1688,12 @@ class $EventsTable extends Events with TableInfo<$EventsTable, Event> {
   late final GeneratedColumn<DateTime> endDateTime = GeneratedColumn<DateTime>(
       'end_date_time', aliasedName, false,
       type: DriftSqlType.dateTime, requiredDuringInsert: true);
-  static const VerificationMeta _dateMeta = const VerificationMeta('date');
+  static const VerificationMeta _scheduledDateMeta =
+      const VerificationMeta('scheduledDate');
   @override
-  late final GeneratedColumn<DateTime> date = GeneratedColumn<DateTime>(
-      'date', aliasedName, false,
-      type: DriftSqlType.dateTime, requiredDuringInsert: true);
+  late final GeneratedColumn<DateTime> scheduledDate =
+      GeneratedColumn<DateTime>('scheduled_date', aliasedName, false,
+          type: DriftSqlType.dateTime, requiredDuringInsert: true);
   static const VerificationMeta _customCategoryMeta =
       const VerificationMeta('customCategory');
   @override
@@ -1808,7 +1809,7 @@ class $EventsTable extends Events with TableInfo<$EventsTable, Event> {
         description,
         startDateTime,
         endDateTime,
-        date,
+        scheduledDate,
         customCategory,
         color,
         completed,
@@ -1875,11 +1876,13 @@ class $EventsTable extends Events with TableInfo<$EventsTable, Event> {
     } else if (isInserting) {
       context.missing(_endDateTimeMeta);
     }
-    if (data.containsKey('date')) {
+    if (data.containsKey('scheduled_date')) {
       context.handle(
-          _dateMeta, date.isAcceptableOrUnknown(data['date']!, _dateMeta));
+          _scheduledDateMeta,
+          scheduledDate.isAcceptableOrUnknown(
+              data['scheduled_date']!, _scheduledDateMeta));
     } else if (isInserting) {
-      context.missing(_dateMeta);
+      context.missing(_scheduledDateMeta);
     }
     if (data.containsKey('custom_category')) {
       context.handle(
@@ -1995,8 +1998,8 @@ class $EventsTable extends Events with TableInfo<$EventsTable, Event> {
           DriftSqlType.dateTime, data['${effectivePrefix}start_date_time'])!,
       endDateTime: attachedDatabase.typeMapping.read(
           DriftSqlType.dateTime, data['${effectivePrefix}end_date_time'])!,
-      date: attachedDatabase.typeMapping
-          .read(DriftSqlType.dateTime, data['${effectivePrefix}date'])!,
+      scheduledDate: attachedDatabase.typeMapping.read(
+          DriftSqlType.dateTime, data['${effectivePrefix}scheduled_date'])!,
       customCategory: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}custom_category']),
       color: attachedDatabase.typeMapping
@@ -2046,7 +2049,7 @@ class Event extends DataClass implements Insertable<Event> {
   final String? description;
   final DateTime startDateTime;
   final DateTime endDateTime;
-  final DateTime date;
+  final DateTime scheduledDate;
   final String? customCategory;
   final String? color;
   final bool completed;
@@ -2070,7 +2073,7 @@ class Event extends DataClass implements Insertable<Event> {
       this.description,
       required this.startDateTime,
       required this.endDateTime,
-      required this.date,
+      required this.scheduledDate,
       this.customCategory,
       this.color,
       required this.completed,
@@ -2098,7 +2101,7 @@ class Event extends DataClass implements Insertable<Event> {
     }
     map['start_date_time'] = Variable<DateTime>(startDateTime);
     map['end_date_time'] = Variable<DateTime>(endDateTime);
-    map['date'] = Variable<DateTime>(date);
+    map['scheduled_date'] = Variable<DateTime>(scheduledDate);
     if (!nullToAbsent || customCategory != null) {
       map['custom_category'] = Variable<String>(customCategory);
     }
@@ -2151,7 +2154,7 @@ class Event extends DataClass implements Insertable<Event> {
           : Value(description),
       startDateTime: Value(startDateTime),
       endDateTime: Value(endDateTime),
-      date: Value(date),
+      scheduledDate: Value(scheduledDate),
       customCategory: customCategory == null && nullToAbsent
           ? const Value.absent()
           : Value(customCategory),
@@ -2202,7 +2205,7 @@ class Event extends DataClass implements Insertable<Event> {
       description: serializer.fromJson<String?>(json['description']),
       startDateTime: serializer.fromJson<DateTime>(json['startDateTime']),
       endDateTime: serializer.fromJson<DateTime>(json['endDateTime']),
-      date: serializer.fromJson<DateTime>(json['date']),
+      scheduledDate: serializer.fromJson<DateTime>(json['scheduledDate']),
       customCategory: serializer.fromJson<String?>(json['customCategory']),
       color: serializer.fromJson<String?>(json['color']),
       completed: serializer.fromJson<bool>(json['completed']),
@@ -2234,7 +2237,7 @@ class Event extends DataClass implements Insertable<Event> {
       'description': serializer.toJson<String?>(description),
       'startDateTime': serializer.toJson<DateTime>(startDateTime),
       'endDateTime': serializer.toJson<DateTime>(endDateTime),
-      'date': serializer.toJson<DateTime>(date),
+      'scheduledDate': serializer.toJson<DateTime>(scheduledDate),
       'customCategory': serializer.toJson<String?>(customCategory),
       'color': serializer.toJson<String?>(color),
       'completed': serializer.toJson<bool>(completed),
@@ -2262,7 +2265,7 @@ class Event extends DataClass implements Insertable<Event> {
           Value<String?> description = const Value.absent(),
           DateTime? startDateTime,
           DateTime? endDateTime,
-          DateTime? date,
+          DateTime? scheduledDate,
           Value<String?> customCategory = const Value.absent(),
           Value<String?> color = const Value.absent(),
           bool? completed,
@@ -2286,7 +2289,7 @@ class Event extends DataClass implements Insertable<Event> {
         description: description.present ? description.value : this.description,
         startDateTime: startDateTime ?? this.startDateTime,
         endDateTime: endDateTime ?? this.endDateTime,
-        date: date ?? this.date,
+        scheduledDate: scheduledDate ?? this.scheduledDate,
         customCategory:
             customCategory.present ? customCategory.value : this.customCategory,
         color: color.present ? color.value : this.color,
@@ -2329,7 +2332,9 @@ class Event extends DataClass implements Insertable<Event> {
           : this.startDateTime,
       endDateTime:
           data.endDateTime.present ? data.endDateTime.value : this.endDateTime,
-      date: data.date.present ? data.date.value : this.date,
+      scheduledDate: data.scheduledDate.present
+          ? data.scheduledDate.value
+          : this.scheduledDate,
       customCategory: data.customCategory.present
           ? data.customCategory.value
           : this.customCategory,
@@ -2380,7 +2385,7 @@ class Event extends DataClass implements Insertable<Event> {
           ..write('description: $description, ')
           ..write('startDateTime: $startDateTime, ')
           ..write('endDateTime: $endDateTime, ')
-          ..write('date: $date, ')
+          ..write('scheduledDate: $scheduledDate, ')
           ..write('customCategory: $customCategory, ')
           ..write('color: $color, ')
           ..write('completed: $completed, ')
@@ -2409,7 +2414,7 @@ class Event extends DataClass implements Insertable<Event> {
         description,
         startDateTime,
         endDateTime,
-        date,
+        scheduledDate,
         customCategory,
         color,
         completed,
@@ -2437,7 +2442,7 @@ class Event extends DataClass implements Insertable<Event> {
           other.description == this.description &&
           other.startDateTime == this.startDateTime &&
           other.endDateTime == this.endDateTime &&
-          other.date == this.date &&
+          other.scheduledDate == this.scheduledDate &&
           other.customCategory == this.customCategory &&
           other.color == this.color &&
           other.completed == this.completed &&
@@ -2463,7 +2468,7 @@ class EventsCompanion extends UpdateCompanion<Event> {
   final Value<String?> description;
   final Value<DateTime> startDateTime;
   final Value<DateTime> endDateTime;
-  final Value<DateTime> date;
+  final Value<DateTime> scheduledDate;
   final Value<String?> customCategory;
   final Value<String?> color;
   final Value<bool> completed;
@@ -2488,7 +2493,7 @@ class EventsCompanion extends UpdateCompanion<Event> {
     this.description = const Value.absent(),
     this.startDateTime = const Value.absent(),
     this.endDateTime = const Value.absent(),
-    this.date = const Value.absent(),
+    this.scheduledDate = const Value.absent(),
     this.customCategory = const Value.absent(),
     this.color = const Value.absent(),
     this.completed = const Value.absent(),
@@ -2514,7 +2519,7 @@ class EventsCompanion extends UpdateCompanion<Event> {
     this.description = const Value.absent(),
     required DateTime startDateTime,
     required DateTime endDateTime,
-    required DateTime date,
+    required DateTime scheduledDate,
     this.customCategory = const Value.absent(),
     this.color = const Value.absent(),
     this.completed = const Value.absent(),
@@ -2537,7 +2542,7 @@ class EventsCompanion extends UpdateCompanion<Event> {
         title = Value(title),
         startDateTime = Value(startDateTime),
         endDateTime = Value(endDateTime),
-        date = Value(date),
+        scheduledDate = Value(scheduledDate),
         createdAt = Value(createdAt),
         updatedAt = Value(updatedAt);
   static Insertable<Event> custom({
@@ -2547,7 +2552,7 @@ class EventsCompanion extends UpdateCompanion<Event> {
     Expression<String>? description,
     Expression<DateTime>? startDateTime,
     Expression<DateTime>? endDateTime,
-    Expression<DateTime>? date,
+    Expression<DateTime>? scheduledDate,
     Expression<String>? customCategory,
     Expression<String>? color,
     Expression<bool>? completed,
@@ -2573,7 +2578,7 @@ class EventsCompanion extends UpdateCompanion<Event> {
       if (description != null) 'description': description,
       if (startDateTime != null) 'start_date_time': startDateTime,
       if (endDateTime != null) 'end_date_time': endDateTime,
-      if (date != null) 'date': date,
+      if (scheduledDate != null) 'scheduled_date': scheduledDate,
       if (customCategory != null) 'custom_category': customCategory,
       if (color != null) 'color': color,
       if (completed != null) 'completed': completed,
@@ -2602,7 +2607,7 @@ class EventsCompanion extends UpdateCompanion<Event> {
       Value<String?>? description,
       Value<DateTime>? startDateTime,
       Value<DateTime>? endDateTime,
-      Value<DateTime>? date,
+      Value<DateTime>? scheduledDate,
       Value<String?>? customCategory,
       Value<String?>? color,
       Value<bool>? completed,
@@ -2627,7 +2632,7 @@ class EventsCompanion extends UpdateCompanion<Event> {
       description: description ?? this.description,
       startDateTime: startDateTime ?? this.startDateTime,
       endDateTime: endDateTime ?? this.endDateTime,
-      date: date ?? this.date,
+      scheduledDate: scheduledDate ?? this.scheduledDate,
       customCategory: customCategory ?? this.customCategory,
       color: color ?? this.color,
       completed: completed ?? this.completed,
@@ -2670,8 +2675,8 @@ class EventsCompanion extends UpdateCompanion<Event> {
     if (endDateTime.present) {
       map['end_date_time'] = Variable<DateTime>(endDateTime.value);
     }
-    if (date.present) {
-      map['date'] = Variable<DateTime>(date.value);
+    if (scheduledDate.present) {
+      map['scheduled_date'] = Variable<DateTime>(scheduledDate.value);
     }
     if (customCategory.present) {
       map['custom_category'] = Variable<String>(customCategory.value);
@@ -2737,7 +2742,7 @@ class EventsCompanion extends UpdateCompanion<Event> {
           ..write('description: $description, ')
           ..write('startDateTime: $startDateTime, ')
           ..write('endDateTime: $endDateTime, ')
-          ..write('date: $date, ')
+          ..write('scheduledDate: $scheduledDate, ')
           ..write('customCategory: $customCategory, ')
           ..write('color: $color, ')
           ..write('completed: $completed, ')
@@ -5813,7 +5818,7 @@ typedef $$EventsTableCreateCompanionBuilder = EventsCompanion Function({
   Value<String?> description,
   required DateTime startDateTime,
   required DateTime endDateTime,
-  required DateTime date,
+  required DateTime scheduledDate,
   Value<String?> customCategory,
   Value<String?> color,
   Value<bool> completed,
@@ -5839,7 +5844,7 @@ typedef $$EventsTableUpdateCompanionBuilder = EventsCompanion Function({
   Value<String?> description,
   Value<DateTime> startDateTime,
   Value<DateTime> endDateTime,
-  Value<DateTime> date,
+  Value<DateTime> scheduledDate,
   Value<String?> customCategory,
   Value<String?> color,
   Value<bool> completed,
@@ -5886,8 +5891,8 @@ class $$EventsTableFilterComposer
   ColumnFilters<DateTime> get endDateTime => $composableBuilder(
       column: $table.endDateTime, builder: (column) => ColumnFilters(column));
 
-  ColumnFilters<DateTime> get date => $composableBuilder(
-      column: $table.date, builder: (column) => ColumnFilters(column));
+  ColumnFilters<DateTime> get scheduledDate => $composableBuilder(
+      column: $table.scheduledDate, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<String> get customCategory => $composableBuilder(
       column: $table.customCategory,
@@ -5974,8 +5979,9 @@ class $$EventsTableOrderingComposer
   ColumnOrderings<DateTime> get endDateTime => $composableBuilder(
       column: $table.endDateTime, builder: (column) => ColumnOrderings(column));
 
-  ColumnOrderings<DateTime> get date => $composableBuilder(
-      column: $table.date, builder: (column) => ColumnOrderings(column));
+  ColumnOrderings<DateTime> get scheduledDate => $composableBuilder(
+      column: $table.scheduledDate,
+      builder: (column) => ColumnOrderings(column));
 
   ColumnOrderings<String> get customCategory => $composableBuilder(
       column: $table.customCategory,
@@ -6063,8 +6069,8 @@ class $$EventsTableAnnotationComposer
   GeneratedColumn<DateTime> get endDateTime => $composableBuilder(
       column: $table.endDateTime, builder: (column) => column);
 
-  GeneratedColumn<DateTime> get date =>
-      $composableBuilder(column: $table.date, builder: (column) => column);
+  GeneratedColumn<DateTime> get scheduledDate => $composableBuilder(
+      column: $table.scheduledDate, builder: (column) => column);
 
   GeneratedColumn<String> get customCategory => $composableBuilder(
       column: $table.customCategory, builder: (column) => column);
@@ -6144,7 +6150,7 @@ class $$EventsTableTableManager extends RootTableManager<
             Value<String?> description = const Value.absent(),
             Value<DateTime> startDateTime = const Value.absent(),
             Value<DateTime> endDateTime = const Value.absent(),
-            Value<DateTime> date = const Value.absent(),
+            Value<DateTime> scheduledDate = const Value.absent(),
             Value<String?> customCategory = const Value.absent(),
             Value<String?> color = const Value.absent(),
             Value<bool> completed = const Value.absent(),
@@ -6170,7 +6176,7 @@ class $$EventsTableTableManager extends RootTableManager<
             description: description,
             startDateTime: startDateTime,
             endDateTime: endDateTime,
-            date: date,
+            scheduledDate: scheduledDate,
             customCategory: customCategory,
             color: color,
             completed: completed,
@@ -6196,7 +6202,7 @@ class $$EventsTableTableManager extends RootTableManager<
             Value<String?> description = const Value.absent(),
             required DateTime startDateTime,
             required DateTime endDateTime,
-            required DateTime date,
+            required DateTime scheduledDate,
             Value<String?> customCategory = const Value.absent(),
             Value<String?> color = const Value.absent(),
             Value<bool> completed = const Value.absent(),
@@ -6222,7 +6228,7 @@ class $$EventsTableTableManager extends RootTableManager<
             description: description,
             startDateTime: startDateTime,
             endDateTime: endDateTime,
-            date: date,
+            scheduledDate: scheduledDate,
             customCategory: customCategory,
             color: color,
             completed: completed,

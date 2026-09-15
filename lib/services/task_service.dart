@@ -4,6 +4,7 @@ import 'package:kinetic/models/subtask_model.dart';
 import 'package:kinetic/models/reminder_model.dart';
 import 'package:kinetic/services/completion_log_service.dart';
 import 'package:kinetic/services/energy_service.dart';
+import 'package:kinetic/services/sync_service.dart';
 import 'package:kinetic/utils/web_persistence_helper.dart';
 import 'package:uuid/uuid.dart';
 import 'package:flutter/material.dart';
@@ -11,6 +12,7 @@ import 'package:drift/drift.dart';
 
 class TaskService {
   final AppDatabase _database;
+  final SyncService _sync = SyncService();
 
   TaskService(this._database);
 
@@ -116,6 +118,10 @@ class TaskService {
       });
       await WebPersistenceHelper.flush();
       WebPersistenceHelper.logPersistence('[TaskService] Task added: $taskId');
+
+      // Sync to Supabase via HTTP
+      await _syncTaskToSupabase('INSERT', task);
+
       await _scheduleTaskNotification(task);
       return 1;
     } catch (e) {
@@ -140,6 +146,10 @@ class TaskService {
       });
       await WebPersistenceHelper.flush();
       WebPersistenceHelper.logPersistence('[TaskService] Task updated: ${task.id}');
+
+      // Sync update to Supabase via HTTP
+      await _syncTaskToSupabase('UPDATE', task);
+
       await _scheduleTaskNotification(task);
     } catch (e) {
       debugPrint('Error updating task: $e');
@@ -331,6 +341,9 @@ class TaskService {
       });
       await WebPersistenceHelper.flush();
       WebPersistenceHelper.logPersistence('[TaskService] Task deleted: $taskId');
+
+      // Sync deletion to Supabase via HTTP
+      await _sync.delete('tasks', taskId);
     } catch (e) {
       debugPrint('Error deleting task: $e');
     }
@@ -725,5 +738,46 @@ class TaskService {
       createdAt: Value(model.createdAt),
       updatedAt: Value(model.updatedAt),
     );
+  }
+
+  /// Sync task to Supabase via HTTP
+  Future<void> _syncTaskToSupabase(String operation, TaskModel task) async {
+    try {
+      final data = {
+        'title': task.title,
+        'description': task.description,
+        'category': task.category,
+        'priority': task.priority,
+        'energyRequired': task.energyRequired ?? 5,
+        'completed': task.completed ? 1 : 0,
+        'dueDate': task.dueDate.millisecondsSinceEpoch,
+        'completedAt': task.completedAt?.millisecondsSinceEpoch,
+        'isRecurring': task.isRecurring ? 1 : 0,
+        'recurrenceRule': task.recurrenceRule,
+        'recurrenceInterval': task.recurrenceInterval ?? 1,
+        'daysOfWeek': task.daysOfWeek?.join(','),
+        'recurrenceEndDate': task.recurrenceEndDate?.millisecondsSinceEpoch,
+        'parentTaskId': task.parentTaskId,
+        'maxOccurrences': task.maxOccurrences,
+        'skipWeekends': task.skipWeekends ? 1 : 0,
+        'dayOfMonth': task.dayOfMonth,
+        'weekOfMonth': task.weekOfMonth,
+        'reminderEnabled': (task.reminderEnabled ?? false) ? 1 : 0,
+        'reminderTime': task.reminderTime?.millisecondsSinceEpoch,
+        'reminderPreset': task.reminderPreset,
+        'pageId': task.pageId,
+        'createdAt': task.createdAt.millisecondsSinceEpoch,
+        'updatedAt': task.updatedAt.millisecondsSinceEpoch,
+      };
+
+      if (operation == 'INSERT') {
+        await _sync.insert('tasks', task.id, data);
+      } else if (operation == 'UPDATE') {
+        await _sync.update('tasks', task.id, data);
+      }
+      debugPrint('[TaskService] Task synced to Supabase: ${task.id}');
+    } catch (e) {
+      debugPrint('[TaskService] Sync error: $e');
+    }
   }
 }

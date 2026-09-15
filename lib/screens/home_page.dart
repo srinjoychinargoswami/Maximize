@@ -66,7 +66,7 @@ class _MyHomePageState extends State<MyHomePage> {
       case 'task':
         _jumpTo(1);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Showing task: $title')),
+          SnackBar(content: Text('Showing task: $title'), duration: Duration(seconds: 8)),
         );
         Future.delayed(const Duration(milliseconds: 300), () {
           _tasksKey.currentState?.scrollToItem(id);
@@ -76,7 +76,7 @@ class _MyHomePageState extends State<MyHomePage> {
       case 'event':
         _jumpTo(2);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Showing event: $title')),
+          SnackBar(content: Text('Showing event: $title'), duration: Duration(seconds: 8)),
         );
         Future.delayed(const Duration(milliseconds: 300), () {
           _calendarKey.currentState?.scrollToItem(id);
@@ -86,7 +86,7 @@ class _MyHomePageState extends State<MyHomePage> {
       case 'note':
         _jumpTo(3);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Showing note: $title')),
+          SnackBar(content: Text('Showing note: $title'), duration: Duration(seconds: 8)),
         );
         Future.delayed(const Duration(milliseconds: 300), () {
           _notesKey.currentState?.scrollToItem(id);
@@ -96,7 +96,7 @@ class _MyHomePageState extends State<MyHomePage> {
       case 'reminder':
         _jumpTo(4);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Showing reminder: $title')),
+          SnackBar(content: Text('Showing reminder: $title'), duration: Duration(seconds: 8)),
         );
         Future.delayed(const Duration(milliseconds: 300), () {
           _remindersKey.currentState?.scrollToItem(id);
@@ -1132,7 +1132,7 @@ class _OverviewPageState extends State<OverviewPage> {
       await _refreshData();
     } catch (error) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to update task: $error')),
+        SnackBar(content: Text('Failed to update task: $error'), duration: Duration(seconds: 8)),
       );
     }
   }
@@ -1151,7 +1151,7 @@ class _OverviewPageState extends State<OverviewPage> {
       await _refreshData();
     } catch (error) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to update subtask: $error')),
+        SnackBar(content: Text('Failed to update subtask: $error'), duration: Duration(seconds: 8)),
       );
     }
   }
@@ -1166,7 +1166,7 @@ class _OverviewPageState extends State<OverviewPage> {
       setState(() {});
     } catch (error) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to update event: $error')),
+        SnackBar(content: Text('Failed to update event: $error'), duration: Duration(seconds: 8)),
       );
     }
   }
@@ -1181,7 +1181,7 @@ class _OverviewPageState extends State<OverviewPage> {
       setState(() {});
     } catch (error) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to update reminder: $error')),
+        SnackBar(content: Text('Failed to update reminder: $error'), duration: Duration(seconds: 8)),
       );
     }
   }

@@ -58,7 +58,7 @@ class Events extends Table {
   TextColumn get description => text().nullable()();
   DateTimeColumn get startDateTime => dateTime()();
   DateTimeColumn get endDateTime => dateTime()();
-  DateTimeColumn get date => dateTime()();
+  DateTimeColumn get scheduledDate => dateTime()();
   TextColumn get customCategory => text().nullable()();
   TextColumn get color => text().nullable()();
   BoolColumn get completed => boolean().withDefault(const Constant(false))();
@@ -162,15 +162,52 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 5;
 
   @override
   MigrationStrategy get migration {
     return MigrationStrategy(
       onUpgrade: (m, from, to) async {
         debugPrint('[Database] Upgrading schema from $from to $to - preserving existing data');
-        // Don't delete tables - preserve existing data on web
-        // Only create new tables if they don't exist
+
+        // Migration: Fix events table column (scheduled_date)
+        if (from <= 4 && to >= 4) {
+          debugPrint('[Database] Fixing events table schema');
+          try {
+            // Drop old events table if it exists with wrong schema
+            await m.issueCustomQuery('DROP TABLE IF EXISTS events_old');
+
+            // Check if events table exists and has the wrong schema
+            try {
+              await m.issueCustomQuery('SELECT scheduled_date FROM events LIMIT 1');
+              debugPrint('[Database] Events table already has scheduled_date - no migration needed');
+            } catch (e) {
+              // Table doesn't have scheduled_date, recreate it
+              debugPrint('[Database] Recreating events table with scheduled_date');
+              await m.issueCustomQuery('ALTER TABLE events RENAME TO events_old');
+              await m.createTable(events);
+
+              // Copy existing data if any
+              try {
+                await m.issueCustomQuery('''
+                  INSERT INTO events
+                  (id, event_id, title, description, start_date_time, end_date_time, scheduled_date, custom_category, color, completed, completed_at, is_recurring, recurrence_pattern, recurrence_rule, recurrence_count, recurrence_end_date, recurrence_exception_dates, parent_event_id, reminder_enabled, reminder_time, reminder_preset, created_at, updated_at)
+                  SELECT
+                  id, event_id, title, description, start_date_time, end_date_time, COALESCE(date, scheduled_date, datetime('now')), custom_category, color, completed, completed_at, is_recurring, recurrence_pattern, recurrence_rule, recurrence_count, recurrence_end_date, recurrence_exception_dates, parent_event_id, reminder_enabled, reminder_time, reminder_preset, created_at, updated_at
+                  FROM events_old
+                ''');
+              } catch (copyError) {
+                debugPrint('[Database] No data to copy: $copyError');
+              }
+
+              await m.issueCustomQuery('DROP TABLE IF EXISTS events_old');
+              debugPrint('[Database] Events table recreated successfully');
+            }
+          } catch (e) {
+            debugPrint('[Database] Migration error: $e');
+            rethrow;
+          }
+        }
       },
       onCreate: (m) async {
         debugPrint('[Database] Creating new database');

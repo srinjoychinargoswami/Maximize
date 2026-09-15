@@ -28,7 +28,7 @@ class EncryptionService {
       // - Windows: Credential Manager
       // For now using a derived key (NOT PRODUCTION SECURE)
 
-      const String masterKey = 'maximize_secure_key_256bit_length_needed';
+      const String masterKey = '';
 
       // Ensure key is exactly 32 bytes (256 bits) for AES-256
       final keyBytes = utf8.encode(masterKey);
@@ -39,7 +39,7 @@ class EncryptionService {
       final finalKey = paddedKey.sublist(0, 32);
 
       // IV (Initialization Vector) - must be 16 bytes
-      const String ivString = 'maximize_iv_16byt';
+      const String ivString = '';
       final ivBytes = utf8.encode(ivString.padRight(16, '0').substring(0, 16));
 
       _key = encrypt.Key(Uint8List.fromList(finalKey));

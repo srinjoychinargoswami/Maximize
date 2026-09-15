@@ -1,13 +1,13 @@
 import 'dart:io';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/data/latest.dart' as tz_data;
-import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
-import 'package:kinetic/firebase_options.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:kinetic/services/sync_service.dart';
 import 'package:kinetic/database/app_database.dart';
 import 'package:kinetic/screens/home_page.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:kinetic/services/task_service.dart';
 import 'package:kinetic/services/calendar_service.dart';
 import 'package:kinetic/services/event_service.dart';
@@ -15,8 +15,8 @@ import 'package:kinetic/services/reminder_service.dart';
 import 'package:kinetic/services/note_service.dart';
 import 'package:kinetic/services/energy_service.dart';
 import 'package:kinetic/services/completion_log_service.dart';
-import 'package:kinetic/services/firebase_realtime_sync_service.dart';
 import 'package:kinetic/services/encryption_service.dart';
+import 'package:kinetic/services/notification_service.dart';
 import 'package:kinetic/services/metrics_service.dart';
 import 'package:kinetic/services/energy_analytics_service.dart';
 import 'package:kinetic/config/theme_config.dart';
@@ -30,15 +30,26 @@ void main() async {
   // Initialize timezone for notifications
   tz_data.initializeTimeZones();
 
-  // Initialize Drift database FIRST
+  // Initialize Supabase for REST API sync
+  try {
+    await Supabase.initialize(
+      url: '',
+      anonKey: '',
+    );
+    debugPrint('[Main] Supabase initialized');
+  } catch (e) {
+    debugPrint('[Main] Supabase initialization error: $e');
+    // App continues even if Supabase fails
+  }
+
+  // Initialize Drift database
   final database = AppDatabase();
   debugPrint('[Main] Drift database initialized');
 
   // Log encryption/storage platform info
   DatabaseEncryptionService.instance.logStorageInfo();
 
-  // CRITICAL: Initialize encryption service SECOND
-  // Must be done before Firebase listeners start decrypting data
+  // Initialize encryption service
   try {
     await EncryptionService.instance.initialize();
     debugPrint('[Main] Encryption service initialized');
@@ -47,22 +58,42 @@ void main() async {
     // App continues even if encryption setup fails
   }
 
-     // Initialize Firebase (only on native platforms)
-  if (!kIsWeb) {
-    try {
-      await Firebase.initializeApp(
-        options: DefaultFirebaseOptions.currentPlatform,
-      );
-      // Initialize Firebase Realtime Database sync service
-      await FirebaseRealtimeSyncService.instance.initialize();
-    } catch (e) {
-      debugPrint('[Firebase] Initialization error: $e');
-      // App continues even if Firebase fails to initialize
-    }
+  // Initialize SyncService for Supabase REST API sync
+  try {
+    await SyncService().initialize();
+    debugPrint('[Main] SyncService initialized');
+  } catch (e) {
+    debugPrint('[Main] SyncService initialization error: $e');
+    // App continues even if SyncService fails to initialize
   }
 
-  // TODO: Initialize notification service once it's been properly migrated
-  // await NotificationService.instance.initialize();
+  // Sync DOWN: Fetch all data from Supabase
+  try {
+    await SyncService().syncDown(database);
+    debugPrint('[Main] syncDown completed - pulled latest data from Supabase');
+  } catch (e) {
+    debugPrint('[Main] syncDown error: $e');
+    // App continues even if syncDown fails
+  }
+
+  // Start periodic sync every 5 minutes
+  Timer.periodic(Duration(minutes: 5), (_) async {
+    try {
+      debugPrint('[Main] Running periodic syncDown...');
+      await SyncService().syncDown(database);
+    } catch (e) {
+      debugPrint('[Main] Periodic syncDown error: $e');
+    }
+  });
+
+  // Initialize notification service for all platforms
+  try {
+    await NotificationService.instance.initialize();
+    debugPrint('[Main] Notification service initialized');
+  } catch (e) {
+    debugPrint('[Main] Notification service initialization error: $e');
+    // App continues even if notifications fail to initialize
+  }
 
   // Request POST_NOTIFICATIONS permission for Android 13+ (native only)
   if (!kIsWeb && Platform.isAndroid) {

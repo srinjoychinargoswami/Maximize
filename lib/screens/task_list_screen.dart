@@ -9,7 +9,6 @@ import 'package:kinetic/models/subtask_model.dart';
 import "package:provider/provider.dart";
 import 'package:kinetic/services/task_service.dart';
 import "package:provider/provider.dart";
-import 'package:kinetic/services/firebase_realtime_sync_service.dart';
 import "package:provider/provider.dart";
 import 'package:kinetic/screens/add_task_page.dart';
 import "package:provider/provider.dart";
@@ -74,17 +73,7 @@ class TaskListScreenState extends State<TaskListScreen> with TickerProviderState
     );
     _loadTasks();
 
-    // Listen for real-time task changes from Firebase
-    if (FirebaseRealtimeSyncService.instance.isInitialized) {
-      FirebaseRealtimeSyncService.instance.listenToTasks((tasks) {
-        if (mounted) {
-          setState(() {
-            _tasks = tasks;
-            _updateFilterOptions();
-          });
-        }
-      });
-    }
+    // PowerSync automatically syncs tasks in real-time - no need for manual listeners
   }
 
   @override
@@ -107,7 +96,7 @@ class TaskListScreenState extends State<TaskListScreen> with TickerProviderState
       print('Error loading tasks: $e');
       setState(() => _isLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to load tasks: $e')),
+        SnackBar(content: Text('Failed to load tasks: $e'), duration: Duration(seconds: 8)),
       );
     }
   }
@@ -135,7 +124,7 @@ class TaskListScreenState extends State<TaskListScreen> with TickerProviderState
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Tasks refreshed!'),
-          duration: Duration(seconds: 1),
+          duration: Duration(seconds: 8),
         ),
       );
     }
@@ -145,7 +134,7 @@ class TaskListScreenState extends State<TaskListScreen> with TickerProviderState
   Future<void> _refreshTasks() async {
     await _loadTasks();
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Tasks refreshed!')),
+      const SnackBar(content: Text('Tasks refreshed!'), duration: Duration(seconds: 8)),
     );
   }
 
@@ -1193,6 +1182,7 @@ return matchesCategory && matchesPriority && matchesDueDate && matchesRecurrence
                           ? 'Recurring task deleted'
                           : 'Task deleted',
                     ),
+                    duration: Duration(seconds: 8),
                     action: SnackBarAction(
                       label: 'UNDO',
                       onPressed: () async {
@@ -1208,7 +1198,7 @@ return matchesCategory && matchesPriority && matchesDueDate && matchesRecurrence
                           await _loadTasks();
                         } catch (e) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Failed to undo: $e')),
+                            SnackBar(content: Text('Failed to undo: $e'), duration: Duration(seconds: 8)),
                           );
                         }
                       },
@@ -1217,7 +1207,7 @@ return matchesCategory && matchesPriority && matchesDueDate && matchesRecurrence
                 );
               } catch (error) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Failed to delete task: $error')),
+                  SnackBar(content: Text('Failed to delete task: $error'), duration: Duration(seconds: 8)),
                 );
               }
             },
@@ -1259,6 +1249,7 @@ return matchesCategory && matchesPriority && matchesDueDate && matchesRecurrence
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     content: const Text('Subtask deleted'),
+                    duration: Duration(seconds: 8),
                     action: SnackBarAction(
                       label: 'UNDO',
                       onPressed: () async {
@@ -1267,7 +1258,7 @@ return matchesCategory && matchesPriority && matchesDueDate && matchesRecurrence
                           await _loadTasks();
                         } catch (e) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Failed to undo: $e')),
+                            SnackBar(content: Text('Failed to undo: $e'), duration: Duration(seconds: 8)),
                           );
                         }
                       },
@@ -1276,7 +1267,7 @@ return matchesCategory && matchesPriority && matchesDueDate && matchesRecurrence
                 );
               } catch (error) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Failed to delete subtask: $error')),
+                  SnackBar(content: Text('Failed to delete subtask: $error'), duration: Duration(seconds: 8)),
                 );
               }
             },
@@ -1290,20 +1281,31 @@ return matchesCategory && matchesPriority && matchesDueDate && matchesRecurrence
 }
 
 
-  // Pass taskService parameter
-  void _editTask(TaskModel task) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => AddTaskPage(
-          task: task,
-        ),
-      ),
-    ).then((value) {
-      if (value != null) {
-        _loadTasks();
+  // Load task with subtasks before editing
+  void _editTask(TaskModel task) async {
+    try {
+      // Load fresh task data WITH subtasks included
+      final taskWithSubtasks = await _taskService.getTaskById(task.id);
+
+      if (taskWithSubtasks != null && mounted) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => AddTaskPage(
+              task: taskWithSubtasks,
+            ),
+          ),
+        ).then((value) {
+          if (value != null) {
+            _loadTasks();
+          }
+        });
       }
-    });
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to load task: $e'), duration: Duration(seconds: 8)),
+      );
+    }
   }
 
   void _toggleTaskCompletion(TaskModel task, bool? isCompleted) async {
@@ -1318,7 +1320,7 @@ return matchesCategory && matchesPriority && matchesDueDate && matchesRecurrence
       _loadTasks();
     } catch (error) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to update task: $error')),
+        SnackBar(content: Text('Failed to update task: $error'), duration: Duration(seconds: 8)),
       );
     }
   }
@@ -1339,7 +1341,7 @@ return matchesCategory && matchesPriority && matchesDueDate && matchesRecurrence
       _loadTasks();
     } catch (error) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to update subtask: $error')),
+        SnackBar(content: Text('Failed to update subtask: $error'), duration: Duration(seconds: 8)),
       );
     }
   }
