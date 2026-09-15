@@ -372,13 +372,7 @@ class NotesPageState extends State<NotesPage> {
       ),
       body: ScrollConfiguration(
         behavior: CustomScrollBehavior(),
-        child: RefreshIndicator(
-          onRefresh: _refreshNotes,
-          color: Colors.blue,
-          backgroundColor: Colors.white,
-          strokeWidth: 2.0,
-          displacement: 40.0,
-          child: Column(
+        child: Column(
           children: [
             Padding(
               padding: const EdgeInsets.all(8.0),
@@ -404,33 +398,42 @@ class NotesPageState extends State<NotesPage> {
               ),
             ),
             Expanded(
-              child: _isLoading
-                  ? const Center(child: CircularProgressIndicator())
-                  : _filteredNotes.isEmpty
-                      ? Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.note_add, size: 64, color: Colors.grey[400]),
-                              const SizedBox(height: 16),
-                              Text(
-                                'No notes yet',
-                                style: TextStyle(fontSize: 18, color: Colors.grey[600]),
+              child: RefreshIndicator(
+                onRefresh: _refreshNotes,
+                color: Colors.blue,
+                backgroundColor: Colors.white,
+                strokeWidth: 2.0,
+                displacement: 40.0,
+                child: _isLoading
+                    ? const Center(child: CircularProgressIndicator())
+                    : _filteredNotes.isEmpty
+                        ? SingleChildScrollView(
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            child: Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.note_add, size: 64, color: Colors.grey[400]),
+                                  const SizedBox(height: 16),
+                                  Text(
+                                    'No notes yet',
+                                    style: TextStyle(fontSize: 18, color: Colors.grey[600]),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    'Tap + to create your first note',
+                                    style: TextStyle(color: Colors.grey[500]),
+                                  ),
+                                ],
                               ),
-                              const SizedBox(height: 8),
-                              Text(
-                                'Tap + to create your first note',
-                                style: TextStyle(color: Colors.grey[500]),
-                              ),
-                            ],
-                          ),
-                        )
-                      : _isGridView
-                          ? _buildGridView()
-                          : _buildListView(),
+                            ),
+                          )
+                        : _isGridView
+                            ? _buildGridView()
+                            : _buildListView(),
+              ),
             ),
           ],
-          ),
         ),
       ),
       floatingActionButton: FloatingActionButton(
