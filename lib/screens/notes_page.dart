@@ -446,6 +446,7 @@ class NotesPageState extends State<NotesPage> {
   Widget _buildGridView() {
     return GridView.builder(
       controller: _scrollController,
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.all(8),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
@@ -464,6 +465,7 @@ class NotesPageState extends State<NotesPage> {
   Widget _buildListView() {
     return ListView.builder(
       controller: _scrollController,
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.all(8),
       itemCount: _filteredNotes.length,
       itemBuilder: (context, index) {
