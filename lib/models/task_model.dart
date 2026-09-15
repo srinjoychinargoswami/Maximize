@@ -1,96 +1,90 @@
-import 'package:kinetic/models/database.dart'; // Import your database file
-import 'package:kinetic/models/subtask_model.dart'; // Import SubtaskModel from separate file
+import 'package:kinetic/models/database.dart';
 import 'package:json_annotation/json_annotation.dart';
 
 part 'task_model.g.dart'; 
 
 @JsonSerializable()
 class TaskModel {
-  final String id; // Non-optional ID for the task
-  final String title; // Title of the task
-  final String? description; // Description of the task (optional)
-  final DateTime dueDate; // Due date of the task
-  bool completed; // Completion status of the task (made non-final) - ALREADY PERFECT FOR CHECKBOXES
-  final String? category; // Category of the task (optional)
-  final String priority; // Priority of the task
-  final String? customCategory; // Custom category (optional)
-  final String? pageId; // Optional page ID for associating with pages
-  final String? day; // Day of the task (optional)
-  
-  // Recurring task fields
-  final bool isRecurring; // Whether this task is recurring
-  final String? recurrenceRule; // Recurrence pattern (daily, weekly, monthly, yearly)
-  final int? recurrenceInterval; // Interval for recurrence (every X days/weeks/months)
-  final List<int>? daysOfWeek; // Days of week for weekly recurrence (1=Monday, 7=Sunday)
-  final DateTime? recurrenceEndDate; // End date for recurrence
-  final String? parentTaskId; // ID of the parent recurring task (for instances)
-  final int? maxOccurrences; // Maximum number of occurrences
-  final bool skipWeekends; // Whether to skip weekends for daily recurrence
-  final int? dayOfMonth; // Specific day of month for monthly recurrence
-  final int? weekOfMonth; // Week of month for monthly recurrence (1-4, or -1 for last)
+  final String id;
+  final String title;
+  final String? description;
+  final String? content;
+  final DateTime dueDate;
+  bool completed;
+  final String? category;
+  final String priority;
+  final String? customCategory;
+  final String? pageId;
+  final String? day;
 
-  // ADDED: Completion tracking fields for better functionality
-  final DateTime? completedAt; // When the task was completed (NEW)
-  final List<SubtaskModel>? subtasks; // List of subtasks (ADDED for better integration)
+  final bool isRecurring;
+  final String? recurrenceRule;
+  final int? recurrenceInterval;
+  final List<int>? daysOfWeek;
+  final DateTime? recurrenceEndDate;
+  final String? parentTaskId;
+  final int? maxOccurrences;
+  final bool skipWeekends;
+  final int? dayOfMonth;
+  final int? weekOfMonth;
 
-  // ADDED: Timestamp tracking
-  late DateTime createdAt; // When the task was created
-  late DateTime updatedAt; // When the task was last updated
+  final DateTime? completedAt;
 
-  // NEW: Reminder fields
-  final bool? reminderEnabled; // Whether reminder notification is enabled
-  final DateTime? reminderTime; // When to show the reminder notification
-  final String? reminderPreset; // Preset type: 'at_time', '15min', '30min', '1hour', '1day', 'custom'
+  late DateTime createdAt;
+  late DateTime updatedAt;
 
-  // NEW: Energy requirement field
-  final int energyRequired; // 1-10 scale: 1=admin, 5=medium, 10=deep focus
+  final bool? reminderEnabled;
+  final DateTime? reminderTime;
+  final String? reminderPreset;
+
+  final int energyRequired;
 
   TaskModel({
     required this.id,
     required this.title,
     this.description,
+    this.content,
     required this.dueDate,
-    this.completed = false, // Default to false - PERFECT FOR CHECKBOXES
+    this.completed = false,
     this.category,
     required this.priority,
     this.customCategory,
     this.pageId,
     this.day,
-    this.isRecurring = false, // Default to false
+    this.isRecurring = false,
     this.recurrenceRule,
     this.recurrenceInterval,
     this.daysOfWeek,
     this.recurrenceEndDate,
     this.parentTaskId,
     this.maxOccurrences,
-    this.skipWeekends = false, // Default to false
+    this.skipWeekends = false,
     this.dayOfMonth,
     this.weekOfMonth,
-    this.completedAt, // ADDED: Track completion timestamp
-    this.subtasks, // ADDED: Include subtasks in model
-    DateTime? createdAt, // ADDED: Allow setting createdAt
-    DateTime? updatedAt, // ADDED: Allow setting updatedAt
+    this.completedAt,
+    DateTime? createdAt,
+    DateTime? updatedAt,
     this.reminderEnabled,
     this.reminderTime,
     this.reminderPreset,
-    this.energyRequired = 5, // Default to medium energy
+    this.energyRequired = 5,
   }) {
-    // Initialize timestamps
     this.createdAt = createdAt ?? DateTime.now();
     this.updatedAt = updatedAt ?? DateTime.now();
   }
 
   factory TaskModel.fromData(TaskData data) {
     return TaskModel(
-      id: data.id, // Changed to String
+      id: data.id,
       title: data.title,
       description: data.description,
+      content: data.content,
       dueDate: data.dueDate,
-      completed: data.completed, // Ensure this is correctly mapped - ALREADY PERFECT
+      completed: data.completed,
       category: data.category,
       priority: data.priority,
       customCategory: data.customCategory,
-      pageId: data.pageId, // Changed to String?
+      pageId: data.pageId,
       day: data.day,
       isRecurring: data.isRecurring ?? false,
       recurrenceRule: data.recurrenceRule,
@@ -102,26 +96,25 @@ class TaskModel {
       skipWeekends: data.skipWeekends ?? false,
       dayOfMonth: data.dayOfMonth,
       weekOfMonth: data.weekOfMonth,
-      completedAt: data.completedAt, // ADDED: Map completion timestamp
-      reminderEnabled: data.reminderEnabled, // : Map reminder enabled
-      reminderTime: data.reminderTime, //  Map reminder time
-      reminderPreset: data.reminderPreset, //  Map reminder preset
-      energyRequired: 5, // Default to medium energy - new field
-      // Note: subtasks will be loaded separately via service layer
+      completedAt: data.completedAt,
+      reminderEnabled: data.reminderEnabled,
+      reminderTime: data.reminderTime,
+      reminderPreset: data.reminderPreset,
+      energyRequired: 5,
     );
   }
 
   factory TaskModel.fromJson(Map<String, dynamic> json) => _$TaskModelFromJson(json);
   Map<String, dynamic> toJson() => _$TaskModelToJson(this);
 
-  // Convert to Map for database operations
   Map<String, dynamic> toMap() {
     return {
       'id': id,
       'title': title,
       'description': description,
+      'content': content,
       'dueDate': dueDate.toIso8601String(),
-      'completed': completed, // ALREADY PERFECT FOR DATABASE STORAGE
+      'completed': completed,
       'category': category,
       'priority': priority,
       'customCategory': customCategory,
@@ -137,22 +130,22 @@ class TaskModel {
       'skipWeekends': skipWeekends,
       'dayOfMonth': dayOfMonth,
       'weekOfMonth': weekOfMonth,
-      'completedAt': completedAt?.toIso8601String(), // ADDED: Include completion timestamp
-      'reminderEnabled': reminderEnabled, // Include reminder enabled
-      'reminderTime': reminderTime?.toIso8601String(), //Include reminder time
-      'reminderPreset': reminderPreset, // Include reminder preset
-      'energyRequired': energyRequired, // Include energy requirement
+      'completedAt': completedAt?.toIso8601String(),
+      'reminderEnabled': reminderEnabled,
+      'reminderTime': reminderTime?.toIso8601String(),
+      'reminderPreset': reminderPreset,
+      'energyRequired': energyRequired,
     };
   }
 
-  // Create from Map for database operations
   factory TaskModel.fromMap(Map<String, dynamic> map) {
     return TaskModel(
       id: map['id'] ?? '',
       title: map['title'] ?? '',
       description: map['description'],
+      content: map['content'],
       dueDate: DateTime.parse(map['dueDate']),
-      completed: map['completed'] ?? false, // ALREADY PERFECT FOR CHECKBOXES
+      completed: map['completed'] ?? false,
       category: map['category'],
       priority: map['priority'] ?? 'medium',
       customCategory: map['customCategory'],
@@ -161,10 +154,10 @@ class TaskModel {
       isRecurring: map['isRecurring'] ?? false,
       recurrenceRule: map['recurrenceRule'],
       recurrenceInterval: map['recurrenceInterval'],
-      daysOfWeek: map['daysOfWeek'] != null 
+      daysOfWeek: map['daysOfWeek'] != null
           ? map['daysOfWeek'].split(',').map<int>((e) => int.parse(e.trim())).toList()
           : null,
-      recurrenceEndDate: map['recurrenceEndDate'] != null 
+      recurrenceEndDate: map['recurrenceEndDate'] != null
           ? DateTime.parse(map['recurrenceEndDate'])
           : null,
       parentTaskId: map['parentTaskId'],
@@ -172,15 +165,15 @@ class TaskModel {
       skipWeekends: map['skipWeekends'] ?? false,
       dayOfMonth: map['dayOfMonth'],
       weekOfMonth: map['weekOfMonth'],
-      completedAt: map['completedAt'] != null // ADDED: Parse completion timestamp
+      completedAt: map['completedAt'] != null
           ? DateTime.parse(map['completedAt'])
           : null,
-      reminderEnabled: map['reminderEnabled'], // Parse reminder enabled
-      reminderTime: map['reminderTime'] != null // Parse reminder time
+      reminderEnabled: map['reminderEnabled'],
+      reminderTime: map['reminderTime'] != null
           ? DateTime.parse(map['reminderTime'])
           : null,
-      reminderPreset: map['reminderPreset'], // Parse reminder preset
-      energyRequired: map['energyRequired'] ?? 5, // Parse energy requirement with default
+      reminderPreset: map['reminderPreset'],
+      energyRequired: map['energyRequired'] ?? 5,
     );
   }
 
@@ -188,8 +181,9 @@ class TaskModel {
     String? id,
     String? title,
     String? description,
+    String? content,
     DateTime? dueDate,
-    bool? completed, // Make this optional - ALREADY PERFECT FOR CHECKBOX UPDATES
+    bool? completed,
     String? category,
     String? priority,
     String? customCategory,
@@ -205,21 +199,21 @@ class TaskModel {
     bool? skipWeekends,
     int? dayOfMonth,
     int? weekOfMonth,
-    DateTime? completedAt, // ADDED: Allow updating completion timestamp
-    List<SubtaskModel>? subtasks, // ADDED: Allow updating subtasks
-    DateTime? createdAt, // ADDED: Allow updating creation timestamp
-    DateTime? updatedAt, // ADDED: Allow updating update timestamp
-    bool? reminderEnabled, // Allow updating reminder enabled
-    DateTime? reminderTime, //  Allow updating reminder time
-    String? reminderPreset, //Allow updating reminder preset
-    int? energyRequired, // Allow updating energy requirement
+    DateTime? completedAt,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+    bool? reminderEnabled,
+    DateTime? reminderTime,
+    String? reminderPreset,
+    int? energyRequired,
   }) {
     return TaskModel(
       id: id ?? this.id,
       title: title ?? this.title,
       description: description ?? this.description,
+      content: content ?? this.content,
       dueDate: dueDate ?? this.dueDate,
-      completed: completed ?? this.completed, // Ensure this is correctly updated - PERFECT
+      completed: completed ?? this.completed,
       category: category ?? this.category,
       priority: priority ?? this.priority,
       customCategory: customCategory ?? this.customCategory,
@@ -235,35 +229,23 @@ class TaskModel {
       skipWeekends: skipWeekends ?? this.skipWeekends,
       dayOfMonth: dayOfMonth ?? this.dayOfMonth,
       weekOfMonth: weekOfMonth ?? this.weekOfMonth,
-      completedAt: completedAt ?? this.completedAt, // ADDED: Update completion timestamp
-      subtasks: subtasks ?? this.subtasks, // ADDED: Update subtasks
-      createdAt: createdAt ?? this.createdAt, // ADDED: Update creation timestamp
-      updatedAt: updatedAt ?? this.updatedAt, // ADDED: Update update timestamp
-      reminderEnabled: reminderEnabled ?? this.reminderEnabled, // Update reminder enabled
-      reminderTime: reminderTime ?? this.reminderTime, // Update reminder time
-      reminderPreset: reminderPreset ?? this.reminderPreset, // Update reminder preset
-      energyRequired: energyRequired ?? this.energyRequired, // Update energy requirement
+      completedAt: completedAt ?? this.completedAt,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      reminderEnabled: reminderEnabled ?? this.reminderEnabled,
+      reminderTime: reminderTime ?? this.reminderTime,
+      reminderPreset: reminderPreset ?? this.reminderPreset,
+      energyRequired: energyRequired ?? this.energyRequired,
     );
   }
 
-  // Helper methods for recurring tasks
   bool get isRecurringInstance => parentTaskId != null;
   bool get isRecurringParent => isRecurring && parentTaskId == null;
-  
-  // ADDED: Helper methods for checkbox functionality
-  bool get hasSubtasks => subtasks != null && subtasks!.isNotEmpty;
-  bool get allSubtasksCompleted => hasSubtasks ? subtasks!.every((subtask) => subtask.completed) : true;
-  double get completionPercentage {
-    if (!hasSubtasks) return completed ? 1.0 : 0.0;
-    int completedCount = subtasks!.where((subtask) => subtask.completed).length;
-    return completedCount / subtasks!.length;
-  }
-  
-  // ADDED: Method to toggle completion status (for checkbox functionality)
+
   TaskModel toggleCompletion() {
     return copyWith(
       completed: !completed,
-      completedAt: !completed ? DateTime.now() : null, // Set timestamp when completing
+      completedAt: !completed ? DateTime.now() : null,
     );
   }
   

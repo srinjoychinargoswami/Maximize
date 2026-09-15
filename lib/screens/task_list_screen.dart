@@ -1,21 +1,14 @@
 import "package:provider/provider.dart";
 import 'package:flutter/material.dart';
-import "package:provider/provider.dart";
 import 'package:flutter/gestures.dart';
-import "package:provider/provider.dart";
 import 'package:kinetic/models/task_model.dart';
-import "package:provider/provider.dart";
-import 'package:kinetic/models/subtask_model.dart';
-import "package:provider/provider.dart";
 import 'package:kinetic/services/task_service.dart';
-import "package:provider/provider.dart";
-import "package:provider/provider.dart";
 import 'package:kinetic/screens/add_task_page.dart';
-import "package:provider/provider.dart";
 import 'package:kinetic/utils/task_utils.dart';
-import "package:provider/provider.dart";
 import 'package:kinetic/database/app_database.dart';
 import 'package:intl/intl.dart';
+import 'package:kinetic/services/sync_service.dart';
+import 'dart:async';
 
 // CustomScrollBehavior to fix RefreshIndicator on Windows desktop
 class CustomScrollBehavior extends ScrollBehavior {
@@ -43,6 +36,7 @@ class TaskListScreenState extends State<TaskListScreen> with TickerProviderState
   bool _isRefreshing = false; // ADDED: Track refresh state
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
+  late StreamSubscription<void> _syncDownSubscription;
 
   // Filter variables
   String _selectedCategory = 'All';
@@ -73,7 +67,11 @@ class TaskListScreenState extends State<TaskListScreen> with TickerProviderState
     );
     _loadTasks();
 
-    // PowerSync automatically syncs tasks in real-time - no need for manual listeners
+    // Listen for syncDown completion to refresh tasks
+    _syncDownSubscription = SyncService().onSyncDownCompleted.listen((_) {
+      debugPrint('[TaskListScreen] syncDown completed - refreshing tasks');
+      _loadTasks();
+    });
   }
 
   @override
@@ -81,6 +79,7 @@ class TaskListScreenState extends State<TaskListScreen> with TickerProviderState
     _animationController.dispose();
     _searchController.dispose();
     _scrollController.dispose();
+    _syncDownSubscription.cancel();
     super.dispose();
   }
 
@@ -132,6 +131,13 @@ class TaskListScreenState extends State<TaskListScreen> with TickerProviderState
 
   // Refresh method for pull-to-refresh functionality
   Future<void> _refreshTasks() async {
+    debugPrint('[TaskListScreen] User pulled to refresh, syncing from Supabase...');
+    try {
+      await SyncService().syncDown(context.read<AppDatabase>());
+      debugPrint('[TaskListScreen] syncDown completed, reloading tasks...');
+    } catch (e) {
+      debugPrint('[TaskListScreen] syncDown error: $e');
+    }
     await _loadTasks();
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Tasks refreshed!'), duration: Duration(seconds: 8)),
@@ -482,7 +488,7 @@ return matchesCategory && matchesPriority && matchesDueDate && matchesRecurrence
 
   Widget _buildTaskCard(TaskModel task) {
     final isExpanded = _expandedRecurringTasks[task.id] ?? false;
-    
+
     return Card(
       margin: const EdgeInsets.only(bottom: 12.0),
       elevation: 3,
@@ -491,14 +497,11 @@ return matchesCategory && matchesPriority && matchesDueDate && matchesRecurrence
         borderRadius: BorderRadius.circular(12),
         child: Column(
           children: [
-            // Main task
             _buildMainTaskTile(task, isExpanded),
-            
-            // Recurring instances (if expanded)
+
             if (task.isRecurring && isExpanded) _buildRecurringInstances(task),
-            
-            // Subtasks
-            _buildSubtasksSection(task),
+
+            if (task.content?.isNotEmpty == true) _buildContentSection(task),
           ],
         ),
       ),
@@ -611,20 +614,6 @@ return matchesCategory && matchesPriority && matchesDueDate && matchesRecurrence
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (task.description?.isNotEmpty == true)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8.0),
-              child: Text(
-                task.description!,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 14,
-                  height: 1.3,
-                ),
-              ),
-            ),
           Wrap(
             spacing: 8.0,
             runSpacing: 4.0,
@@ -832,100 +821,40 @@ return matchesCategory && matchesPriority && matchesDueDate && matchesRecurrence
     );
   }
 
-  Widget _buildSubtasksSection(TaskModel task) {
-    return FutureBuilder<List<SubtaskModel>>(
-      future: _taskService.getSubtasks(task.id),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Padding(
-            padding: EdgeInsets.all(20.0),
-            child: Center(child: SizedBox(
-              height: 24,
-              width: 24,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            )),
-          );
-        }
-        
-        if (snapshot.hasError) {
-          return Padding(
-            padding: const EdgeInsets.all(20.0),
-            child: Text(
-              'Error loading subtasks',
-              style: TextStyle(color: Colors.red[600], fontSize: 13),
-            ),
-          );
-        }
-        
-        final subtasks = snapshot.data ?? [];
-        if (subtasks.isEmpty) return const SizedBox.shrink();
-        
-        return Container(
-          margin: const EdgeInsets.fromLTRB(20.0, 0, 20.0, 16.0),
-          padding: const EdgeInsets.all(16.0),
-          decoration: BoxDecoration(
-            color: task.completed ? Colors.grey[700] : Colors.blue[50],
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: task.completed ? Colors.grey[500]! : Colors.blue[100]!),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _buildContentSection(TaskModel task) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(20.0, 0, 20.0, 16.0),
+      padding: const EdgeInsets.all(16.0),
+      decoration: BoxDecoration(
+        color: task.completed ? Colors.grey[700] : Colors.blue[50],
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: task.completed ? Colors.grey[500]! : Colors.blue[100]!),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
-              Row(
-                children: [
-                  Icon(Icons.subdirectory_arrow_right, size: 18, color: task.completed ? Colors.white : Colors.blue[600]),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Subtasks (${subtasks.length})',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w600,
-                      color: task.completed ? Colors.white : Colors.blue[700],
-                      fontSize: 14,
-                    ),
-                  ),
-                ],
+              Icon(Icons.description, size: 18, color: task.completed ? Colors.white : Colors.blue[600]),
+              const SizedBox(width: 8),
+              Text(
+                'Details',
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  color: task.completed ? Colors.white : Colors.blue[700],
+                  fontSize: 14,
+                ),
               ),
-              const SizedBox(height: 8),
-              ...subtasks.map((subtask) => _buildSubtaskTile(subtask, task)),
             ],
           ),
-        );
-      },
-    );
-  }
-
-  Widget _buildSubtaskTile(SubtaskModel subtask, TaskModel task) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4.0),
-      child: Row(
-        children: [
-          SizedBox(
-            height: 24,
-            width: 24,
-            child: Checkbox(
-              value: subtask.completed,
-              onChanged: (value) => _toggleSubtaskCompletion(subtask, value),
-              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          const SizedBox(height: 12),
+          Text(
+            task.content!,
+            style: TextStyle(
+              fontSize: 13,
+              color: task.completed ? Colors.white : Colors.grey[700],
+              height: 1.5,
             ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              subtask.title,
-              style: TextStyle(
-                fontSize: 13,
-                decoration: subtask.completed ? TextDecoration.lineThrough : null,
-                color: task.completed 
-                    ? Colors.white
-                    : (subtask.completed ? Colors.grey[500] : Colors.grey[700]),
-              ),
-            ),
-          ),
-          IconButton(
-            icon: Icon(Icons.delete_outline, size: 18, color: Colors.red[400]),
-            onPressed: () => _deleteSubtask(subtask),
-            tooltip: 'Delete subtask',
-            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
           ),
         ],
       ),
@@ -1139,8 +1068,12 @@ return matchesCategory && matchesPriority && matchesDueDate && matchesRecurrence
         builder: (context) => const AddTaskPage(),
       ),
     ).then((value) {
-      if (value != null) {
-        _loadTasks();
+      if (value != null && mounted) {
+        // Use the returned task directly instead of reloading
+        setState(() {
+          _tasks.insert(0, value);
+        });
+        _updateFilterOptions();
       }
     });
   }
@@ -1166,15 +1099,12 @@ return matchesCategory && matchesPriority && matchesDueDate && matchesRecurrence
             onPressed: () async {
               Navigator.of(context).pop();
 
-              // ✅ Cache task + subtasks before deletion
               final deletedTask = task;
-              final subtasks = await _taskService.getSubtasks(task.id);
 
               try {
                 await _taskService.deleteTask(task.id);
                 await _loadTasks();
 
-                // ✅ Undo SnackBar
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     content: Text(
@@ -1187,14 +1117,7 @@ return matchesCategory && matchesPriority && matchesDueDate && matchesRecurrence
                       label: 'UNDO',
                       onPressed: () async {
                         try {
-                          // Restore task
                           await _taskService.insertTask(deletedTask);
-
-                          // Restore subtasks
-                          for (final subtask in subtasks) {
-                            await _taskService.insertSubtask(subtask);
-                          }
-
                           await _loadTasks();
                         } catch (e) {
                           ScaffoldMessenger.of(context).showSnackBar(
@@ -1220,84 +1143,27 @@ return matchesCategory && matchesPriority && matchesDueDate && matchesRecurrence
   );
 }
 
-
-  void _deleteSubtask(SubtaskModel subtask) {
-  showDialog(
-    context: context,
-    builder: (context) {
-      return AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Delete Subtask'),
-        content: Text('Are you sure you want to delete "${subtask.title}"?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              Navigator.of(context).pop();
-
-              // ✅ Cache subtask before deletion
-              final deletedSubtask = subtask;
-
-              try {
-                await _taskService.deleteSubtask(subtask.id);
-                await _loadTasks();
-
-                // ✅ Undo SnackBar
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: const Text('Subtask deleted'),
-                    duration: Duration(seconds: 8),
-                    action: SnackBarAction(
-                      label: 'UNDO',
-                      onPressed: () async {
-                        try {
-                          await _taskService.insertSubtask(deletedSubtask);
-                          await _loadTasks();
-                        } catch (e) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Failed to undo: $e'), duration: Duration(seconds: 8)),
-                          );
-                        }
-                      },
-                    ),
-                  ),
-                );
-              } catch (error) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Failed to delete subtask: $error'), duration: Duration(seconds: 8)),
-                );
-              }
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('Delete', style: TextStyle(color: Colors.white)),
-          ),
-        ],
-      );
-    },
-  );
-}
-
-
-  // Load task with subtasks before editing
   void _editTask(TaskModel task) async {
     try {
-      // Load fresh task data WITH subtasks included
-      final taskWithSubtasks = await _taskService.getTaskById(task.id);
+      final freshTask = await _taskService.getTaskById(task.id);
 
-      if (taskWithSubtasks != null && mounted) {
+      if (freshTask != null && mounted) {
         Navigator.push(
           context,
           MaterialPageRoute(
             builder: (context) => AddTaskPage(
-              task: taskWithSubtasks,
+              task: freshTask,
             ),
           ),
         ).then((value) {
-          if (value != null) {
-            _loadTasks();
+          if (value != null && mounted) {
+            final existingIndex = _tasks.indexWhere((t) => t.id == value.id);
+            setState(() {
+              if (existingIndex >= 0) {
+                _tasks[existingIndex] = value;
+              }
+            });
+            _updateFilterOptions();
           }
         });
       }
@@ -1321,27 +1187,6 @@ return matchesCategory && matchesPriority && matchesDueDate && matchesRecurrence
     } catch (error) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Failed to update task: $error'), duration: Duration(seconds: 8)),
-      );
-    }
-  }
-
-  void _toggleSubtaskCompletion(SubtaskModel subtask, bool? isCompleted) async {
-    try {
-      if (isCompleted == true) {
-        await _taskService.markSubtaskCompleted(subtask.id);
-      } else {
-        final updatedSubtask = subtask.copyWith(
-          completed: false,
-          completedAt: null,
-        );
-        await _taskService.updateSubtask(updatedSubtask);
-      }
-      // Add small delay to ensure database update completes
-      await Future.delayed(const Duration(milliseconds: 100));
-      _loadTasks();
-    } catch (error) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to update subtask: $error'), duration: Duration(seconds: 8)),
       );
     }
   }

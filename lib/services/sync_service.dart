@@ -59,6 +59,10 @@ class SyncService {
   bool _isInitialized = false;
   bool _isSyncing = false;
 
+  // Stream to notify UI when syncDown completes
+  final _syncDownCompleted = StreamController<void>.broadcast();
+  Stream<void> get onSyncDownCompleted => _syncDownCompleted.stream;
+
   Future<void> initialize() async {
     if (_isInitialized) return;
 
@@ -115,6 +119,13 @@ class SyncService {
     try {
       final unsynced = _queue.where((item) => !item.synced).toList();
       for (final item in unsynced) {
+        // Skip subtasks and old events - these tables no longer exist in Supabase
+        if (item.table == 'subtasks' || item.table == 'events') {
+          debugPrint('[SyncService] ⏭️  Skipping ${item.table} (table removed): ${item.id}');
+          item.synced = true;
+          continue;
+        }
+
         try {
           await _syncItem(item);
           item.synced = true;
@@ -244,7 +255,6 @@ class SyncService {
       'notes': 'noteid',
       'energy_entries': 'entryid',
       'completion_logs': 'logid',
-      'subtasks': 'subtaskid',
     };
     return primaryKeyMap[table] ?? 'id';
   }
@@ -391,7 +401,6 @@ class SyncService {
       'noteid': 'noteId',
       'entryid': 'entryId',
       'logid': 'logId',
-      'subtaskid': 'subtaskId',
       'createdat': 'createdAt',
       'updatedat': 'updatedAt',
       'completedat': 'completedAt',
@@ -422,7 +431,6 @@ class SyncService {
       'moodtags': 'moodTags',
       'privacycontext': 'privacyContext',
       'tasktitle': 'taskTitle',
-      'issubtask': 'isSubtask',
       'parenttasktitle': 'parentTaskTitle',
       'energyrequired': 'energyRequired',
       'pageid': 'pageId',
@@ -472,7 +480,6 @@ class SyncService {
       await db.notes.delete().go();
       await db.energyEntries.delete().go();
       await db.completionLogs.delete().go();
-      await db.subtasks.delete().go();
       debugPrint('[SyncService] ✅ Cleared all old data from Drift');
 
       // NOW sync fresh data from Supabase
@@ -483,6 +490,7 @@ class SyncService {
             taskId: drift.Value(data['taskId'] ?? ''),
             title: drift.Value(data['title'] ?? ''),
             description: drift.Value(data['description']),
+            content: drift.Value(data['content']),
             dueDate: drift.Value(_convertTimestampFromIso(data['dueDate'])),
             completed: drift.Value(data['completed'] ?? false),
             completedAt: drift.Value(_convertTimestampFromIso(data['completedAt'])),
@@ -603,28 +611,12 @@ class SyncService {
             category: drift.Value(data['category']),
             priority: drift.Value(data['priority']),
             completedAt: drift.Value(_convertTimestampFromIso(data['completedAt']) ?? DateTime.now()),
-            isSubtask: drift.Value(data['isSubtask'] ?? false),
             parentTaskTitle: drift.Value(data['parentTaskTitle']),
             energyLevel: drift.Value(data['energyLevel']),
             moodTags: drift.Value(data['moodTags']),
             privacyContext: drift.Value(data['privacyContext']),
             location: drift.Value(data['location']),
             createdAt: drift.Value(_convertTimestampFromIso(data['createdAt']) ?? DateTime.now()),
-          ),
-        );
-      });
-
-      await _syncDownTable('subtasks', headers, (data) async {
-        await db.into(db.subtasks).insertOnConflictUpdate(
-          SubtasksCompanion(
-            id: drift.Value(data['id'] ?? ''),
-            subtaskId: drift.Value(data['subtaskId'] ?? ''),
-            taskId: drift.Value(data['taskId'] ?? ''),
-            title: drift.Value(data['title'] ?? ''),
-            completed: drift.Value(data['completed'] ?? false),
-            completedAt: drift.Value(_convertTimestampFromIso(data['completedAt'])),
-            createdAt: drift.Value(_convertTimestampFromIso(data['createdAt']) ?? DateTime.now()),
-            updatedAt: drift.Value(_convertTimestampFromIso(data['updatedAt']) ?? DateTime.now()),
           ),
         );
       });
@@ -636,6 +628,9 @@ class SyncService {
 
       debugPrint('[SyncService] ✅ syncDown completed successfully');
       debugPrint('[SyncService] Drift database after sync: ${remindersCount.length} reminders, ${tasksCount.length} tasks, ${eventsCount.length} events');
+
+      // Notify listeners that syncDown completed
+      _syncDownCompleted.add(null);
     } catch (e) {
       debugPrint('[SyncService] ❌ syncDown error: $e');
       rethrow;

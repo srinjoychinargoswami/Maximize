@@ -334,7 +334,6 @@ class _SettingsPageState extends State<SettingsPage> {
                 // Delete all data from all tables
                 await database.delete(database.completionLogs).go();
                 await database.delete(database.tasks).go();
-                await database.delete(database.subtasks).go();
                 await database.delete(database.events).go();
                 await database.delete(database.reminders).go();
                 await database.delete(database.notes).go();

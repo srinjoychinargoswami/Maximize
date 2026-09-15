@@ -10,6 +10,7 @@ TaskModel _$TaskModelFromJson(Map<String, dynamic> json) => TaskModel(
       id: json['id'] as String,
       title: json['title'] as String,
       description: json['description'] as String?,
+      content: json['content'] as String?,
       dueDate: DateTime.parse(json['dueDate'] as String),
       completed: json['completed'] as bool? ?? false,
       category: json['category'] as String?,
@@ -34,9 +35,6 @@ TaskModel _$TaskModelFromJson(Map<String, dynamic> json) => TaskModel(
       completedAt: json['completedAt'] == null
           ? null
           : DateTime.parse(json['completedAt'] as String),
-      subtasks: (json['subtasks'] as List<dynamic>?)
-          ?.map((e) => SubtaskModel.fromJson(e as Map<String, dynamic>))
-          .toList(),
       createdAt: json['createdAt'] == null
           ? null
           : DateTime.parse(json['createdAt'] as String),
@@ -55,6 +53,7 @@ Map<String, dynamic> _$TaskModelToJson(TaskModel instance) => <String, dynamic>{
       'id': instance.id,
       'title': instance.title,
       'description': instance.description,
+      'content': instance.content,
       'dueDate': instance.dueDate.toIso8601String(),
       'completed': instance.completed,
       'category': instance.category,
@@ -73,7 +72,6 @@ Map<String, dynamic> _$TaskModelToJson(TaskModel instance) => <String, dynamic>{
       'dayOfMonth': instance.dayOfMonth,
       'weekOfMonth': instance.weekOfMonth,
       'completedAt': instance.completedAt?.toIso8601String(),
-      'subtasks': instance.subtasks,
       'createdAt': instance.createdAt.toIso8601String(),
       'updatedAt': instance.updatedAt.toIso8601String(),
       'reminderEnabled': instance.reminderEnabled,

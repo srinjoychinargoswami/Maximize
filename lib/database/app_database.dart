@@ -10,6 +10,7 @@ class Tasks extends Table {
   TextColumn get taskId => text()();
   TextColumn get title => text()();
   TextColumn get description => text().nullable()();
+  TextColumn get content => text().nullable()();
   DateTimeColumn get dueDate => dateTime().nullable()();
   BoolColumn get completed => boolean().withDefault(const Constant(false))();
   DateTimeColumn get completedAt => dateTime().nullable()();
@@ -35,20 +36,6 @@ class Tasks extends Table {
 
   @override
   Set<Column> get primaryKey => {taskId};
-}
-
-class Subtasks extends Table {
-  TextColumn get id => text()();
-  TextColumn get subtaskId => text()();
-  TextColumn get taskId => text()();
-  TextColumn get title => text()();
-  BoolColumn get completed => boolean().withDefault(const Constant(false))();
-  DateTimeColumn get completedAt => dateTime().nullable()();
-  DateTimeColumn get createdAt => dateTime()();
-  DateTimeColumn get updatedAt => dateTime()();
-
-  @override
-  Set<Column> get primaryKey => {subtaskId};
 }
 
 class Events extends Table {
@@ -151,7 +138,6 @@ class CompletionLogs extends Table {
 
 @DriftDatabase(tables: [
   Tasks,
-  Subtasks,
   Events,
   Reminders,
   Notes,
@@ -162,7 +148,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
   @override
-  int get schemaVersion => 5;
+  int get schemaVersion => 6;
 
   @override
   MigrationStrategy get migration {

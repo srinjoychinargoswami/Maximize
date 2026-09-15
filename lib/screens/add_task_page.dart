@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:kinetic/models/subtask_model.dart';
 import 'package:kinetic/utils/task_utils.dart';
 import 'package:uuid/uuid.dart';
 import 'package:kinetic/models/task_model.dart';
@@ -48,7 +47,7 @@ class _AddTaskPageState extends State<AddTaskPage> {
   String _reminderPreset = 'at_time';
 
   // Energy requirement field
-  int _energyRequired = 5; // Default to medium energy
+  int _energyRequired = 5;
 
   final List<Map<String, String>> _reminderPresets = [
     {'value': 'at_time', 'label': 'At time of task'},
@@ -59,9 +58,9 @@ class _AddTaskPageState extends State<AddTaskPage> {
     {'value': 'custom', 'label': 'Custom time'},
   ];
 
-  // Subtask management
-  List<SubtaskModel> _subtasks = [];
-  final TextEditingController _subtaskController = TextEditingController();
+  // Task content field
+  String _taskContent = '';
+  final TextEditingController _contentController = TextEditingController();
 
   @override
   void initState() {
@@ -95,29 +94,9 @@ class _AddTaskPageState extends State<AddTaskPage> {
       // Initialize energy requirement field
       _energyRequired = widget.task!.energyRequired;
 
-      // Use subtasks if already loaded, otherwise fetch them
-      if (widget.task!.subtasks != null && widget.task!.subtasks!.isNotEmpty) {
-        _subtasks = widget.task!.subtasks!;
-      } else {
-        _loadExistingSubtasks();
-      }
-    }
-  }
-
-  Future<void> _loadExistingSubtasks() async {
-    try {
-      final taskService = Provider.of<TaskService>(context, listen: false);
-      final existingSubtasks = await taskService.getSubtasks(widget.task!.id);
-
-      if (mounted) {
-        setState(() {
-          _subtasks = existingSubtasks;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        debugPrint('Error loading subtasks: $e');
-      }
+      // Initialize content field
+      _taskContent = widget.task!.content ?? '';
+      _contentController.text = _taskContent;
     }
   }
 
@@ -150,13 +129,13 @@ class _AddTaskPageState extends State<AddTaskPage> {
                 _buildPriorityDropdown(),
                 _buildDueDateField(),
                 const SizedBox(height: 16),
+                _buildSubtaskField(),
+                const SizedBox(height: 24),
+                _buildEnergyRequiredSection(), // NEW: Energy requirement section
+                const SizedBox(height: 16),
                 _buildRecurringSection(),
                 const SizedBox(height: 16),
                 _buildReminderSection(), //NEW: Reminder section
-                const SizedBox(height: 16),
-                _buildEnergyRequiredSection(), // NEW: Energy requirement section
-                const SizedBox(height: 16),
-                _buildSubtaskField(),
                 const SizedBox(height: 24),
                 _buildSubmitButton(),
               ],
@@ -333,13 +312,14 @@ class _AddTaskPageState extends State<AddTaskPage> {
   Widget _buildReminderSection() {
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 12.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             SwitchListTile(
-              title: const Text('Reminder', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-              subtitle: const Text('Get notified about this task'),
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Reminder', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+              subtitle: const Text('Get notified about this task', style: TextStyle(fontSize: 12)),
               value: _reminderEnabled,
               onChanged: (value) {
                 setState(() {
@@ -352,13 +332,14 @@ class _AddTaskPageState extends State<AddTaskPage> {
               },
             ),
             if (_reminderEnabled) ...[
-              const Divider(),
-              const SizedBox(height: 8),
-              const Text('Remind me:', style: TextStyle(fontWeight: FontWeight.w500)),
-              const SizedBox(height: 8),
+              const Divider(height: 12),
+              const Text('Remind me:', style: TextStyle(fontWeight: FontWeight.w500, fontSize: 12)),
+              const SizedBox(height: 4),
               ..._reminderPresets.map((preset) {
                 return RadioListTile<String>(
-                  title: Text(preset['label']!),
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(preset['label']!, style: const TextStyle(fontSize: 12)),
                   value: preset['value']!,
                   groupValue: _reminderPreset,
                   onChanged: (value) {
@@ -370,43 +351,45 @@ class _AddTaskPageState extends State<AddTaskPage> {
                 );
               }).toList(),
               if (_reminderPreset == 'custom') ...[
-                const SizedBox(height: 16),
+                const SizedBox(height: 8),
                 TextFormField(
                   decoration: const InputDecoration(
                     labelText: 'Custom Reminder Time',
-                    suffixIcon: Icon(Icons.access_time),
+                    suffixIcon: Icon(Icons.access_time, size: 18),
                     border: OutlineInputBorder(),
+                    contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
                   ),
                   readOnly: true,
                   onTap: _pickCustomReminderTime,
                   controller: TextEditingController(
-                    text: _reminderTime != null 
+                    text: _reminderTime != null
                         ? DateFormat('MMM dd, yyyy - hh:mm a').format(_reminderTime!)
                         : 'Tap to set time',
                   ),
                 ),
               ],
-              const SizedBox(height: 8),
-              if (_reminderTime != null)
+              if (_reminderTime != null) ...[
+                const SizedBox(height: 6),
                 Container(
-                  padding: const EdgeInsets.all(12),
+                  padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
                     color: Colors.blue.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(6),
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.notifications_active, color: Colors.blue, size: 20),
-                      const SizedBox(width: 8),
+                      const Icon(Icons.notifications_active, color: Colors.blue, size: 16),
+                      const SizedBox(width: 6),
                       Expanded(
                         child: Text(
                           'Reminder set for ${DateFormat('MMM dd, yyyy - hh:mm a').format(_reminderTime!)}',
-                          style: const TextStyle(fontSize: 13, color: Colors.blue),
+                          style: const TextStyle(fontSize: 11, color: Colors.blue),
                         ),
                       ),
                     ],
                   ),
                 ),
+              ],
             ],
           ],
         ),
@@ -693,72 +676,24 @@ class _AddTaskPageState extends State<AddTaskPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('Subtasks:', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        const Text('Task Details:', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
         const SizedBox(height: 8),
-        
-        // Display existing subtasks
-        if (_subtasks.isNotEmpty) ...[
-          Wrap(
-            spacing: 8.0,
-            runSpacing: 8.0,
-            children: _subtasks.map((subtask) {
-              return Chip(
-                avatar: subtask.completed 
-                    ? Icon(Icons.check_circle, size: 18, color: Colors.green[600])
-                    : Icon(Icons.radio_button_unchecked, size: 18, color: Colors.grey[600]),
-                label: Text(
-                  subtask.title,
-                  style: TextStyle(
-                    decoration: subtask.completed ? TextDecoration.lineThrough : null,
-                    color: subtask.completed ? Colors.grey[600] : null,
-                  ),
-                ),
-                onDeleted: () {
-                  setState(() {
-                    _subtasks.remove(subtask);
-                  });
-                },
-                backgroundColor: subtask.completed ? Colors.green[50] : null,
-              );
-            }).toList(),
+
+        TextField(
+          controller: _contentController,
+          decoration: const InputDecoration(
+            hintText: 'Add detailed notes, steps, or additional context...',
+            border: OutlineInputBorder(),
+            contentPadding: EdgeInsets.all(12),
           ),
-          const SizedBox(height: 12),
-        ],
-        
-        // Add new subtask
-        Row(
-          children: [
-            Expanded(
-              child: TextField(
-                controller: _subtaskController,
-                decoration: const InputDecoration(hintText: 'Enter new subtask'),
-                onSubmitted: (_) => _addNewSubtask(),
-              ),
-            ),
-            const SizedBox(width: 8),
-            ElevatedButton(
-              onPressed: _addNewSubtask,
-              child: const Text('Add Subtask'),
-            ),
-          ],
+          maxLines: 10,
+          minLines: 5,
+          onChanged: (value) {
+            setState(() => _taskContent = value);
+          },
         ),
       ],
     );
-  }
-
-  void _addNewSubtask() {
-    final title = _subtaskController.text.trim();
-    if (title.isNotEmpty) {
-      setState(() {
-        _subtasks.add(SubtaskModel(
-          id: const Uuid().v1(),
-          taskId: widget.task?.id ?? '',
-          title: title,
-          completed: false,
-        ));
-        _subtaskController.clear();
-      });
-    }
   }
 
   Widget _buildEnergyRequiredSection() {
@@ -859,10 +794,11 @@ class _AddTaskPageState extends State<AddTaskPage> {
             }
             
             try {
-              final taskModel = TaskModel(
+              var taskModel = TaskModel(
                 id: widget.task?.id ?? const Uuid().v1(),
                 title: _taskTitle,
                 description: _taskDescription,
+                content: _taskContent.isNotEmpty ? _taskContent : null,
                 dueDate: _dueDate,
                 completed: _completed,
                 category: _categories.join(', '),
@@ -889,28 +825,21 @@ class _AddTaskPageState extends State<AddTaskPage> {
               if (widget.task != null) {
                 // Update existing task with proper notification handling
                 final taskService = Provider.of<TaskService>(context, listen: false);
-                // Use TaskService (handles notifications automatically)
                 await taskService.updateTask(taskModel);
-
-                // Delete existing subtasks before inserting new ones
-                final existingSubtasks = await taskService.getSubtasks(taskModel.id);
-                for (var existingSubtask in existingSubtasks) {
-                  await taskService.deleteSubtask(existingSubtask.id);
-                }
               } else {
                 // Create new task with proper notification handling
                 final taskService = Provider.of<TaskService>(context, listen: false);
                 // Use TaskService (handles notifications automatically)
-                await taskService.addTask(
+                final createdTask = await taskService.addTask(
                   title: taskModel.title,
                   description: taskModel.description ?? '',
+                  content: _taskContent.isNotEmpty ? _taskContent : null,
                   dueDate: taskModel.dueDate,
                   completed: taskModel.completed,
                   category: taskModel.category ?? '',
                   priority: taskModel.priority,
                   pageId: taskModel.pageId != null ? int.tryParse(taskModel.pageId!) : null,
                   completedAt: taskModel.completedAt,
-                  subtasks: taskModel.subtasks,
                   isRecurring: taskModel.isRecurring ?? false,
                   recurrenceRule: taskModel.recurrenceRule,
                   recurrenceInterval: taskModel.recurrenceInterval,
@@ -926,17 +855,14 @@ class _AddTaskPageState extends State<AddTaskPage> {
                   reminderPreset: taskModel.reminderPreset,
                   energyRequired: taskModel.energyRequired,
                 );
+
+                // Use created task ID
+                if (createdTask != null) {
+                  taskModel = createdTask;
+                }
               }
 
-              // Save all subtasks
-              final taskService = Provider.of<TaskService>(context, listen: false);
-              for (var subtask in _subtasks) {
-                final updatedSubtask = subtask.copyWith(taskId: taskModel.id);
-                await taskService.insertSubtask(updatedSubtask);
-              }
-
-              // Fetch fresh task with subtasks
-              final freshTask = await taskService.getTaskById(taskModel.id);
+              final freshTask = taskModel;
 
               if (mounted) {
                 // Show scheduling suggestion for new tasks only

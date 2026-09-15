@@ -7,6 +7,7 @@ import 'package:kinetic/services/sync_service.dart';
 import 'package:kinetic/database/app_database.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
+import 'dart:async';
 
 class CustomScrollBehavior extends ScrollBehavior {
   @override
@@ -35,17 +36,25 @@ class NotesPageState extends State<NotesPage> {
   final TextEditingController _searchController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   String? _selectedCategory;
+  late StreamSubscription<void> _syncDownSubscription;
 
   @override
   void initState() {
     super.initState();
     _loadNotes();
+
+    // Listen for syncDown completion to refresh notes
+    _syncDownSubscription = SyncService().onSyncDownCompleted.listen((_) {
+      debugPrint('[NotesPage] syncDown completed - refreshing notes');
+      _loadNotes();
+    });
   }
 
   @override
   void dispose() {
     _searchController.dispose();
     _scrollController.dispose();
+    _syncDownSubscription.cancel();
     super.dispose();
   }
 

@@ -1,6 +1,5 @@
 import 'package:kinetic/database/app_database.dart';
 import 'package:kinetic/models/task_model.dart';
-import 'package:kinetic/models/subtask_model.dart';
 import 'package:kinetic/models/reminder_model.dart';
 import 'package:kinetic/services/completion_log_service.dart';
 import 'package:kinetic/services/energy_service.dart';
@@ -62,7 +61,7 @@ class TaskService {
     required String priority,
     int? pageId,
     DateTime? completedAt,
-    List<SubtaskModel>? subtasks,
+    String? content,
     bool isRecurring = false,
     String? recurrenceRule,
     int? recurrenceInterval,
@@ -85,13 +84,13 @@ class TaskService {
       id: taskId,
       title: title,
       description: description,
+      content: content,
       dueDate: dueDate,
       completed: completed,
       category: category,
       priority: priority,
       pageId: pageId?.toString(),
       completedAt: completedAt,
-      subtasks: subtasks,
       isRecurring: isRecurring,
       recurrenceRule: recurrenceRule,
       recurrenceInterval: recurrenceInterval,
@@ -330,10 +329,6 @@ class TaskService {
   Future<void> deleteTask(String taskId) async {
     try {
       await _cancelTaskNotification(taskId);
-      final subtasks = await getSubtasks(taskId);
-      for (final subtask in subtasks) {
-        await deleteSubtask(subtask.id);
-      }
       await _database.transaction(() async {
         await (_database.delete(_database.tasks)
               ..where((t) => t.taskId.equals(taskId)))
@@ -342,34 +337,9 @@ class TaskService {
       await WebPersistenceHelper.flush();
       WebPersistenceHelper.logPersistence('[TaskService] Task deleted: $taskId');
 
-      // Sync deletion to Supabase via HTTP
       await _sync.delete('tasks', taskId);
     } catch (e) {
       debugPrint('Error deleting task: $e');
-    }
-  }
-
-  Future<void> insertSubtask(SubtaskModel subtask) async {
-    try {
-      await _database.transaction(() async {
-        await _database.into(_database.subtasks).insert(
-          SubtasksCompanion(
-            id: Value(subtask.id),
-            subtaskId: Value(subtask.id),
-            taskId: Value(subtask.taskId),
-            title: Value(subtask.title),
-            completed: Value(subtask.completed),
-            completedAt: Value(subtask.completedAt),
-            createdAt: Value(subtask.createdAt),
-            updatedAt: Value(subtask.updatedAt),
-          ),
-        );
-      });
-      await WebPersistenceHelper.flush();
-      debugPrint('[TaskService] Subtask restored: ${subtask.title}');
-    } catch (e) {
-      debugPrint('Error inserting subtask: $e');
-      rethrow;
     }
   }
 
@@ -398,45 +368,9 @@ class TaskService {
       if (row == null) return null;
 
       final taskModel = _rowToModel(row);
-      final subtasks = await getSubtasks(id);
-      return taskModel.copyWith(subtasks: subtasks);
+      return taskModel;
     } catch (e) {
       debugPrint('Error fetching task by ID: $e');
-      return null;
-    }
-  }
-
-  Future<TaskModel?> getTaskWithSubtasks(String taskId) async {
-    try {
-      final task = await getTaskById(taskId);
-      if (task == null) return null;
-
-      final subtasks = await getSubtasks(taskId);
-      return task.copyWith(subtasks: subtasks);
-    } catch (e) {
-      debugPrint('Error fetching task with subtasks: $e');
-      return null;
-    }
-  }
-
-  Future<SubtaskModel?> getSubtaskById(String subtaskId) async {
-    try {
-      final row = await (_database.select(_database.subtasks)
-            ..where((s) => s.subtaskId.equals(subtaskId)))
-          .getSingleOrNull();
-      if (row == null) return null;
-
-      return SubtaskModel(
-        id: row.id,
-        taskId: row.taskId,
-        title: row.title,
-        completed: row.completed,
-        completedAt: row.completedAt,
-        createdAt: row.createdAt,
-        updatedAt: row.updatedAt,
-      );
-    } catch (e) {
-      debugPrint('Error fetching subtask by ID: $e');
       return null;
     }
   }
@@ -474,191 +408,6 @@ class TaskService {
     }
   }
 
-  Future<List<SubtaskModel>> getSubtasks(String taskId) async {
-    try {
-      final rows = await (_database.select(_database.subtasks)
-            ..where((s) => s.taskId.equals(taskId)))
-          .get();
-      return rows.map((row) => SubtaskModel(
-        id: row.id,
-        taskId: row.taskId,
-        title: row.title,
-        completed: row.completed,
-        completedAt: row.completedAt,
-        createdAt: row.createdAt,
-        updatedAt: row.updatedAt,
-      )).toList();
-    } catch (e) {
-      debugPrint('Error fetching subtasks: $e');
-      return [];
-    }
-  }
-
-  Future<int?> addSubtask(String taskId, {
-    required String title,
-    bool completed = false,
-    DateTime? completedAt,
-  }) async {
-    final subtask = SubtaskModel(
-      id: const Uuid().v1(),
-      taskId: taskId,
-      title: title,
-      completed: completed,
-      completedAt: completedAt,
-    );
-
-    try {
-      await insertSubtask(subtask);
-      return 1;
-    } catch (e) {
-      debugPrint('Error adding subtask: $e');
-      return null;
-    }
-  }
-
-  Future<void> updateSubtask(SubtaskModel subtask) async {
-    if (subtask.id.isEmpty) {
-      debugPrint('Error: Subtask ID cannot be empty for update.');
-      return;
-    }
-
-    try {
-      await _database.transaction(() async {
-        await (_database.update(_database.subtasks)
-              ..where((s) => s.subtaskId.equals(subtask.id)))
-            .write(SubtasksCompanion(
-              id: Value(subtask.id),
-              subtaskId: Value(subtask.id),
-              taskId: Value(subtask.taskId),
-              title: Value(subtask.title),
-              completed: Value(subtask.completed),
-              completedAt: Value(subtask.completedAt),
-              createdAt: Value(subtask.createdAt),
-              updatedAt: Value(DateTime.now()),
-            ));
-      });
-      await WebPersistenceHelper.flush();
-      WebPersistenceHelper.logPersistence('[TaskService] Subtask updated: ${subtask.id}');
-    } catch (e) {
-      debugPrint('Error updating subtask: $e');
-    }
-  }
-
-  Future<void> toggleSubtaskCompletion(String subtaskId) async {
-    try {
-      final subtask = await getSubtaskById(subtaskId);
-
-      if (subtask == null) {
-        debugPrint('Subtask with ID $subtaskId not found');
-        return;
-      }
-
-      final updatedSubtask = subtask.toggleCompletion();
-      await updateSubtask(updatedSubtask);
-    } catch (e) {
-      debugPrint('Error toggling subtask completion: $e');
-    }
-  }
-
-  Future<void> markSubtaskCompleted(String subtaskId) async {
-    try {
-      final subtask = await getSubtaskById(subtaskId);
-
-      if (subtask == null) {
-        debugPrint('Subtask with ID $subtaskId not found');
-        return;
-      }
-
-      if (!subtask.completed) {
-        final updatedSubtask = subtask.copyWith(
-          completed: true,
-          completedAt: DateTime.now(),
-        );
-        await updateSubtask(updatedSubtask);
-
-        try {
-          final parentTask = await getTaskById(subtask.taskId);
-          int? energyLevel;
-          String? moodTags;
-          String? privacyContext;
-          String? location;
-
-          final todayEntry = await _database.select(_database.energyEntries)
-              .get()
-              .then((entries) {
-            final now = DateTime.now();
-            try {
-              return entries.firstWhere((e) =>
-                e.timestamp.year == now.year &&
-                e.timestamp.month == now.month &&
-                e.timestamp.day == now.day
-              );
-            } catch (e) {
-              return null;
-            }
-          });
-
-          if (todayEntry != null) {
-            energyLevel = todayEntry.energyLevel;
-            moodTags = todayEntry.moodTags;
-            privacyContext = todayEntry.privacyContext;
-            location = todayEntry.location;
-          }
-
-          await CompletionLogService(_database).logCompletion(
-            taskId: subtaskId,
-            taskTitle: subtask.title,
-            isSubtask: true,
-            parentTaskTitle: parentTask?.title,
-            energyLevel: energyLevel,
-            moodTags: moodTags,
-            privacyContext: privacyContext,
-            location: location,
-          );
-        } catch (e) {
-          debugPrint('Error logging subtask completion: $e');
-        }
-      }
-    } catch (e) {
-      debugPrint('Error marking subtask as completed: $e');
-    }
-  }
-
-  Future<void> markSubtaskIncomplete(String subtaskId) async {
-    try {
-      final subtask = await getSubtaskById(subtaskId);
-
-      if (subtask == null) {
-        debugPrint('Subtask with ID $subtaskId not found');
-        return;
-      }
-
-      if (subtask.completed) {
-        final updatedSubtask = subtask.copyWith(
-          completed: false,
-          completedAt: null,
-        );
-        await updateSubtask(updatedSubtask);
-      }
-    } catch (e) {
-      debugPrint('Error marking subtask as incomplete: $e');
-    }
-  }
-
-  Future<void> deleteSubtask(String subtaskId) async {
-    try {
-      await _database.transaction(() async {
-        await (_database.delete(_database.subtasks)
-              ..where((s) => s.subtaskId.equals(subtaskId)))
-            .go();
-      });
-      await WebPersistenceHelper.flush();
-      WebPersistenceHelper.logPersistence('[TaskService] Subtask deleted: $subtaskId');
-    } catch (e) {
-      debugPrint('Error deleting subtask: $e');
-    }
-  }
-
   Future<Map<String, int>> getTaskStats() async {
     try {
       final tasks = await getTasks();
@@ -684,6 +433,7 @@ class TaskService {
       id: row.taskId,
       title: row.title,
       description: row.description,
+      content: row.content,
       dueDate: row.dueDate ?? DateTime.now(),
       completed: row.completed,
       category: row.category,
@@ -705,6 +455,7 @@ class TaskService {
       reminderEnabled: row.reminderEnabled,
       reminderTime: row.reminderTime,
       reminderPreset: row.reminderPreset,
+      energyRequired: row.energyRequired,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
     );
@@ -716,6 +467,7 @@ class TaskService {
       taskId: skipPrimaryKey ? const Value.absent() : Value(model.id),
       title: Value(model.title),
       description: Value(model.description),
+      content: Value(model.content),
       dueDate: Value(model.dueDate),
       completed: Value(model.completed),
       completedAt: Value(model.completedAt),
@@ -734,6 +486,7 @@ class TaskService {
       reminderEnabled: Value(model.reminderEnabled ?? false),
       reminderTime: Value(model.reminderTime),
       reminderPreset: Value(model.reminderPreset),
+      energyRequired: Value(model.energyRequired),
       pageId: Value(model.pageId),
       createdAt: Value(model.createdAt),
       updatedAt: Value(model.updatedAt),
@@ -746,6 +499,7 @@ class TaskService {
       final data = {
         'title': task.title,
         'description': task.description,
+        'content': task.content,
         'category': task.category,
         'priority': task.priority,
         'energyRequired': task.energyRequired ?? 5,

@@ -53,6 +53,8 @@ class TaskData {
     this.reminderTime,
     this.reminderPreset,
   });
+
+  String? get content => null;
 }
 
 class EventData {
@@ -196,8 +198,6 @@ class CompletionLogData {
   final String? description;
   final String? category;
   final String? priority;
-  final bool isSubtask;
-  final String? subtaskId;
   final String? parentTaskTitle;
   final DateTime completedAt;
   final String? notes;
@@ -215,8 +215,6 @@ class CompletionLogData {
     this.description,
     this.category,
     this.priority,
-    this.isSubtask = false,
-    this.subtaskId,
     this.parentTaskTitle,
     required this.completedAt,
     this.notes,

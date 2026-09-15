@@ -20,7 +20,6 @@ import 'package:kinetic/services/completion_log_service.dart';
 import 'package:kinetic/services/metrics_service.dart';
 import 'package:kinetic/database/app_database.dart' as db;
 import 'package:kinetic/models/task_model.dart';
-import 'package:kinetic/models/subtask_model.dart';
 import 'package:kinetic/models/event_model.dart' as event_model;
 import 'package:kinetic/models/reminder_model.dart';
 import 'package:kinetic/models/energy_model.dart';
@@ -895,38 +894,6 @@ class _OverviewPageState extends State<OverviewPage> {
                       ),
                       trailing: _buildPriorityIndicator(task.priority),
                     ),
-                    FutureBuilder<List<SubtaskModel>>(
-                      future: _taskService.getSubtasks(task.id),
-                      builder: (_, subSnap) {
-                        if (!subSnap.hasData || subSnap.data!.isEmpty) return const SizedBox.shrink();
-                        final subtasks = subSnap.data!;
-                        return Container(
-                          padding: const EdgeInsets.only(left: 16, right: 16, bottom: 8),
-                          child: Column(
-                            children: subtasks.map((subtask) => ListTile(
-                              dense: true,
-                              leading: SizedBox(
-                                height: 20,
-                                width: 20,
-                                child: Checkbox(
-                                  value: subtask.completed,
-                                  onChanged: (value) => _toggleSubtaskCompletion(subtask.id, value),
-                                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                ),
-                              ),
-                              title: Text(
-                                subtask.title,
-                                style: TextStyle(
-                                  color: Colors.grey[300],
-                                  fontSize: 14,
-                                  decoration: subtask.completed ? TextDecoration.lineThrough : null,
-                                ),
-                              ),
-                            )).toList(),
-                          ),
-                        );
-                      },
-                    ),
                   ],
                 ),
               );
@@ -1133,25 +1100,6 @@ class _OverviewPageState extends State<OverviewPage> {
     } catch (error) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Failed to update task: $error'), duration: Duration(seconds: 8)),
-      );
-    }
-  }
-
-  Future<void> _toggleSubtaskCompletion(String subtaskId, bool? isCompleted) async {
-    try {
-      if (isCompleted == true) {
-        await _taskService.markSubtaskCompleted(subtaskId);
-      } else {
-        final subtask = await _taskService.getSubtaskById(subtaskId);
-        if (subtask == null) return;
-        final updatedSubtask = subtask.copyWith(completed: false, completedAt: null);
-        await _taskService.updateSubtask(updatedSubtask);
-      }
-      // Refresh the entire page to update tasks and metrics
-      await _refreshData();
-    } catch (error) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to update subtask: $error'), duration: Duration(seconds: 8)),
       );
     }
   }
