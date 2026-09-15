@@ -53,7 +53,7 @@ class TaskService {
            date1.day == date2.day;
   }
 
-  Future<int?> addTask({
+  Future<TaskModel?> addTask({
     required String title,
     required String description,
     required DateTime dueDate,
@@ -123,7 +123,7 @@ class TaskService {
       await _syncTaskToSupabase('INSERT', task);
 
       await _scheduleTaskNotification(task);
-      return 1;
+      return task;
     } catch (e) {
       debugPrint('Error adding task: $e');
       return null;
