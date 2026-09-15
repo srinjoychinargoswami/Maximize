@@ -935,6 +935,9 @@ class _AddTaskPageState extends State<AddTaskPage> {
                 await taskService.insertSubtask(updatedSubtask);
               }
 
+              // Fetch fresh task with subtasks
+              final freshTask = await taskService.getTaskById(taskModel.id);
+
               if (mounted) {
                 // Show scheduling suggestion for new tasks only
                 if (widget.task == null) {
@@ -944,16 +947,16 @@ class _AddTaskPageState extends State<AddTaskPage> {
                   showDialog(
                     context: context,
                     builder: (context) => TaskSchedulingSuggestionScreen(
-                      task: taskModel,
+                      task: freshTask ?? taskModel,
                       currentEnergy: currentEnergy,
                     ),
                   ).then((_) {
                     if (mounted) {
-                      Navigator.pop(context, taskModel);
+                      Navigator.pop(context, freshTask ?? taskModel);
                     }
                   });
                 } else {
-                  Navigator.pop(context, taskModel);
+                  Navigator.pop(context, freshTask ?? taskModel);
                 }
               }
             } catch (e) {
