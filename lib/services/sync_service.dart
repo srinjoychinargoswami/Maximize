@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:kinetic/database/app_database.dart';
 import 'package:kinetic/services/encryption_service.dart';
 import 'package:drift/drift.dart' as drift;
+import 'package:kinetic/main.dart' as main_app;
 
 class SyncQueue {
   final String table;
@@ -45,9 +46,14 @@ class SyncQueue {
 
 class SyncService {
   static final SyncService _instance = SyncService._internal();
-  static const String _supabaseUrl = '';
-  static const String _anonKey = '';
   static const String _queueKey = 'sync_queue';
+
+  static String get _supabaseUrl {
+    final baseUrl = main_app.envVars['SUPABASE_URL'] ?? '';
+    return '$baseUrl/rest/v1';
+  }
+
+  static String get _anonKey => main_app.envVars['SUPABASE_ANON_KEY'] ?? '';
 
   factory SyncService() {
     return _instance;
@@ -172,15 +178,21 @@ class SyncService {
         if (encryptedData.containsKey(field) &&
             encryptedData[field] != null &&
             encryptedData[field] is String) {
-          encryptedData[field] =
-              await EncryptionService.instance.encryptString(encryptedData[field]);
-          debugPrint('[SyncService] 🔒 Encrypted field: $field');
+          try {
+            encryptedData[field] =
+                await EncryptionService.instance.encryptString(encryptedData[field]);
+            debugPrint('[SyncService] 🔒 Encrypted field: $field');
+          } catch (e) {
+            // If encryption fails, continue with unencrypted data
+            debugPrint('[SyncService] ⚠️ Could not encrypt $field: $e (continuing with unencrypted data)');
+          }
         }
       }
       return encryptedData;
     } catch (e) {
-      debugPrint('[SyncService] ⚠️ Encryption error: $e');
-      rethrow;
+      debugPrint('[SyncService] ⚠️ Encryption error: $e (returning unencrypted data)');
+      // Return original data if encryption fails completely
+      return data;
     }
   }
 
@@ -199,13 +211,15 @@ class SyncService {
                 await EncryptionService.instance.decryptString(decryptedData[field]);
             debugPrint('[SyncService] 🔓 Decrypted field: $field');
           } catch (e) {
-            debugPrint('[SyncService] Decryption failed for $field (may be plaintext): $e');
+            // If decryption fails, continue with encrypted data
+            debugPrint('[SyncService] ⚠️ Could not decrypt $field: $e (keeping as is)');
           }
         }
       }
       return decryptedData;
     } catch (e) {
-      debugPrint('[SyncService] ⚠️ Decryption error: $e');
+      debugPrint('[SyncService] ⚠️ Decryption error: $e (returning as is)');
+      // Return original data if decryption fails completely
       return data;
     }
   }

@@ -509,10 +509,8 @@ return matchesCategory && matchesPriority && matchesDueDate && matchesRecurrence
   }
 
   Widget _buildMainTaskTile(TaskModel task, bool isExpanded) {
-    return Container(
-      decoration: BoxDecoration(
-        color: task.completed ? Colors.grey[700] : null,
-      ),
+    return Material(
+      color: task.completed ? Colors.grey[700] : Colors.transparent,
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 12.0),
         leading: _buildTaskLeading(task),

@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:encrypt/encrypt.dart' as encrypt;
 import 'dart:convert';
+import 'package:kinetic/services/secure_storage_service.dart';
 
 /// Encryption Service - Handles AES-256 encryption/decryption of sensitive data
 /// All Firebase data is encrypted before upload and decrypted after download
@@ -16,19 +17,13 @@ class EncryptionService {
   bool get isInitialized => _isInitialized;
 
   /// Initialize encryption service with AES-256
-  /// Uses a default key - in production, should use platform-specific secure storage
+  /// Loads keys from SecureStorageService (device-encrypted storage)
   Future<void> initialize() async {
     if (_isInitialized) return;
 
     try {
-      // IMPORTANT: In production, store this key in:
-      // - iOS: Keychain
-      // - Android: Keystore
-      // - macOS: Keychain
-      // - Windows: Credential Manager
-      // For now using a derived key (NOT PRODUCTION SECURE)
-
-      const String masterKey = '';
+      // Get master key from secure storage (first run loads from .env)
+      final masterKey = await SecureStorageService.getMasterKey();
 
       // Ensure key is exactly 32 bytes (256 bits) for AES-256
       final keyBytes = utf8.encode(masterKey);
@@ -38,8 +33,8 @@ class EncryptionService {
       }
       final finalKey = paddedKey.sublist(0, 32);
 
-      // IV (Initialization Vector) - must be 16 bytes
-      const String ivString = '';
+      // Get IV from secure storage (first run loads from .env)
+      final ivString = await SecureStorageService.getEncryptionIV();
       final ivBytes = utf8.encode(ivString.padRight(16, '0').substring(0, 16));
 
       _key = encrypt.Key(Uint8List.fromList(finalKey));
@@ -47,7 +42,7 @@ class EncryptionService {
       _encrypter = encrypt.Encrypter(encrypt.AES(_key));
 
       _isInitialized = true;
-      debugPrint('[EncryptionService] Initialized AES-256 encryption');
+      debugPrint('[EncryptionService] Initialized AES-256 encryption with secure storage keys');
     } catch (e) {
       debugPrint('[EncryptionService] Initialization error: $e');
       rethrow;
