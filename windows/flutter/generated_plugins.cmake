@@ -8,6 +8,7 @@ list(APPEND FLUTTER_PLUGIN_LIST
   flutter_secure_storage_windows
   flutter_timezone
   screen_retriever
+  share_plus
   sqlite3_flutter_libs
   tray_manager
   url_launcher_windows

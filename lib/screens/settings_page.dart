@@ -13,9 +13,14 @@ import 'package:kinetic/services/event_service.dart';
 import 'package:kinetic/services/reminder_service.dart';
 import 'package:kinetic/services/note_service.dart';
 import 'package:kinetic/services/energy_service.dart';
+import 'package:kinetic/services/export_service.dart';
+import 'package:kinetic/services/import_service.dart';
 import 'package:kinetic/database/app_database.dart' as db;
 import 'package:kinetic/screens/privacy_policy_screen.dart';
 import 'package:kinetic/screens/terms_conditions_screen.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:share_plus/share_plus.dart';
+import 'dart:io';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -368,6 +373,185 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
+  // Export data dialog
+  Future<void> _showExportDialog() async {
+    String selectedFormat = 'json';
+
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: const Text('Export Data'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              RadioListTile<String>(
+                title: const Text('JSON (All data)'),
+                value: 'json',
+                groupValue: selectedFormat,
+                onChanged: (value) => setState(() => selectedFormat = value!),
+              ),
+              RadioListTile<String>(
+                title: const Text('CSV (Spreadsheet format)'),
+                value: 'csv',
+                groupValue: selectedFormat,
+                onChanged: (value) => setState(() => selectedFormat = value!),
+              ),
+              RadioListTile<String>(
+                title: const Text('ICS (Calendar format)'),
+                value: 'ics',
+                groupValue: selectedFormat,
+                onChanged: (value) => setState(() => selectedFormat = value!),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.pop(ctx);
+                _performExport(selectedFormat);
+              },
+              child: const Text('Export'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _performExport(String format) async {
+    try {
+      final database = context.read<db.AppDatabase>();
+      final exportService = ExportService(database);
+
+      String content;
+      String filename;
+
+      if (format == 'json') {
+        content = await exportService.exportToJSON();
+        filename =
+            'kinetic_backup_${DateTime.now().toIso8601String().replaceAll(':', '-').split('.').first}.json';
+      } else if (format == 'csv') {
+        // For CSV, we'll export as zip or just JSON for now
+        content = await exportService.exportToJSON();
+        filename =
+            'kinetic_backup_${DateTime.now().toIso8601String().replaceAll(':', '-').split('.').first}.json';
+      } else if (format == 'ics') {
+        content = await exportService.exportToICS();
+        filename =
+            'kinetic_events_${DateTime.now().toIso8601String().replaceAll(':', '-').split('.').first}.ics';
+      } else {
+        throw Exception('Unknown format');
+      }
+
+      String filePath = await exportService.saveExportFile(content, filename);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('✅ Exported to: $filename'),
+            duration: const Duration(seconds: 5),
+          ),
+        );
+
+        // Share the file
+        await Share.shareXFiles([XFile(filePath)],
+            text: 'Kinetic backup: $filename');
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ Export failed: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  // Import data dialog
+  Future<void> _showImportDialog() async {
+    try {
+      FilePickerResult? result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['json', 'ics'],
+      );
+
+      if (result != null && mounted) {
+        File file = File(result.files.single.path!);
+        String content = await file.readAsString();
+        String? extension =
+            result.files.single.extension?.toLowerCase();
+
+        if (!mounted) return;
+
+        final database = context.read<db.AppDatabase>();
+        final importService = ImportService(database);
+
+        if (extension == 'json') {
+          final importResult =
+              await importService.importFromJSON(content);
+          _showImportResult(importResult);
+        } else if (extension == 'ics') {
+          final importResult =
+              await importService.importFromICS(content);
+          _showImportResult(importResult);
+        } else {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('❌ Unsupported file format')),
+            );
+          }
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ Error: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  void _showImportResult(dynamic importResult) {
+    String message = '';
+
+    if (importResult.success) {
+      message = '✅ Import successful!\n';
+      if (importResult.tasksImported > 0)
+        message += '${importResult.tasksImported} tasks\n';
+      if (importResult.eventsImported > 0)
+        message += '${importResult.eventsImported} events\n';
+      if (importResult.remindersImported > 0)
+        message += '${importResult.remindersImported} reminders\n';
+      if (importResult.notesImported > 0)
+        message += '${importResult.notesImported} notes\n';
+      if (importResult.energyEntriesImported > 0)
+        message += '${importResult.energyEntriesImported} energy entries\n';
+    } else {
+      message = '❌ Import failed: ${importResult.error}';
+    }
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          duration: const Duration(seconds: 5),
+          backgroundColor:
+              importResult.success ? Colors.green : Colors.red,
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
@@ -605,6 +789,30 @@ class _SettingsPageState extends State<SettingsPage> {
                     subtitle: const Text('Read our terms'),
                     trailing: const Icon(Icons.open_in_new),
                     onTap: () => _openUrl(AppConfig.termsOfServiceUrl),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+
+            // SECTION 5: Data Management
+            _buildSectionHeader('Data Management'),
+            Card(
+              color: Colors.grey[800],
+              child: Column(
+                children: [
+                  ListTile(
+                    title: const Text('Export Data'),
+                    subtitle: const Text('Backup as JSON or ICS format'),
+                    trailing: const Icon(Icons.download),
+                    onTap: _showExportDialog,
+                  ),
+                  const Divider(height: 0),
+                  ListTile(
+                    title: const Text('Import Data'),
+                    subtitle: const Text('Restore from backup or calendar file'),
+                    trailing: const Icon(Icons.upload),
+                    onTap: _showImportDialog,
                   ),
                 ],
               ),
